@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: trackit-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trackit
+      POSTGRES_PASSWORD: trackit_dev
+      POSTGRES_DB: trackit
+    ports:
+      - "5432:5432"
+    volumes:
+      - trackit_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trackit -d trackit"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trackit-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://trackit:trackit_dev@db:5432/trackit
+      SECRET_KEY: ${SECRET_KEY:-dev_secret_change_me}
+      FERNET_KEY: ${FERNET_KEY:-}
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+      MOBILE_RETURN_SCHEME: ${MOBILE_RETURN_SCHEME:-trackit}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      REFRESH_TOKEN_EXPIRE_DAYS: "30"
+      CORS_ORIGINS: "*"
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  trackit_pg_data:

@@ -1,0 +1,4 @@
+Async Alembic environment for TrackIt. Run from backend/ root:
+
+    alembic upgrade head
+    alembic revision --autogenerate -m "your message"

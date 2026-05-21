@@ -1,0 +1,45 @@
+Delivered-To: user@example.test
+Received: by 2002:a98:9acf:0:b0:268:7270:15ef with SMTP id q15csp110833eic;
+        Wed, 20 May 2026 18:27:40 -0700 (PDT)
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@clienteitau.co header.s=gvdmuhvjsymp3z4y2uhrecn4stunzq2b header.b=MO5KfJNO;
+       spf=pass (google.com: domain of 0100019e4825393a-0c9eee2c-2871-4d66-9a66-84e9e649c935-000000@amazonses.com designates 54.240.8.70 as permitted sender) smtp.mailfrom=0100019e4825393a-0c9eee2c-2871-4d66-9a66-84e9e649c935-000000@amazonses.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=clienteitau.co
+Return-Path: <0100019e4825393a-0c9eee2c-2871-4d66-9a66-84e9e649c935-000000@amazonses.com>
+From: notificaciones@clienteitau.co
+To: user@example.test
+Message-ID: <0100019e4825393a-0c9eee2c-2871-4d66-9a66-84e9e649c935-000000@email.amazonses.com>
+Subject: Notificaciones Itau
+MIME-Version: 1.0
+Content-Type: multipart/mixed;
+	boundary="----=_Part_30436_-807014280.1779326858228"
+Date: Thu, 21 May 2026 01:27:39 +0000
+Feedback-ID: ::1.us-east-1.Y5VXCNeYHXw2/HtX38//OjyP2U76TTwCUw8+E1whEUA=:AmazonSES
+X-SES-Outgoing: 2026.05.21-54.240.8.70
+
+------=_Part_30436_-807014280.1779326858228
+Content-Type: text/html; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+<html>
+	<body>
+		Estimado Sr(a). Juan Perez Test: <br/>
+		<table>
+			<tr>
+				<td>Se realiz&oacute; una compra en RAPPI COLOMBIA*DL desde tu Tarjeta Credito n&uacute;mero *****1234 de Ita&uacute: </td>
+			</tr>
+		</table> <br/>
+		<table>
+			<tr>
+				<td>Monto: </td>
+				<td>$26,300</td>
+			</tr>
+			<tr>
+				<td>Fecha y hora: </td>
+				<td>2026/05/20 20:27:37</td>
+			</tr>
+		</table> <br/><br/>
+		<small>Este mensaje ha sido enviado autom&aacute;ticamente, por favor no respondas a esta direcci&oacute;n de correo electr&oacute;nico.</small>
+</body>
+</html>
+------=_Part_30436_-807014280.1779326858228--

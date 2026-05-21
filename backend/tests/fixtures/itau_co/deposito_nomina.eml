@@ -1,0 +1,51 @@
+Delivered-To: user@example.test
+Received: by 2002:a05:7110:3492:b0:2fd:dfc1:eb2f with SMTP id q18csp97920ged;
+        Thu, 5 Mar 2026 12:20:06 -0800 (PST)
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@clienteitau.co header.s=2y6aq3ykldnjj3e74ucbafyajyf7thja header.b=TkrlQClw;
+       spf=pass (google.com: domain of 0100019cbfa84bc4-08267d52-f37d-4e53-b9b3-419b95d87172-000000@amazonses.com designates 54.240.8.59 as permitted sender) smtp.mailfrom=0100019cbfa84bc4-08267d52-f37d-4e53-b9b3-419b95d87172-000000@amazonses.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=clienteitau.co
+Return-Path: <0100019cbfa84bc4-08267d52-f37d-4e53-b9b3-419b95d87172-000000@amazonses.com>
+From: notificaciones@clienteitau.co
+To: user@example.test
+Message-ID: <0100019cbfa84bc4-08267d52-f37d-4e53-b9b3-419b95d87172-000000@email.amazonses.com>
+Subject: Notificaciones Itau
+MIME-Version: 1.0
+Content-Type: multipart/mixed;
+	boundary="----=_Part_2606049_272769530.1772742002337"
+Date: Thu, 5 Mar 2026 20:20:03 +0000
+Feedback-ID: ::1.us-east-1.Y5VXCNeYHXw2/HtX38//OjyP2U76TTwCUw8+E1whEUA=:AmazonSES
+X-SES-Outgoing: 2026.03.05-54.240.8.59
+
+------=_Part_2606049_272769530.1772742002337
+Content-Type: text/html; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+<html>
+	<body>
+		Estimado Sr(a). Perez
+		<br/>
+		<table><tr><td>
+		Se realiz&oacute; un dep&oacute;sito a tu Cuenta de Ahorros n&uacute;mero ***9999 de Ita&uacute;:
+		</td></tr></table>
+
+		<br/>
+			<table>
+				<tr>
+
+					<td>Monto:</td>
+					<td>$656,159</td>
+				</tr>
+				<tr>
+					<td>Fecha y hora: </td>
+					<td>2026/03/05 15:16:00</td>
+				</tr>
+
+			</table>
+		<br/>
+		<br/>
+<small>Este mensaje ha sido enviado autom&aacute;ticamente, por favor no respondas a esta direcci&oacute;n de correo electr&oacute;nico.</small>
+</body>
+</html>
+
+------=_Part_2606049_272769530.1772742002337--

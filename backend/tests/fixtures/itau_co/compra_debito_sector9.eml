@@ -1,0 +1,61 @@
+Delivered-To: user@example.test
+Received: by 2002:a98:9d88:0:b0:263:3e90:3737 with SMTP id l8csp491038eig;
+        Sat, 2 May 2026 01:43:43 -0700 (PDT)
+X-Received: by 2002:a05:6214:5013:b0:8ac:d145:79b5 with SMTP id 6a1803df08f44-8b66573a5bcmr28194236d6.1.1777711422778;
+        Sat, 02 May 2026 01:43:42 -0700 (PDT)
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@clienteitau.co header.s=2y6aq3ykldnjj3e74ucbafyajyf7thja header.b=CCB3YtZe;
+       dkim=pass header.i=@amazonses.com header.s=224i4yxa5dv7c2xz3womw6peuasteono header.b="sDM/phQq";
+       spf=pass (google.com: domain of 0100019de7db9b42-892ca323-8a2a-49d7-8f1b-ce7025fe76bf-000000@amazonses.com designates 54.240.8.70 as permitted sender) smtp.mailfrom=0100019de7db9b42-892ca323-8a2a-49d7-8f1b-ce7025fe76bf-000000@amazonses.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=clienteitau.co
+Return-Path: <0100019de7db9b42-892ca323-8a2a-49d7-8f1b-ce7025fe76bf-000000@amazonses.com>
+From: notificaciones@clienteitau.co
+To: user@example.test
+Message-ID: <0100019de7db9b42-892ca323-8a2a-49d7-8f1b-ce7025fe76bf-000000@email.amazonses.com>
+Subject: Notificaciones Itau
+MIME-Version: 1.0
+Content-Type: multipart/mixed;
+	boundary="----=_Part_1183_-448426596.1777711420922"
+Date: Sat, 2 May 2026 08:43:42 +0000
+Feedback-ID: ::1.us-east-1.Y5VXCNeYHXw2/HtX38//OjyP2U76TTwCUw8+E1whEUA=:AmazonSES
+X-SES-Outgoing: 2026.05.02-54.240.8.70
+
+------=_Part_1183_-448426596.1777711420922
+Content-Type: text/html; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+<html>
+	<body>
+		Estimado Sr(a). Juan Perez Test: <br/>
+		<table>
+			<tr>
+				<td>Se realiz&oacute; una compra en SECTOR 9 SAS desde tu Cuenta de Ahorros n&uacute;mero *****9999 de Ita&uacute: </td>
+			</tr>
+		</table> <br/>
+		<table>
+			<tr>
+				<td>Monto: </td>
+				<td>$17,000</td>
+			</tr>
+			<tr>
+				<td>Fecha y hora: </td>
+				<td>2026/05/02 03:43:36</td>
+			</tr>
+		</table> <br/><br/>
+		Cualquier inquietud, comun&iacute;cate con nuestro N&uacute;mero &Uacute;nico por ciudad:
+		<table width="660px">
+			<tr>
+				<td>Bogot&aacute; </td>
+				<td>581  8181</td>
+				<td>C/gena </td>
+				<td>693 1818</td>
+				<td>Medell&iacute;n </td>
+				<td> 604 1818</td>
+				<td>Cali  </td>
+				<td> 486 1818</td>
+			</tr>
+		</table>
+		<small>Este mensaje ha sido enviado autom&aacute;ticamente, por favor no respondas a esta direcci&oacute;n de correo electr&oacute;nico.</small>
+</body>
+</html>
+------=_Part_1183_-448426596.1777711420922--
