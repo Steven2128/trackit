@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     gmail_sync_default_lookback_days: int = 30
     gmail_sync_max_messages: int = 200
 
+    user_timezone: str = Field(default="America/Bogota")
+
     cors_origins: str = Field(default="*")
     log_level: str = Field(default="INFO")
 

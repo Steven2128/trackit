@@ -18,10 +18,24 @@ class TransactionOut(BaseModel):
     currency: str
     card_last_digits: str | None
     occurred_at: datetime
-    created_at: datetime
+
+
+class TransactionListResponse(BaseModel):
+    items: list[TransactionOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class CategorySummaryItem(BaseModel):
+    category: str | None
+    total: Decimal
+    count: int
 
 
 class TransactionSummary(BaseModel):
-    total_debit: Decimal = Decimal("0")
-    total_credit: Decimal = Decimal("0")
-    transaction_count: int = 0
+    month: str
+    total_spent: Decimal
+    total_received: Decimal
+    by_category: list[CategorySummaryItem]
+    transaction_count: int
