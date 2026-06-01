@@ -43,6 +43,7 @@ COLOMBIA_TZ = timezone(timedelta(hours=-5))
 
 class ItauCoParser(EmailParser):
     name = "itau_co"
+    sender_filter = ITAU_CO_SENDER
 
     _AMOUNT_RE = re.compile(r"Monto\s*:\s*\$([\d,]+(?:\.\d+)?)")
     _DATETIME_RE = re.compile(

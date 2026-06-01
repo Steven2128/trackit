@@ -3,8 +3,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
+from googleapiclient.errors import HttpError
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -16,6 +17,7 @@ from app.core.security import (
     encrypt_token,
 )
 from app.models.provider_connection import ProviderConnection, ProviderType
+from app.services.email_sync import sync_provider_connection
 from app.services.google_oauth import (
     GMAIL_READONLY_SCOPES,
     build_authorization_url,
@@ -171,6 +173,79 @@ async def gmail_callback(code: str, state: str, db: DbSession) -> RedirectRespon
     return RedirectResponse(deep_link, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
-@router.post("/sync", status_code=status.HTTP_202_ACCEPTED)
-async def gmail_sync(current_user: CurrentUser) -> dict[str, str]:
-    return {"status": "not_implemented", "endpoint": "POST /gmail/sync"}
+class SyncResponse(BaseModel):
+    processed: int
+    created: int
+    skipped_duplicate: int
+    skipped_no_parser: int
+    skipped_parser_returned_none: int
+    errors: int
+    last_sync_at: datetime | None
+
+
+@router.post("/sync", response_model=SyncResponse)
+async def gmail_sync(
+    current_user: CurrentUser,
+    db: DbSession,
+    days: int = Query(
+        default=None,
+        ge=1,
+        le=365,
+        description="Only used on the first sync; subsequent runs resume from last_sync_at.",
+    ),
+    max_messages: int = Query(default=None, ge=1, le=2000),
+) -> SyncResponse:
+    existing = await db.execute(
+        select(ProviderConnection).where(
+            ProviderConnection.user_id == current_user.id,
+            ProviderConnection.provider_type == ProviderType.gmail,
+        )
+    )
+    connection = existing.scalars().first()
+    if connection is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="no_gmail_connection",
+        )
+
+    lookback = days if days is not None else settings.gmail_sync_default_lookback_days
+    limit = (
+        max_messages if max_messages is not None else settings.gmail_sync_max_messages
+    )
+
+    try:
+        result = await sync_provider_connection(
+            db,
+            connection,
+            fallback_lookback_days=lookback,
+            max_messages=limit,
+        )
+    except HttpError as exc:
+        log.warning("Gmail API error during sync: %s", exc)
+        if exc.resp.status in (401, 403):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="gmail_reauth_required",
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="gmail_api_error",
+        ) from exc
+    except ValueError as exc:
+        # decrypt_token raises ValueError if the ciphertext is corrupt or the
+        # FERNET_KEY was rotated since the tokens were stored.
+        log.warning("Gmail sync token decrypt failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="gmail_reauth_required",
+        ) from exc
+
+    return SyncResponse(
+        processed=result.processed,
+        created=result.created,
+        skipped_duplicate=result.skipped_duplicate,
+        skipped_no_parser=result.skipped_no_parser,
+        skipped_parser_returned_none=result.skipped_parser_returned_none,
+        errors=result.errors,
+        last_sync_at=result.last_sync_at,
+    )

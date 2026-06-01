@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     google_client_id: str = Field(default="")
     google_client_secret: str = Field(default="")
 
+    gmail_sync_default_lookback_days: int = 30
+    gmail_sync_max_messages: int = 200
+
     cors_origins: str = Field(default="*")
     log_level: str = Field(default="INFO")
 

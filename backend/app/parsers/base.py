@@ -40,6 +40,7 @@ class EmailParser(ABC):
     """Base class for bank-specific email parsers."""
 
     name: str = "base"
+    sender_filter: str | None = None
 
     @abstractmethod
     def can_parse(self, envelope: EmailEnvelope) -> bool:
