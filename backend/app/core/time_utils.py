@@ -20,7 +20,8 @@ def current_month_local() -> str:
 
 def month_bounds(month: str) -> tuple[datetime, datetime]:
     """(start_inclusive, end_exclusive) as tz-aware datetimes for a YYYY-MM month."""
-    year, month_num = int(month[:4]), int(month[5:])
+    year_str, month_str = month.split("-")
+    year, month_num = int(year_str), int(month_str)
     tz = user_tz()
     start_local = datetime(year, month_num, 1, tzinfo=tz)
     if month_num == 12:
