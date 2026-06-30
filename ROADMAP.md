@@ -14,30 +14,37 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [x] Docker Compose + PostgreSQL
 - [x] FastAPI boilerplate
 - [x] Google OAuth (login + Gmail)
-- [ ] Parser de emails Itaú
-- [ ] Categorización automática
+- [x] Parser de emails Itaú (3 templates: compra, depósito, débito por canal)
+- [x] Gmail sync (`POST /gmail/sync` con dedupe por `raw_email_reference`)
+- [x] Categorización automática (reglas — IA planeada para Fase 4)
+- [x] Backfill CLI (`python -m app.scripts.recategorize`)
 - [ ] Dashboard mensual
 - [ ] Tracker de deudas
+- [ ] Pareo de transferencias (Itaú → Nequi/Daviplata/Falabella, ver PARSERS.md)
 
 ## Fase 1 — MVP (mes 1) 🚧
 
-### Sprint 3 — Parser + Categorización
+### Sprint 3 — Parser + Categorización ✅
 
-- [ ] Parser modular de emails Itaú Colombia
-- [ ] Extracción: monto, comercio, fecha, últimos dígitos de tarjeta, tipo (débito/crédito)
-- [ ] Categorización por reglas (supermercado → Food, Uber → Transport, etc.)
-- [ ] Endpoint GET /transactions con filtros por mes y categoría
-- [ ] Endpoint GET /transactions/summary
+- [x] Parser modular de emails Itaú Colombia
+- [x] Extracción: monto, comercio, fecha, últimos dígitos de tarjeta, tipo (débito/crédito)
+- [x] Gmail sync end-to-end con dedupe por `message_id`
+- [x] Categorización por reglas (7 categorías iniciales, case+accent-insensitive)
+- [x] Backfill CLI para recategorizar filas existentes
+- [x] Endpoint GET /transactions con filtros por mes y categoría
+- [x] Endpoint GET /transactions/summary
 
-### Sprint 4 — Dashboard + Deudas
+### Sprint 4 — Dashboard + Deudas 🚧
 
-- [ ] Dashboard: total gastado el mes, por categoría, tendencia
+- [ ] Dashboard backend: tendencia mensual (últimos 6 meses por categoría)
 - [ ] CRUD de deudas: banco, monto, tasa de interés, pago mínimo
 - [ ] Pantallas mobile: Dashboard, Transactions, DebtTracker
 - [ ] Sync automático con cron (cada 6 horas)
+- [ ] Transfer matcher (`app/services/transfer_matcher.py`) + migración `is_pairing_candidate` + `transfer_pair_id` (ver PARSERS.md)
 
 ## Fase 2 — Entender patrones (mes 2)
 
+- [ ] Reconciliación con extracto mensual Itaú: parser del email de cierre mensual + job que cruza contra la DB, marca diferencias y agrega lo que solo aparece ahí (intereses, comisiones, cuotas de manejo). Las notificaciones por transacción siguen siendo la fuente de tiempo real; el extracto es backfill autoritativo.
 - [ ] Presupuesto por categoría con alertas al 80% y 100%
 - [ ] Detector de suscripciones recurrentes
 - [ ] Resumen semanal automático (push notification o email)

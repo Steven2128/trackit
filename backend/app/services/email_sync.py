@@ -38,6 +38,7 @@ from app.integrations.gmail import (
 from app.models.provider_connection import ProviderConnection
 from app.models.transaction import Transaction
 from app.parsers import REGISTERED_PARSERS
+from app.services.categorizer import categorize
 from app.parsers.base import EmailEnvelope, EmailParser, ParsedTransaction
 
 log = logging.getLogger(__name__)
@@ -160,12 +161,13 @@ def _to_transaction(
     *,
     fallback_message_id: str,
 ) -> Transaction:
+    category = parsed.category if parsed.category is not None else categorize(parsed.merchant)
     return Transaction(
         user_id=connection.user_id,
         provider_connection_id=connection.id,
         amount=parsed.amount,
         merchant=parsed.merchant,
-        category=parsed.category,
+        category=category,
         transaction_type=parsed.transaction_type,
         currency=parsed.currency,
         card_last_digits=parsed.card_last_digits,

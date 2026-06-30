@@ -15,7 +15,7 @@ Cuando agregues un banco nuevo:
 
 | Banco / Proveedor      | País | Estado     | Sender                              | Parser                                |
 |------------------------|------|------------|-------------------------------------|---------------------------------------|
-| Itaú                   | CO   | WIP        | `notificaciones@clienteitau.co`     | `app/parsers/itau_co.py`              |
+| Itaú                   | CO   | Done       | `notificaciones@clienteitau.co`     | `app/parsers/itau_co.py`              |
 | Nequi                  | CO   | Backlog    | TBD — confirmar con email real      | `app/parsers/nequi.py` (TBD)          |
 | Daviplata              | CO   | Backlog    | TBD — confirmar con email real      | `app/parsers/daviplata.py` (TBD)      |
 | Banco Falabella        | CO   | Backlog    | TBD — confirmar con email real      | `app/parsers/falabella_co.py` (TBD)   |
@@ -35,9 +35,9 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 
 - **País**: Colombia
 - **Sender**: `notificaciones@clienteitau.co`
-- **Estado**: WIP
-- **Parser**: `backend/app/parsers/itau_co.py` (por crear)
-- **Fixtures**: `backend/tests/fixtures/itau_co/` (por crear)
+- **Estado**: Done (11/11 tests pasan, `tests/parsers/test_itau_co.py`)
+- **Parser**: `backend/app/parsers/itau_co.py`
+- **Fixtures**: `backend/tests/fixtures/itau_co/` (5 emails reales anonimizados)
 
 ### Tipos de notificación a soportar
 
@@ -60,16 +60,12 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 | `raw_email_reference`      | Gmail message ID — para dedupe                     |
 | `category`                 | Inicialmente null; se completa post-process        |
 
-### Gotchas conocidos (a confirmar con fixtures)
+### Gotchas conocidos
 
-- El monto puede venir como `$ 1.234.567,89` o `COP 1,234,567.89` según el template. Hay que soportar ambos formatos de separador.
-- Los emails de transferencia saliente incluyen el destinatario. Si matchea uno de los patrones de la tabla "Cuentas destino de transferencias propias", el parser debe marcar `category="transfer"`.
-- Notificaciones "informativas" (cambio de plan, vencimiento de tarjeta) NO deben generar transacciones — el parser debe descartarlas en `can_parse` o devolver `None` en `parse`.
-
-### Pendiente antes de empezar
-
-- [ ] Guardar 5-7 emails reales como fixtures. Casos: compra con tarjeta, transferencia a cuenta propia (Falabella o Nequi), transferencia a un tercero, transferencia recibida (nómina), retiro en cajero, email informativo (negativo).
-- [ ] Anonimizar los fixtures: reemplazar mi nombre, número de cuenta, últimos 4 dígitos con valores placeholder consistentes.
+- **Formato de monto solo soportado: gringo (`$18,800`).** Los fixtures reales que tenemos vienen así (coma = miles, punto = decimal opcional). El regex `_AMOUNT_RE` en `itau_co.py:47` y el `replace(",", "")` solo manejan ese formato. Si en algún momento Itaú manda un email con formato colombiano (`$1.234.567,89` — punto = miles, coma = decimal), el parser va a leer mal el monto. Pendiente: confirmar con más fixtures si ese formato existe; si aparece, agregar branch en `_extract_amount`.
+- Los emails de transferencia saliente NO incluyen destinatario (solo dicen `Canal: Portal Internet`). Se resuelve por pareo con notificaciones entrantes de Nequi/Daviplata/Falabella — ver "Pareo de transferencias" abajo.
+- Notificaciones "informativas" (cambio de plan, vencimiento de tarjeta) no generan transacción — el parser devuelve `None` cuando ningún template matchea. Cubierto por `test_no_recognized_template_returns_none`.
+- **Falta fixture de retiro en cajero**: el template 5 de PARSERS.md ("Retiro en cajero") aún no está cubierto por fixture ni test. Cuando aparezca un email real, hay que agregarlo y verificar si cae en `_DEBIT_RE` con `Canal: Cajero` o si requiere un template propio.
 
 ---
 
