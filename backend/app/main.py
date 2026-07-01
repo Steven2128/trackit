@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, debts, gmail, transactions
+from app.api.routes import auth, dashboard, debts, gmail, transactions
 from app.core.config import settings
 from app.core.logging import configure_logging
 
@@ -26,6 +26,7 @@ def create_app() -> FastAPI:
     app.include_router(gmail.router)
     app.include_router(transactions.router)
     app.include_router(debts.router)
+    app.include_router(dashboard.router)
 
     return app
 
