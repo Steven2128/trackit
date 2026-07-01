@@ -94,7 +94,9 @@ async def _fetch_trend(db: AsyncSession, user_id: UUID, trend_start: datetime) -
 async def _fetch_count(db: AsyncSession, user_id: UUID, current_month: str) -> int:
     month_start, month_end = month_bounds(current_month)
     result = await db.execute(
-        select(func.count()).where(
+        select(func.count())
+        .select_from(Transaction)
+        .where(
             Transaction.user_id == user_id,
             Transaction.occurred_at >= month_start,
             Transaction.occurred_at < month_end,
@@ -109,7 +111,9 @@ async def _fetch_debts(db: AsyncSession, user_id: UUID):
             func.count().label("debt_count"),
             func.coalesce(func.sum(Debt.total_amount), 0).label("total_debt"),
             func.coalesce(func.sum(Debt.minimum_payment), 0).label("total_min"),
-        ).where(Debt.user_id == user_id)
+        )
+        .select_from(Debt)
+        .where(Debt.user_id == user_id)
     )
     return result.one()
 
