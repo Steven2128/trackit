@@ -12,9 +12,11 @@ import asyncio
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi import APIRouter
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
@@ -65,7 +67,7 @@ async def get_dashboard(current_user: CurrentUser, db: DbSession) -> DashboardRe
     )
 
 
-async def _fetch_trend(db, user_id, trend_start: datetime):
+async def _fetch_trend(db: AsyncSession, user_id: UUID, trend_start: datetime) -> list:
     tz_str = settings.user_timezone
     local_ts = func.timezone(tz_str, func.timezone("UTC", Transaction.occurred_at))
     month_col = func.date_trunc("month", local_ts).label("month")
@@ -89,7 +91,7 @@ async def _fetch_trend(db, user_id, trend_start: datetime):
     return result.all()
 
 
-async def _fetch_count(db, user_id, current_month: str) -> int:
+async def _fetch_count(db: AsyncSession, user_id: UUID, current_month: str) -> int:
     month_start, month_end = month_bounds(current_month)
     result = await db.execute(
         select(func.count()).where(
@@ -101,7 +103,7 @@ async def _fetch_count(db, user_id, current_month: str) -> int:
     return result.scalar_one()
 
 
-async def _fetch_debts(db, user_id):
+async def _fetch_debts(db: AsyncSession, user_id: UUID):
     result = await db.execute(
         select(
             func.count().label("debt_count"),
