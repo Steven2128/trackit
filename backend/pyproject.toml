@@ -23,6 +23,7 @@ dependencies = [
     "google-api-python-client>=2.150",
     "httpx>=0.27",
     "python-multipart>=0.0.20",
+    "apscheduler>=3.10",
 ]
 
 [project.optional-dependencies]
