@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     gmail_sync_default_lookback_days: int = 30
     gmail_sync_max_messages: int = 200
 
+    sync_interval_hours: int = Field(default=6)
+    sync_scheduler_enabled: bool = Field(default=True)
+
     user_timezone: str = Field(default="America/Bogota")
 
     cors_origins: str = Field(default="*")
