@@ -16,9 +16,9 @@ Cuando agregues un banco nuevo:
 | Banco / Proveedor      | País | Estado     | Sender                              | Parser                                |
 |------------------------|------|------------|-------------------------------------|---------------------------------------|
 | Itaú                   | CO   | Done       | `notificaciones@clienteitau.co`     | `app/parsers/itau_co.py`              |
-| Nequi                  | CO   | Backlog    | TBD — confirmar con email real      | `app/parsers/nequi.py` (TBD)          |
-| Daviplata              | CO   | Backlog    | TBD — confirmar con email real      | `app/parsers/daviplata.py` (TBD)      |
-| Banco Falabella        | CO   | Backlog    | TBD — confirmar con email real      | `app/parsers/falabella_co.py` (TBD)   |
+| Nequi                  | CO   | Done       | `notificaciones@nequi.com.co`       | `app/parsers/nequi.py`                |
+| Daviplata              | CO   | Backlog    | Sin notificaciones por email (0 hits en 90 días) | `app/parsers/daviplata.py` (TBD) |
+| Banco Falabella        | CO   | Backlog    | Solo marketing observado (`contacto@co.bancofalabella.com`) | `app/parsers/falabella_co.py` (TBD) |
 
 > **Por qué parseamos los tres "destinos"**: Itaú no incluye el destinatario
 > cuando hacés una transferencia (solo dice "Débito · Canal: Portal Internet").
@@ -66,6 +66,31 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 - Los emails de transferencia saliente NO incluyen destinatario (solo dicen `Canal: Portal Internet`). Se resuelve por pareo con notificaciones entrantes de Nequi/Daviplata/Falabella — ver "Pareo de transferencias" abajo.
 - Notificaciones "informativas" (cambio de plan, vencimiento de tarjeta) no generan transacción — el parser devuelve `None` cuando ningún template matchea. Cubierto por `test_no_recognized_template_returns_none`.
 - **Falta fixture de retiro en cajero**: el template 5 de PARSERS.md ("Retiro en cajero") aún no está cubierto por fixture ni test. Cuando aparezca un email real, hay que agregarlo y verificar si cae en `_DEBIT_RE` con `Canal: Cajero` o si requiere un template propio.
+
+---
+
+## Nequi
+
+- **País**: Colombia
+- **Sender transaccional**: `notificaciones@nequi.com.co` — el marketing viene de `somos@nequi.com.co` / `somos@notificaciones.nequi.com.co` y `can_parse` lo rechaza.
+- **Estado**: Done (`tests/parsers/test_nequi.py`)
+- **Parser**: `backend/app/parsers/nequi.py`
+- **Fixtures**: `backend/tests/fixtures/nequi/` (anonimizados de emails reales; `recibiste_otro_banco.eml` es **sintético** — construido para fijar el comportamiento de no-candidato, no se observó un email real de otro banco).
+
+### Templates
+
+1. **"¡Recibiste plata por Bre-B!"** → `credit`, `merchant="Nequi"`.
+   Dice el banco origen ("desde el banco Itau") — si es Itaú se marca
+   `is_pairing_candidate=True` (autotransferencia a emparejar); cualquier
+   otro banco es ingreso de tercero, no candidato.
+2. **"¡Enviaste plata por Bre-B!"** → `debit`, `merchant=<destinatario>`.
+   Gasto real desde el saldo Nequi, no candidato.
+
+### Gotchas
+
+- **Monto en formato colombiano**: `1.647.000` (punto = miles, coma = decimal opcional, sin `$`) — al revés de Itaú que usa formato gringo.
+- **Fecha en español largo hora Bogotá**: "el 3 de julio de 2026 a las 3:07 p.m". Con la 1 en singular: "a la 1:55 p.m" — el regex acepta `a las?`.
+- Notificaciones de acceso ("Notificación de acceso a tu Nequi") no matchean ningún template → `None`.
 
 ---
 
@@ -119,10 +144,10 @@ Internet pre-existentes). El matcher está en
 `app/services/transfer_matcher.py` con la lógica de pareo pura
 (`pair_transfers`) testeada en `tests/services/test_transfer_matcher.py`.
 
-**Estado actual del pareo**: el lado débito (Itaú) está completo. El lado
-crédito espera los parsers de Nequi/Daviplata/Falabella — hasta que existan,
-no hay créditos candidatos y el matcher no encuentra parejas. Para
-implementarlos hacen falta emails reales (ver tabla de estado arriba).
+**Estado actual del pareo**: lado débito (Itaú) y lado crédito **Nequi**
+completos — el pareo Itaú→Nequi está activo end-to-end. Daviplata no manda
+notificaciones por email y de Falabella solo se observó marketing; esos dos
+lados crédito siguen pendientes de emails reales.
 
 ### Efectivo (caso especial)
 

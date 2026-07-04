@@ -1,11 +1,12 @@
 from app.parsers.base import EmailEnvelope, EmailParser, ParsedTransaction
 from app.parsers.itau_co import ItauCoParser
+from app.parsers.nequi import NequiParser
 
 REGISTERED_PARSERS: list[EmailParser] = [
     ItauCoParser(),
-    # NequiParser(),         # TODO: when we have Nequi email fixtures
-    # DaviplataParser(),     # TODO: when we have Daviplata email fixtures
-    # FalabellaCoParser(),   # TODO: when we have Falabella email fixtures
+    NequiParser(),
+    # DaviplataParser(),     # TODO: user has no Daviplata email notifications yet
+    # FalabellaCoParser(),   # TODO: only marketing emails observed; need transactional samples
 ]
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "EmailParser",
     "ParsedTransaction",
     "ItauCoParser",
+    "NequiParser",
     "REGISTERED_PARSERS",
 ]
