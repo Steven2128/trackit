@@ -20,7 +20,7 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [x] Backfill CLI (`python -m app.scripts.recategorize`)
 - [ ] Dashboard mensual
 - [ ] Tracker de deudas
-- [ ] Pareo de transferencias (Itaú → Nequi/Daviplata/Falabella, ver PARSERS.md)
+- [x] Pareo de transferencias Itaú → Nequi activo end-to-end (parser Nequi Bre-B + matcher). Daviplata/Falabella pendientes de notificaciones transaccionales reales (ver PARSERS.md)
 
 ## Fase 1 — MVP (mes 1) 🚧
 
