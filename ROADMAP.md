@@ -40,7 +40,7 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [ ] CRUD de deudas: banco, monto, tasa de interés, pago mínimo
 - [ ] Pantallas mobile: Dashboard, Transactions, DebtTracker
 - [x] Sync automático con cron (APScheduler en lifespan, `SYNC_INTERVAL_HOURS`, default 6h)
-- [ ] Transfer matcher (`app/services/transfer_matcher.py`) + migración `is_pairing_candidate` + `transfer_pair_id` (ver PARSERS.md)
+- [x] Transfer matcher (`app/services/transfer_matcher.py`) + migración `is_pairing_candidate` + `transfer_pair_id` — lado crédito inerte hasta tener parsers de Nequi/Daviplata/Falabella (ver PARSERS.md)
 
 ## Fase 2 — Entender patrones (mes 2)
 

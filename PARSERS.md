@@ -91,7 +91,7 @@ con los débitos genéricos de Itaú.
 2. Parser de Nequi (o Daviplata/Falabella) parsea el email entrante como
    `credit` con `merchant="Nequi"` (o el banco que corresponda), también
    marcado como pairing candidate.
-3. Después del sync, un job `app/services/transfer_matcher.py` (por crear):
+3. Después del sync, `app/services/transfer_matcher.py` (**implementado** — corre automáticamente al final de cada `sync_provider_connection`, manual y cron):
    - Toma todos los débitos sin emparejar con `merchant="Portal Internet"` de los últimos 7 días.
    - Toma todos los créditos sin emparejar con `merchant in ("Nequi", "Daviplata", "Banco Falabella")` del mismo período.
    - Empareja por **monto exacto** y **ventana de tiempo ±10 min**.
@@ -114,8 +114,15 @@ CREATE INDEX ix_transactions_pairing_candidate ON transactions(user_id, is_pairi
   WHERE is_pairing_candidate IS TRUE AND transfer_pair_id IS NULL;
 ```
 
-(Lo hacemos cuando lleguemos al paso 3 del pareo. Por ahora el parser deja
-todo listo para que el matcher trabaje después.)
+**Hecho** — migración `31074b1ae88b` (incluye backfill de débitos Portal
+Internet pre-existentes). El matcher está en
+`app/services/transfer_matcher.py` con la lógica de pareo pura
+(`pair_transfers`) testeada en `tests/services/test_transfer_matcher.py`.
+
+**Estado actual del pareo**: el lado débito (Itaú) está completo. El lado
+crédito espera los parsers de Nequi/Daviplata/Falabella — hasta que existan,
+no hay créditos candidatos y el matcher no encuentra parejas. Para
+implementarlos hacen falta emails reales (ver tabla de estado arriba).
 
 ### Efectivo (caso especial)
 

@@ -40,6 +40,7 @@ from app.models.provider_connection import ProviderConnection
 from app.models.transaction import Transaction
 from app.parsers import REGISTERED_PARSERS
 from app.services.categorizer import categorize
+from app.services.transfer_matcher import match_transfers
 from app.parsers.base import EmailEnvelope, EmailParser, ParsedTransaction
 
 log = logging.getLogger(__name__)
@@ -103,6 +104,12 @@ async def sync_provider_connection(
     connection.last_sync_at = datetime.now(timezone.utc)
     result.last_sync_at = connection.last_sync_at
     await db.commit()
+
+    try:
+        await match_transfers(db, connection.user_id)
+    except Exception:  # noqa: BLE001 — pairing is best-effort, never fail the sync
+        log.exception("transfer_matcher failed user_id=%s", connection.user_id)
+
     return result
 
 
