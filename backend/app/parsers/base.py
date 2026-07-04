@@ -34,6 +34,7 @@ class ParsedTransaction:
     currency: str = "USD"
     card_last_digits: str | None = None
     raw_email_reference: str | None = None
+    is_pairing_candidate: bool = False
 
 
 class EmailParser(ABC):

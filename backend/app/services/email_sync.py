@@ -182,6 +182,7 @@ def _to_transaction(
         card_last_digits=parsed.card_last_digits,
         occurred_at=parsed.occurred_at,
         raw_email_reference=parsed.raw_email_reference or fallback_message_id,
+        is_pairing_candidate=parsed.is_pairing_candidate,
     )
 
 

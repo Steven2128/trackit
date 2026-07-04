@@ -116,6 +116,14 @@ class TestParseGenericDebit:
         assert tx.card_last_digits == "9999"
         # No category yet — will be set to "transfer" later by the pairing job
         assert tx.category is None
+        assert tx.is_pairing_candidate is True
+
+    def test_purchase_is_not_pairing_candidate(self, parser: ItauCoParser) -> None:
+        envelope = load_eml_fixture("itau_co/compra_debito_rappi.eml")
+        tx = parser.parse(envelope)
+
+        assert tx is not None
+        assert tx.is_pairing_candidate is False
 
 
 class TestParseDateTimezone:

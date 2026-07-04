@@ -127,6 +127,10 @@ class ItauCoParser(EmailParser):
                 currency="COP",
                 card_last_digits=debit.group("digits")[-4:],
                 raw_email_reference=envelope.message_id,
+                # Outgoing transfers carry no recipient — only the channel. The
+                # transfer matcher pairs these against incoming credits from
+                # Nequi/Daviplata/Falabella. See PARSERS.md § Pareo.
+                is_pairing_candidate=channel == "Portal Internet",
             )
 
         return None
