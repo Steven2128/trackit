@@ -3,7 +3,18 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,6 +54,24 @@ class Transaction(Base):
     card_last_digits: Mapped[str | None] = mapped_column(String(4), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     raw_email_reference: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_pairing_candidate: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    transfer_pair_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_transactions_pairing_candidate",
+            "user_id",
+            "is_pairing_candidate",
+            "occurred_at",
+            postgresql_where=text(
+                "is_pairing_candidate IS TRUE AND transfer_pair_id IS NULL"
+            ),
+        ),
     )
