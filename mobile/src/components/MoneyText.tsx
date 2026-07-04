@@ -7,6 +7,7 @@ type Props = TextProps & {
   value: number | string | null | undefined;
   signed?: boolean;
   positive?: boolean;
+  negative?: boolean;
   size?: "sm" | "md" | "lg" | "xl";
 };
 
@@ -15,21 +16,22 @@ const SIZES: Record<NonNullable<Props["size"]>, number> = {
 };
 
 export default function MoneyText({
-  value, signed = false, positive = false, size = "md", style, ...rest
+  value, signed = false, positive = false, negative = false, size = "md", style, ...rest
 }: Props) {
   const text = formatCOP(value);
   const n = typeof value === "string" ? Number(value) : (value ?? 0);
-  const withSign = signed && n > 0 ? `+${text}` : text;
+  const prefix = negative ? "-" : signed && n > 0 ? "+" : "";
+  const color = negative
+    ? colors.danger
+    : positive
+      ? colors.success
+      : colors.textPrimary;
   return (
     <Text
       {...rest}
-      style={[
-        styles.base,
-        { fontSize: SIZES[size], color: positive ? colors.success : colors.textPrimary },
-        style,
-      ]}
+      style={[styles.base, { fontSize: SIZES[size], color }, style]}
     >
-      {withSign}
+      {`${prefix}${text}`}
     </Text>
   );
 }

@@ -28,6 +28,7 @@ export default function TransactionRow({ merchant, category, amount, type }: Pro
         value={amount}
         signed={isIncome}
         positive={isIncome}
+        negative={!isIncome}
         size="md"
       />
     </View>
