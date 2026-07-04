@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decrypt_token, encrypt_token
@@ -144,7 +145,15 @@ async def _process_message(
         result.skipped_parser_returned_none += 1
         return
 
-    db.add(_to_transaction(parsed, connection, fallback_message_id=message_id))
+    # Savepoint per insert: a concurrent sync (manual + cron overlap) can win
+    # the race after our dedupe SELECT; the unique index is the source of truth.
+    try:
+        async with db.begin_nested():
+            db.add(_to_transaction(parsed, connection, fallback_message_id=message_id))
+            await db.flush()
+    except IntegrityError:
+        result.skipped_duplicate += 1
+        return
     result.created += 1
 
 
