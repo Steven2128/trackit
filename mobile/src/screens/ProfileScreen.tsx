@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import GmailConnectCard from "../components/GmailConnectCard";
 import { useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
 
@@ -18,6 +19,8 @@ export default function ProfileScreen() {
       ) : (
         <Text style={styles.value}>No active session</Text>
       )}
+
+      <GmailConnectCard />
 
       <Pressable style={styles.signOut} onPress={() => clearSession()}>
         <Text style={styles.signOutText}>Sign out</Text>
