@@ -18,11 +18,11 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [x] Gmail sync (`POST /gmail/sync` con dedupe por `raw_email_reference`)
 - [x] Categorización automática (reglas — IA planeada para Fase 4)
 - [x] Backfill CLI (`python -m app.scripts.recategorize`)
-- [ ] Dashboard mensual (backend ✅ `GET /dashboard` — falta pantalla mobile)
-- [ ] Tracker de deudas (backend ✅ CRUD `/debts` — falta pantalla mobile)
+- [x] Dashboard mensual (backend `GET /dashboard` + pantalla mobile con dual hero y trend chart)
+- [x] Tracker de deudas (backend CRUD `/debts` + pantalla mobile con bottom sheet)
 - [x] Pareo de transferencias Itaú → Nequi activo end-to-end (parser Nequi Bre-B + matcher). Daviplata/Falabella pendientes de notificaciones transaccionales reales (ver PARSERS.md)
 
-## Fase 1 — MVP (mes 1) 🚧
+## Fase 1 — MVP (mes 1) ✅
 
 ### Sprint 3 — Parser + Categorización ✅
 
@@ -34,11 +34,11 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [x] Endpoint GET /transactions con filtros por mes y categoría
 - [x] Endpoint GET /transactions/summary
 
-### Sprint 4 — Dashboard + Deudas 🚧
+### Sprint 4 — Dashboard + Deudas ✅
 
 - [x] Dashboard backend: `GET /dashboard` — tendencia 6 meses, snapshot mes actual, totales de deuda (3 queries concurrentes)
 - [x] CRUD de deudas: banco, monto, tasa de interés, pago mínimo (`GET/POST /debts`, `PATCH/DELETE /debts/{id}`)
-- [ ] Pantallas mobile: Dashboard, DebtTracker (Transactions ya existe; ver `docs/superpowers/specs/2026-07-01-mobile-screens-design.md`)
+- [x] Pantallas mobile: Dashboard, Transactions, DebtTracker (react-query + chart-kit + bottom sheet; ver `docs/superpowers/specs/2026-07-01-mobile-screens-design.md`)
 - [x] Sync automático con cron (APScheduler en lifespan, `SYNC_INTERVAL_HOURS`, default 6h)
 - [x] Transfer matcher (`app/services/transfer_matcher.py`) + migración `is_pairing_candidate` + `transfer_pair_id` — lado crédito inerte hasta tener parsers de Nequi/Daviplata/Falabella (ver PARSERS.md)
 

@@ -9,17 +9,19 @@ export type CategoryDef = {
   color: string;
 };
 
+// Keys must match what the backend emits: categorizer.py rules plus
+// `transfer` (transfer_matcher) and `cash_withdrawal` (parsers).
+// Uncategorized rows arrive as null and render via FALLBACK.
 export const CATEGORIES: CategoryDef[] = [
   { key: "food", label: "Comida", icon: "restaurant", color: "#F2B441" },
   { key: "transport", label: "Transporte", icon: "car", color: "#5B8DEF" },
-  { key: "grocery", label: "Mercado", icon: "cart", color: "#3FB67C" },
+  { key: "bills", label: "Servicios", icon: "flash", color: "#3FB67C" },
+  { key: "shopping", label: "Compras", icon: "bag-handle", color: "#E88BB6" },
   { key: "health", label: "Salud", icon: "medkit", color: "#E5484D" },
   { key: "entertainment", label: "Entretenimiento", icon: "film", color: "#B98CF0" },
   { key: "subscriptions", label: "Suscripciones", icon: "repeat", color: "#5B8DEF" },
-  { key: "income", label: "Ingreso", icon: "trending-up", color: "#3FB67C" },
   { key: "transfer", label: "Transferencia", icon: "swap-horizontal", color: "#A3A8B3" },
   { key: "cash_withdrawal", label: "Retiro", icon: "cash", color: "#D9A053" },
-  { key: "other", label: "Otros", icon: "cube", color: "#A3A8B3" },
 ];
 
 const FALLBACK: CategoryDef = { key: "other", label: "Otros", icon: "cube", color: "#A3A8B3" };
