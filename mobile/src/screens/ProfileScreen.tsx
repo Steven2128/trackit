@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import GmailConnectCard from "../components/GmailConnectCard";
@@ -10,20 +11,28 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Profile</Text>
-      {user ? (
-        <>
-          <Text style={styles.label}>Signed in as</Text>
-          <Text style={styles.value}>{user.email}</Text>
-        </>
-      ) : (
-        <Text style={styles.value}>No active session</Text>
-      )}
+      <View style={styles.accountCard}>
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={22} color={colors.primary} />
+        </View>
+        <View style={styles.accountBody}>
+          <Text style={styles.accountName} numberOfLines={1}>
+            {user?.name ?? "Sin sesión"}
+          </Text>
+          <Text style={styles.accountEmail} numberOfLines={1}>
+            {user?.email ?? "—"}
+          </Text>
+        </View>
+      </View>
 
       <GmailConnectCard />
 
-      <Pressable style={styles.signOut} onPress={() => clearSession()}>
-        <Text style={styles.signOutText}>Sign out</Text>
+      <Pressable
+        style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
+        onPress={() => clearSession()}
+      >
+        <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+        <Text style={styles.signOutText}>Cerrar sesión</Text>
       </Pressable>
     </View>
   );
@@ -33,20 +42,40 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: 24,
+    padding: 16,
+  },
+  accountCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 16,
+    gap: 12,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: `${colors.primary}26`,
+    alignItems: "center",
     justifyContent: "center",
   },
-  title: { color: colors.textPrimary, fontSize: 28, fontWeight: "700", marginBottom: 24 },
-  label: { color: colors.textSecondary, fontSize: 12, marginBottom: 4 },
-  value: { color: colors.textPrimary, fontSize: 16, marginBottom: 48 },
+  accountBody: { flex: 1 },
+  accountName: { color: colors.textPrimary, fontSize: 16, fontWeight: "700" },
+  accountEmail: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
   signOut: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: 14,
     borderRadius: 10,
-    alignSelf: "flex-start",
+    marginTop: "auto",
   },
+  pressed: { opacity: 0.7 },
   signOutText: { color: colors.danger, fontSize: 14, fontWeight: "600" },
 });
