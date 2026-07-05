@@ -41,7 +41,7 @@ RULES: list[CategoryRule] = [
             "carulla", "exito", "jumbo", "olimpica", "ara", "d1", "justo",
             "rappi", "ifood", "didi food",
             "mcdonald", "burger king", "dominos", "kfc", "subway",
-            "restaurante", "panaderia", "cafeteria", "pizza",
+            "restaurante", "panaderia", "cafeteria", "pizza", "heladeria",
         ],
         "food",
     ),

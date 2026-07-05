@@ -45,6 +45,7 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 ## Fase 2 — Entender patrones (mes 2)
 
 - [ ] Reconciliación con extracto mensual Itaú: parser del email de cierre mensual + job que cruza contra la DB, marca diferencias y agrega lo que solo aparece ahí (intereses, comisiones, cuotas de manejo). Las notificaciones por transacción siguen siendo la fuente de tiempo real; el extracto es backfill autoritativo.
+  - [x] Versión CLI manual: `python -m app.scripts.reconcile_statement <csv> --account <n>` — cruza CSV del extracto por (fecha local ±1 día, monto, tipo), inserta faltantes con ref idempotente `statement:*`. CSVs en `backend/statements/` (gitignoreado). Falta: parser automático del email de cierre.
 - [ ] Presupuesto por categoría con alertas al 80% y 100%
 - [ ] Detector de suscripciones recurrentes
 - [ ] Resumen semanal automático (push notification o email)

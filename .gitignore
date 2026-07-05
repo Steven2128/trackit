@@ -55,3 +55,6 @@ backend/alembic/versions/__pycache__/
 
 # Superpowers session state
 .superpowers/
+
+# Personal bank statements (never commit)
+backend/statements/
