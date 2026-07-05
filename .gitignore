@@ -52,3 +52,6 @@ logs/
 
 # Alembic local
 backend/alembic/versions/__pycache__/
+
+# Superpowers session state
+.superpowers/
