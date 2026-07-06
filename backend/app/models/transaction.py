@@ -74,4 +74,13 @@ class Transaction(Base):
                 "is_pairing_candidate IS TRUE AND transfer_pair_id IS NULL"
             ),
         ),
+        # Dedupe guard used by email_sync; created in migration
+        # f1a3c2d4e5b6. Declared here so autogenerate doesn't drop it.
+        Index(
+            "ix_transactions_provider_email_uniq",
+            "provider_connection_id",
+            "raw_email_reference",
+            unique=True,
+            postgresql_where=text("raw_email_reference IS NOT NULL"),
+        ),
     )

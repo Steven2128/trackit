@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
+import BudgetsScreen from "../screens/BudgetsScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import DebtTrackerScreen from "../screens/DebtTrackerScreen";
 import ProfileScreen from "../screens/ProfileScreen";
@@ -10,6 +11,7 @@ import { colors } from "../theme/colors";
 export type AppTabParamList = {
   Dashboard: undefined;
   Transactions: undefined;
+  Budgets: undefined;
   DebtTracker: undefined;
   Profile: undefined;
 };
@@ -19,6 +21,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
 const TAB_ICONS: Record<keyof AppTabParamList, { active: IconName; inactive: IconName }> = {
   Dashboard: { active: "stats-chart", inactive: "stats-chart-outline" },
   Transactions: { active: "receipt", inactive: "receipt-outline" },
+  Budgets: { active: "pie-chart", inactive: "pie-chart-outline" },
   DebtTracker: { active: "card", inactive: "card-outline" },
   Profile: { active: "person-circle", inactive: "person-circle-outline" },
 };
@@ -58,6 +61,11 @@ export default function AppStack() {
         name="Transactions"
         component={TransactionsScreen}
         options={{ title: "Movimientos", tabBarLabel: "Movimientos" }}
+      />
+      <Tab.Screen
+        name="Budgets"
+        component={BudgetsScreen}
+        options={{ title: "Presupuesto", tabBarLabel: "Presupuesto" }}
       />
       <Tab.Screen
         name="DebtTracker"

@@ -12,6 +12,7 @@ import {
 import CategoryIcon from "../components/CategoryIcon";
 import MoneyText from "../components/MoneyText";
 import TrendChart from "../components/TrendChart";
+import { useBudgetStatus, type BudgetAlertStatus } from "../services/queries/budgets";
 import { useDashboard, type DashboardResponse } from "../services/queries/dashboard";
 import { colors } from "../theme/colors";
 import { getCategory } from "../utils/categories";
@@ -52,6 +53,15 @@ function DashboardContent({
   isRefetching: boolean;
 }) {
   const { current_month, debts, monthly_trend } = data;
+  const { data: budgetStatus } = useBudgetStatus();
+
+  const budgetAlertByCategory = useMemo(() => {
+    const map = new Map<string, BudgetAlertStatus>();
+    for (const item of budgetStatus?.items ?? []) {
+      if (item.status !== "ok") map.set(item.category, item.status);
+    }
+    return map;
+  }, [budgetStatus]);
 
   const sortedCategories = useMemo(() => {
     return [...current_month.by_category].sort(
@@ -110,7 +120,12 @@ function DashboardContent({
             <View key={`${c.category ?? "null"}-${i}`} style={styles.catRow}>
               <CategoryIcon categoryKey={c.category} />
               <View style={styles.catBody}>
-                <Text style={styles.catLabel}>{cat.label}</Text>
+                <Text style={styles.catLabel}>
+                  {cat.label}
+                  {c.category && budgetAlertByCategory.has(c.category)
+                    ? ` ${budgetAlertByCategory.get(c.category) === "exceeded" ? "🔴" : "⚠️"}`
+                    : ""}
+                </Text>
                 <Text style={styles.catCount}>{c.count} {c.count === 1 ? "tx" : "txs"}</Text>
               </View>
               <MoneyText value={c.total} size="md" />
