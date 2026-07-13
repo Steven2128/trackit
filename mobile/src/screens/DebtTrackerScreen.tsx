@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -75,7 +76,7 @@ export default function DebtTrackerScreen() {
         }
         ListHeaderComponent={
           <View style={styles.hero}>
-            <Text style={styles.heroLabel}>DEUDA TOTAL</Text>
+            <Text style={styles.heroLabel}>Deuda total</Text>
             <MoneyText value={totalDebt} size="xl" style={styles.heroMoney} />
             <Text style={styles.heroSub}>
               {count} {count === 1 ? "deuda" : "deudas"} · pago mínimo {" "}
@@ -86,9 +87,12 @@ export default function DebtTrackerScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyEmoji}>🎉</Text>
+            <Ionicons name="checkmark-done-circle" size={44} color={colors.success} />
             <Text style={styles.emptyText}>Sin deudas registradas</Text>
-            <Pressable style={styles.emptyBtn} onPress={openCreate}>
+            <Pressable
+              style={({ pressed }) => [styles.emptyBtn, pressed && styles.pressed]}
+              onPress={openCreate}
+            >
               <Text style={styles.emptyBtnText}>Agregar primera deuda</Text>
             </Pressable>
           </View>
@@ -97,8 +101,12 @@ export default function DebtTrackerScreen() {
       />
 
       {debts.length > 0 ? (
-        <Pressable style={styles.fab} onPress={openCreate}>
-          <Text style={styles.fabPlus}>+</Text>
+        <Pressable
+          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+          onPress={openCreate}
+          accessibilityLabel="Agregar deuda"
+        >
+          <Ionicons name="add" size={28} color="#fff" />
         </Pressable>
       ) : null}
 
@@ -133,39 +141,45 @@ const styles = StyleSheet.create({
   },
   retryText: { color: "#fff", fontWeight: "600" },
   list: { padding: 16, paddingBottom: 96 },
+  // Surface card with a red accent instead of a solid red block — the
+  // number carries the weight; a full red panel reads as a permanent alarm.
   hero: {
-    backgroundColor: colors.danger,
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.danger,
     padding: 16,
     marginBottom: 16,
   },
   heroLabel: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 10,
+    color: colors.textSecondary,
+    fontSize: 11,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  heroMoney: { color: "#fff", marginTop: 4 },
-  heroSub: { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 6 },
-  heroSubMoney: { color: "#fff", fontWeight: "600" },
+  heroMoney: { color: colors.danger, marginTop: 4 },
+  heroSub: { color: colors.textSecondary, fontSize: 12, marginTop: 6 },
+  heroSubMoney: { color: colors.textPrimary, fontWeight: "600" },
   emptyBox: { alignItems: "center", paddingVertical: 40, gap: 12 },
-  emptyEmoji: { fontSize: 40 },
   emptyText: { color: colors.textSecondary, fontSize: 14 },
   emptyBtn: {
     marginTop: 8,
     backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   emptyBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  pressed: { opacity: 0.7 },
   fab: {
     position: "absolute",
     right: 16,
     bottom: 24,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
@@ -175,5 +189,5 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  fabPlus: { color: "#fff", fontSize: 28, fontWeight: "300", marginTop: -2 },
+  fabPressed: { opacity: 0.85, transform: [{ scale: 0.96 }] },
 });

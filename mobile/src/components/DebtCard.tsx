@@ -13,7 +13,10 @@ export default function DebtCard({ debt, onPress }: Props) {
   const rate = debt.interest_rate ? `${Number(debt.interest_rate)}% EA` : null;
   const min = debt.minimum_payment ? `Pago mín ${Number(debt.minimum_payment).toLocaleString("es-CO")}` : null;
   return (
-    <Pressable style={styles.card} onPress={() => onPress(debt)}>
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={() => onPress(debt)}
+    >
       <View style={styles.left}>
         <View style={styles.titleRow}>
           <Text style={styles.bank} numberOfLines={1}>{debt.bank_name}</Text>
@@ -35,16 +38,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderLeftWidth: 3,
     borderLeftColor: colors.danger,
     gap: 12,
   },
+  cardPressed: { opacity: 0.7 },
   left: { flex: 1 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  bank: { color: colors.textPrimary, fontSize: 14, fontWeight: "600" },
+  bank: { color: colors.textPrimary, fontSize: 15, fontWeight: "600" },
   pill: {
     backgroundColor: colors.surfaceMuted,
     paddingHorizontal: 6,

@@ -1,3 +1,6 @@
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMemo } from "react";
 import {
   ActivityIndicator,
@@ -9,11 +12,15 @@ import {
   View,
 } from "react-native";
 
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import CategoryIcon from "../components/CategoryIcon";
 import MoneyText from "../components/MoneyText";
 import TrendChart from "../components/TrendChart";
+import type { AppStackParamList } from "../navigation/AppStack";
 import { useBudgetStatus, type BudgetAlertStatus } from "../services/queries/budgets";
 import { useDashboard, type DashboardResponse } from "../services/queries/dashboard";
+import { useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
 import { getCategory } from "../utils/categories";
 import { humanizeMonth } from "../utils/dates";
@@ -33,7 +40,10 @@ export default function DashboardScreen() {
     return (
       <View style={styles.centered}>
         <Text style={styles.errorText}>No pudimos cargar el dashboard.</Text>
-        <Pressable style={styles.retryBtn} onPress={() => refetch()}>
+        <Pressable
+          style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}
+          onPress={() => refetch()}
+        >
           <Text style={styles.retryText}>Reintentar</Text>
         </Pressable>
       </View>
@@ -54,6 +64,11 @@ function DashboardContent({
 }) {
   const { current_month, debts, monthly_trend } = data;
   const { data: budgetStatus } = useBudgetStatus();
+  const user = useAuthStore((s) => s.user);
+  const firstName = user?.name?.split(" ")[0];
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  // Screen hides the navigator header, so it must clear the notch itself.
+  const insets = useSafeAreaInsets();
 
   const budgetAlertByCategory = useMemo(() => {
     const map = new Map<string, BudgetAlertStatus>();
@@ -75,7 +90,7 @@ function DashboardContent({
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
       refreshControl={
         <RefreshControl
           refreshing={isRefetching}
@@ -84,9 +99,28 @@ function DashboardContent({
         />
       }
     >
+      <View style={styles.greeting}>
+        <View style={styles.greetingBody}>
+          <Text style={styles.greetingName}>
+            {firstName ? `Hola, ${firstName}` : "Hola"}
+          </Text>
+          <Text style={styles.greetingSub}>
+            Así van tus finanzas en {humanizeMonth(current_month.month)}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => navigation.navigate("Profile")}
+          hitSlop={8}
+          accessibilityLabel="Perfil"
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          <Ionicons name="person-circle-outline" size={32} color={colors.textPrimary} />
+        </Pressable>
+      </View>
+
       <View style={styles.heroRow}>
-        <View style={[styles.hero, styles.heroSpend]}>
-          <Text style={styles.heroLabel}>Gastado en {humanizeMonth(current_month.month)}</Text>
+        <View style={styles.hero}>
+          <Text style={styles.heroLabel}>Gastado este mes</Text>
           <MoneyText value={current_month.total_spent} size="lg" />
           <Text style={styles.heroMeta}>
             {current_month.transaction_count} transacciones
@@ -116,16 +150,21 @@ function DashboardContent({
       ) : (
         sortedCategories.map((c, i) => {
           const cat = getCategory(c.category);
+          const alert = c.category ? budgetAlertByCategory.get(c.category) : undefined;
           return (
             <View key={`${c.category ?? "null"}-${i}`} style={styles.catRow}>
               <CategoryIcon categoryKey={c.category} />
               <View style={styles.catBody}>
-                <Text style={styles.catLabel}>
-                  {cat.label}
-                  {c.category && budgetAlertByCategory.has(c.category)
-                    ? ` ${budgetAlertByCategory.get(c.category) === "exceeded" ? "🔴" : "⚠️"}`
-                    : ""}
-                </Text>
+                <View style={styles.catLabelRow}>
+                  <Text style={styles.catLabel}>{cat.label}</Text>
+                  {alert ? (
+                    <Ionicons
+                      name={alert === "exceeded" ? "alert-circle" : "warning"}
+                      size={14}
+                      color={alert === "exceeded" ? colors.danger : colors.warning}
+                    />
+                  ) : null}
+                </View>
                 <Text style={styles.catCount}>{c.count} {c.count === 1 ? "tx" : "txs"}</Text>
               </View>
               <MoneyText value={c.total} size="md" />
@@ -152,33 +191,45 @@ const styles = StyleSheet.create({
   retryBtn: {
     backgroundColor: colors.primary,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
   retryText: { color: "#fff", fontWeight: "600" },
+  pressed: { opacity: 0.7 },
+  greeting: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 12,
+  },
+  greetingBody: { flex: 1 },
+  greetingName: { color: colors.textPrimary, fontSize: 24, fontWeight: "700" },
+  greetingSub: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
   heroRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
   hero: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 14,
   },
-  heroSpend: {},
   heroDebt: { borderLeftWidth: 3, borderLeftColor: colors.danger },
   heroLabel: {
     color: colors.textSecondary,
-    fontSize: 10,
+    fontSize: 11,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     marginBottom: 6,
   },
-  heroMeta: { color: colors.textSecondary, fontSize: 11, marginTop: 4 },
+  heroMeta: { color: colors.textSecondary, fontSize: 12, marginTop: 4 },
   noDebt: { color: colors.success, fontSize: 16, fontWeight: "700", marginTop: 4 },
   sectionLabel: {
     color: colors.textSecondary,
-    fontSize: 10,
+    fontSize: 11,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     marginTop: 20,
     marginBottom: 8,
   },
@@ -186,13 +237,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 6,
     gap: 12,
   },
   catBody: { flex: 1 },
-  catLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: "600" },
-  catCount: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+  catLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  catLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: "600" },
+  catCount: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
   emptyCat: { color: colors.textSecondary, fontSize: 13, padding: 16, textAlign: "center" },
 });

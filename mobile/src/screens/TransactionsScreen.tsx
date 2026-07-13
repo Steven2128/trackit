@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -58,12 +59,22 @@ export default function TransactionsScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <Pressable onPress={() => setMonth((m) => shiftMonth(m, -1))} hitSlop={12}>
-          <Text style={styles.navArrow}>‹</Text>
+        <Pressable
+          onPress={() => setMonth((m) => shiftMonth(m, -1))}
+          hitSlop={12}
+          style={({ pressed }) => [styles.navBtn, pressed && styles.pressed]}
+          accessibilityLabel="Mes anterior"
+        >
+          <Ionicons name="chevron-back" size={20} color={colors.primary} />
         </Pressable>
         <Text style={styles.headerTitle}>{humanizeMonth(month)}</Text>
-        <Pressable onPress={() => setMonth((m) => shiftMonth(m, +1))} hitSlop={12}>
-          <Text style={styles.navArrow}>›</Text>
+        <Pressable
+          onPress={() => setMonth((m) => shiftMonth(m, +1))}
+          hitSlop={12}
+          style={({ pressed }) => [styles.navBtn, pressed && styles.pressed]}
+          accessibilityLabel="Mes siguiente"
+        >
+          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -139,7 +150,11 @@ function Chip({
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.chip, active && styles.chipActive]}
+      style={({ pressed }) => [
+        styles.chip,
+        active && styles.chipActive,
+        pressed && styles.pressed,
+      ]}
     >
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </Pressable>
@@ -156,17 +171,23 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  navArrow: { color: colors.primary, fontSize: 24, paddingHorizontal: 8 },
-  headerTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: "600" },
-  chipsRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
+  navBtn: { padding: 6 },
+  pressed: { opacity: 0.6 },
+  headerTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "700",
+    textTransform: "capitalize",
+  },
+  chipsRow: { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
   chip: {
     backgroundColor: colors.surfaceMuted,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
   },
   chipActive: { backgroundColor: colors.primary },
-  chipText: { color: colors.textSecondary, fontSize: 11 },
+  chipText: { color: colors.textSecondary, fontSize: 13 },
   chipTextActive: { color: "#fff", fontWeight: "600" },
   centered: {
     flex: 1,
@@ -187,9 +208,9 @@ const styles = StyleSheet.create({
   listContent: { padding: 16, paddingBottom: 32 },
   sectionHeader: {
     color: colors.textSecondary,
-    fontSize: 10,
+    fontSize: 11,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     marginTop: 12,
     marginBottom: 6,
   },

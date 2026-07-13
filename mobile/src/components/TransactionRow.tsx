@@ -24,11 +24,12 @@ export default function TransactionRow({ merchant, category, amount, type }: Pro
         </Text>
         <Text style={styles.cat}>{cat.label}</Text>
       </View>
+      {/* Income stands out in green; expenses stay neutral — red is reserved
+          for alerts and debt so every purchase doesn't read as a warning. */}
       <MoneyText
         value={amount}
         signed={isIncome}
         positive={isIncome}
-        negative={!isIncome}
         size="md"
       />
     </View>
@@ -40,12 +41,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     gap: 12,
   },
   body: { flex: 1 },
-  merchant: { color: colors.textPrimary, fontSize: 14, fontWeight: "600" },
-  cat: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+  merchant: { color: colors.textPrimary, fontSize: 15, fontWeight: "600" },
+  cat: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
 });

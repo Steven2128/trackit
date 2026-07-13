@@ -16,6 +16,8 @@ const chartConfig = {
   labelColor: (opacity = 1) => `rgba(163, 168, 179, ${opacity})`,
   propsForBackgroundLines: { stroke: colors.border },
   barPercentage: 0.6,
+  // BarChart only picks up formatYLabel from chartConfig (unlike LineChart's prop).
+  formatYLabel: (raw: string) => compactCOP(raw),
 };
 
 const MES_ABREV = [
@@ -26,6 +28,18 @@ const MES_ABREV = [
 function labelOf(yyyymm: string): string {
   const m = Number(yyyymm.split("-")[1]);
   return MES_ABREV[m - 1] ?? yyyymm;
+}
+
+// Raw COP values (7-8 digits) overflow the y-axis; compact them to $350k / $1,2M.
+function compactCOP(raw: string): string {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n === 0) return "0";
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `$${(Math.round(m * 10) / 10).toString().replace(".", ",")}M`;
+  }
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}k`;
+  return `$${Math.round(n)}`;
 }
 
 export default function TrendChart({ months, totals }: Props) {

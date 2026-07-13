@@ -1,5 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useNavigation } from "@react-navigation/native";
+import {
+  createNativeStackNavigator,
+  type NativeStackNavigationProp,
+} from "@react-navigation/native-stack";
+import { Pressable } from "react-native";
 
 import BudgetsScreen from "../screens/BudgetsScreen";
 import DashboardScreen from "../screens/DashboardScreen";
@@ -9,13 +15,18 @@ import SubscriptionsScreen from "../screens/SubscriptionsScreen";
 import TransactionsScreen from "../screens/TransactionsScreen";
 import { colors } from "../theme/colors";
 
+// Profile lives outside the tab bar (header avatar) to keep bottom nav at 5 items.
+export type AppStackParamList = {
+  Tabs: undefined;
+  Profile: undefined;
+};
+
 export type AppTabParamList = {
   Dashboard: undefined;
   Transactions: undefined;
   Budgets: undefined;
   Subscriptions: undefined;
   DebtTracker: undefined;
-  Profile: undefined;
 };
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -26,18 +37,33 @@ const TAB_ICONS: Record<keyof AppTabParamList, { active: IconName; inactive: Ico
   Budgets: { active: "pie-chart", inactive: "pie-chart-outline" },
   Subscriptions: { active: "repeat", inactive: "repeat-outline" },
   DebtTracker: { active: "card", inactive: "card-outline" },
-  Profile: { active: "person-circle", inactive: "person-circle-outline" },
 };
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
+const Stack = createNativeStackNavigator<AppStackParamList>();
 
-export default function AppStack() {
+export function HeaderAvatarButton() {
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  return (
+    <Pressable
+      onPress={() => navigation.navigate("Profile")}
+      hitSlop={8}
+      accessibilityLabel="Perfil"
+      style={({ pressed }) => [{ paddingHorizontal: 12 }, pressed && { opacity: 0.6 }]}
+    >
+      <Ionicons name="person-circle-outline" size={28} color={colors.textPrimary} />
+    </Pressable>
+  );
+}
+
+function Tabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerStyle: { backgroundColor: colors.background },
         headerTitleStyle: { color: colors.textPrimary, fontWeight: "700" },
         headerShadowVisible: false,
+        headerRight: () => <HeaderAvatarButton />,
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
@@ -58,7 +84,8 @@ export default function AppStack() {
       <Tab.Screen
         name="Dashboard"
         component={DashboardScreen}
-        options={{ title: "Inicio", tabBarLabel: "Inicio" }}
+        // The screen renders its own personalized greeting header (with avatar).
+        options={{ title: "Inicio", tabBarLabel: "Inicio", headerShown: false }}
       />
       <Tab.Screen
         name="Transactions"
@@ -80,11 +107,26 @@ export default function AppStack() {
         component={DebtTrackerScreen}
         options={{ title: "Deudas", tabBarLabel: "Deudas" }}
       />
-      <Tab.Screen
+    </Tab.Navigator>
+  );
+}
+
+export default function AppStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
+      <Stack.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ title: "Perfil", tabBarLabel: "Perfil" }}
+        options={{
+          title: "Perfil",
+          presentation: "modal",
+          headerStyle: { backgroundColor: colors.background },
+          headerTitleStyle: { color: colors.textPrimary, fontWeight: "700" },
+          headerTintColor: colors.primary,
+          headerShadowVisible: false,
+        }}
       />
-    </Tab.Navigator>
+    </Stack.Navigator>
   );
 }

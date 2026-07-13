@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -82,13 +83,21 @@ export default function BudgetsScreen() {
           <View style={styles.alertBox}>
             {alerts.map((a) => {
               const cat = getCategory(a.category);
+              const exceeded = a.status === "exceeded";
               return (
-                <Text key={a.category} style={styles.alertText}>
-                  {a.status === "exceeded" ? "🔴" : "⚠️"} {cat.label}:{" "}
-                  {a.status === "exceeded"
-                    ? `superaste el límite (${a.pct}%)`
-                    : `vas en ${a.pct}% del límite`}
-                </Text>
+                <View key={a.category} style={styles.alertRow}>
+                  <Ionicons
+                    name={exceeded ? "alert-circle" : "warning"}
+                    size={16}
+                    color={exceeded ? colors.danger : colors.warning}
+                  />
+                  <Text style={styles.alertText}>
+                    {cat.label}:{" "}
+                    {exceeded
+                      ? `superaste el límite (${a.pct}%)`
+                      : `vas en ${a.pct}% del límite`}
+                  </Text>
+                </View>
               );
             })}
           </View>
@@ -99,7 +108,7 @@ export default function BudgetsScreen() {
           return (
             <Pressable
               key={cat.key}
-              style={styles.row}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() =>
                 setEditing({ category: cat.key, limit: item?.monthly_limit ?? null })
               }
@@ -174,35 +183,37 @@ const styles = StyleSheet.create({
   retryText: { color: "#fff", fontWeight: "600" },
   monthLabel: {
     color: colors.textSecondary,
-    fontSize: 10,
+    fontSize: 11,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     marginBottom: 12,
   },
   alertBox: {
     backgroundColor: colors.surfaceMuted,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 12,
-    gap: 6,
+    gap: 8,
   },
-  alertText: { color: colors.textPrimary, fontSize: 13 },
+  alertRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  alertText: { color: colors.textPrimary, fontSize: 13, flex: 1 },
   row: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 6,
     gap: 12,
   },
+  rowPressed: { opacity: 0.7 },
   rowBody: { flex: 1, gap: 8 },
   rowTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  rowLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: "600" },
+  rowLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: "600" },
   rowAmounts: { color: colors.textPrimary, fontSize: 13 },
   noLimit: { color: colors.textSecondary, fontSize: 12 },
   barTrack: {

@@ -37,5 +37,7 @@ export default function MoneyText({
 }
 
 const styles = StyleSheet.create({
-  base: { fontWeight: "700" },
+  // tabular-nums keeps digit columns aligned in lists and prevents
+  // layout shift when values update.
+  base: { fontWeight: "700", fontVariant: ["tabular-nums"] },
 });
