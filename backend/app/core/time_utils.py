@@ -1,5 +1,5 @@
 # app/core/time_utils.py
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
@@ -47,6 +47,24 @@ def month_filter(month: str | None) -> list[ColumnElement]:
         Transaction.occurred_at >= start,
         Transaction.occurred_at < end,
     ]
+
+
+def last_completed_week_bounds(
+    reference: datetime | None = None,
+) -> tuple[datetime, datetime, date, date]:
+    """Monday 00:00 -> next Monday 00:00 (exclusive) of the week *before* the
+    one `reference` falls in, in user tz. Returns
+    (start, end, week_start_date, week_end_date) — week_end_date is the
+    Sunday, inclusive.
+
+    `reference` is injectable for tests; defaults to now in user tz.
+    """
+    tz = user_tz()
+    now = reference if reference is not None else datetime.now(tz)
+    this_monday = datetime(now.year, now.month, now.day, tzinfo=tz) - timedelta(days=now.weekday())
+    start = this_monday - timedelta(days=7)
+    end = this_monday
+    return start, end, start.date(), (end - timedelta(days=1)).date()
 
 
 def not_in_excluded(column: ColumnElement, excluded: tuple[str, ...]) -> ColumnElement:

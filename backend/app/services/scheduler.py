@@ -20,9 +20,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.core.time_utils import last_completed_week_bounds
 from app.db.session import AsyncSessionLocal
 from app.models.provider_connection import ProviderConnection, ProviderType
+from app.models.user import User
+from app.services.email_sender import send_email
 from app.services.email_sync import sync_provider_connection
+from app.services.weekly_summary import build_weekly_summary, render_weekly_summary_email
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +79,58 @@ async def sync_all_users_job() -> None:
         extra={
             "total": len(connection_ids),
             "ok": ok,
+            "failed": failed,
+            "duration_ms": duration_ms,
+        },
+    )
+
+
+async def send_weekly_summaries_job() -> None:
+    """Email every user their spending digest for the week that just ended.
+
+    Same isolation pattern as `sync_all_users_job`: one bad user (send
+    failure, DB error) never stops the batch. Users with zero transactions
+    in the window are skipped — no point emailing an empty summary.
+    """
+    started = time.monotonic()
+    week_start_at, week_end_at, week_start_date, week_end_date = last_completed_week_bounds()
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User.id))
+        user_ids = list(result.scalars())
+
+    ok = 0
+    skipped = 0
+    failed = 0
+    for user_id in user_ids:
+        async with AsyncSessionLocal() as db:
+            user = await db.get(User, user_id)
+            if user is None:
+                continue
+            try:
+                data = await build_weekly_summary(
+                    db, user.id, week_start_at, week_end_at, week_start_date, week_end_date
+                )
+                if data.transaction_count == 0:
+                    skipped += 1
+                    continue
+                subject, html = render_weekly_summary_email(data)
+                await send_email(user.email, subject, html)
+                ok += 1
+            except Exception:  # noqa: BLE001 — one bad user must not stop the batch
+                log.exception(
+                    "send_weekly_summaries_job user_failed",
+                    extra={"user_id": str(user_id)},
+                )
+                failed += 1
+
+    duration_ms = int((time.monotonic() - started) * 1000)
+    log.info(
+        "send_weekly_summaries_job completed",
+        extra={
+            "total": len(user_ids),
+            "ok": ok,
+            "skipped": skipped,
             "failed": failed,
             "duration_ms": duration_ms,
         },
