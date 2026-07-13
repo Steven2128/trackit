@@ -2,14 +2,16 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
+from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, budgets, dashboard, debts, gmail, transactions
+from app.api.routes import auth, budgets, dashboard, debts, gmail, subscriptions, transactions
 from app.core.config import settings
 from app.core.logging import configure_logging
-from app.services.scheduler import build_scheduler, sync_all_users_job
+from app.core.time_utils import user_tz
+from app.services.scheduler import build_scheduler, send_weekly_summaries_job, sync_all_users_job
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +28,25 @@ async def lifespan(app: FastAPI):
             id="gmail_sync_all_users",
             replace_existing=True,
         )
+        if settings.weekly_summary_enabled:
+            scheduler.add_job(
+                send_weekly_summaries_job,
+                CronTrigger(
+                    day_of_week=settings.weekly_summary_day_of_week,
+                    hour=settings.weekly_summary_hour,
+                    timezone=user_tz(),
+                ),
+                id="weekly_summary",
+                replace_existing=True,
+            )
+            log.info(
+                "weekly_summary_scheduled",
+                extra={
+                    "day_of_week": settings.weekly_summary_day_of_week,
+                    "hour": settings.weekly_summary_hour,
+                },
+            )
+
         scheduler.start()
         log.info(
             "sync_scheduler_started",
@@ -63,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(debts.router)
     app.include_router(dashboard.router)
     app.include_router(budgets.router)
+    app.include_router(subscriptions.router)
 
     return app
 

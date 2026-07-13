@@ -5,6 +5,7 @@ import BudgetsScreen from "../screens/BudgetsScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import DebtTrackerScreen from "../screens/DebtTrackerScreen";
 import ProfileScreen from "../screens/ProfileScreen";
+import SubscriptionsScreen from "../screens/SubscriptionsScreen";
 import TransactionsScreen from "../screens/TransactionsScreen";
 import { colors } from "../theme/colors";
 
@@ -12,6 +13,7 @@ export type AppTabParamList = {
   Dashboard: undefined;
   Transactions: undefined;
   Budgets: undefined;
+  Subscriptions: undefined;
   DebtTracker: undefined;
   Profile: undefined;
 };
@@ -22,6 +24,7 @@ const TAB_ICONS: Record<keyof AppTabParamList, { active: IconName; inactive: Ico
   Dashboard: { active: "stats-chart", inactive: "stats-chart-outline" },
   Transactions: { active: "receipt", inactive: "receipt-outline" },
   Budgets: { active: "pie-chart", inactive: "pie-chart-outline" },
+  Subscriptions: { active: "repeat", inactive: "repeat-outline" },
   DebtTracker: { active: "card", inactive: "card-outline" },
   Profile: { active: "person-circle", inactive: "person-circle-outline" },
 };
@@ -66,6 +69,11 @@ export default function AppStack() {
         name="Budgets"
         component={BudgetsScreen}
         options={{ title: "Presupuesto", tabBarLabel: "Presupuesto" }}
+      />
+      <Tab.Screen
+        name="Subscriptions"
+        component={SubscriptionsScreen}
+        options={{ title: "Suscripciones", tabBarLabel: "Suscripciones" }}
       />
       <Tab.Screen
         name="DebtTracker"

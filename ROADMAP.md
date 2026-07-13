@@ -44,11 +44,12 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 
 ## Fase 2 — Entender patrones (mes 2)
 
-- [ ] Reconciliación con extracto mensual Itaú: parser del email de cierre mensual + job que cruza contra la DB, marca diferencias y agrega lo que solo aparece ahí (intereses, comisiones, cuotas de manejo). Las notificaciones por transacción siguen siendo la fuente de tiempo real; el extracto es backfill autoritativo.
-  - [x] Versión CLI manual: `python -m app.scripts.reconcile_statement <csv> --account <n>` — cruza CSV del extracto por (fecha local ±1 día, monto, tipo), inserta faltantes con ref idempotente `statement:*`. CSVs en `backend/statements/` (gitignoreado). Falta: parser automático del email de cierre.
+- [x] Reconciliación con extracto mensual Itaú: parser del email de cierre mensual + job que cruza contra la DB, marca diferencias y agrega lo que solo aparece ahí (intereses, comisiones, cuotas de manejo). Las notificaciones por transacción siguen siendo la fuente de tiempo real; el extracto es backfill autoritativo.
+  - [x] Versión CLI manual: `python -m app.scripts.reconcile_statement <csv> --account <n>` — cruza CSV del extracto por (fecha local ±1 día, monto, tipo), inserta faltantes con ref idempotente `statement:*`. CSVs en `backend/statements/` (gitignoreado).
+  - [x] Parser automático: `POST /gmail/sync-statements` detecta el email de `extractos@clienteitau.co`, baja el PDF adjunto (protegido con cédula vía `ITAU_STATEMENT_PDF_PASSWORD`), extrae movimientos (`app/parsers/itau_statement.py`) y reconcilia (`app/services/statement_reconciler.py`, compartido con el CLI). Ver "Extracto mensual Itaú" en `PARSERS.md` para gotchas (fuente CID rota en páginas de encabezado, periodo inferido de la fecha del email).
 - [x] Presupuesto por categoría con alertas al 80% y 100% — tabla `budgets` (unique user+category), `PUT/DELETE /budgets/{category}` + `GET /budgets/status` (spent/pct/estado por mes local), tab mobile "Presupuesto" con barras de progreso y sheet de edición, badges ⚠️/🔴 en Dashboard. Alertas son in-app; push queda con "Resumen semanal".
-- [ ] Detector de suscripciones recurrentes
-- [ ] Resumen semanal automático (push notification o email)
+- [x] Detector de suscripciones recurrentes — `GET /subscriptions` (sin tabla nueva, calculado al vuelo como `/dashboard`): agrupa por comercio normalizado, clusteriza por monto (±10%) y detecta cadencia (semanal/quincenal/mensual/anual) solo si todos los gaps entre ocurrencias caen en la misma ventana (`app/services/subscription_detector.py`, lógica pura testeada). Tab mobile "Suscripciones" con total mensualizado estimado y próximo cobro por comercio.
+- [x] Resumen semanal automático (email) — cron `CronTrigger` lunes 8am hora local (`app/services/scheduler.py::send_weekly_summaries_job`), envía por usuario el resumen de la semana Mon-Sun anterior (gastado, recibido, breakdown por categoría) vía Resend (`app/services/email_sender.py`). Sin tabla nueva — se calcula al vuelo igual que dashboard/subscriptions. Salta usuarios sin actividad en la semana (no manda email vacío). Requiere `RESEND_API_KEY` en `.env`.
 - [ ] Estrategia de pago de deudas: modo avalancha vs bola de nieve
 
 ## Fase 3 — Construir hábitos (mes 3)
