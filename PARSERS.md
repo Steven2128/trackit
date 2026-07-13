@@ -170,6 +170,53 @@ los movimientos, solo que no inflen el total de gasto.
 
 ---
 
+## Extracto mensual Itaú (reconciliación automática)
+
+- **Sender**: `extractos@clienteitau.co`. **Asunto**: "Extractos Itaú" (no
+  confirmado el texto exacto — se detecta solo por sender).
+- **Estado**: Done. `app/parsers/itau_statement.py` (extracción del PDF) +
+  `app/services/statement_reconciler.py` (cruce/inserción, compartido con el
+  CLI manual) + `app/services/statement_sync.py` (orquestación email→PDF) +
+  endpoint `POST /gmail/sync-statements`.
+- **Adjunto**: PDF "Multiextracto de Ahorros", protegido con contraseña =
+  cédula del usuario (`ITAU_STATEMENT_PDF_PASSWORD` en `.env`, nunca en el repo/chat).
+  Un solo PDF trae **todas** las cuentas de ahorro del usuario (en el fixture
+  real: 3 cuentas, solo 1 con movimientos); se reconcilian todas las que
+  tengan filas.
+
+### Gotchas conocidos
+
+- **Las páginas de encabezado del PDF (número de cuenta, "Fecha inicio/fin")
+  usan una fuente embebida con ToUnicode CMap roto** — `pdfplumber` solo ve
+  glifos `(cid:NN)` ahí, no texto legible. Por eso el extractor **no** lee
+  cuenta/periodo de esas páginas:
+  - **Cuenta**: se toma de la página resumen (página 1), que sí tiene texto
+    legible y lista las cuentas en el mismo orden en que aparecen las
+    secciones de tabla más adelante.
+  - **Periodo (mes/año)**: no es recuperable del PDF. Se asume que el
+    extracto de cierre del mes M llega por email a comienzos del mes M+1
+    (confirmado por el usuario: extracto de junio llegó el 02 de julio) —
+    `app/services/statement_sync.py::_statement_period` resta un mes a la
+    fecha de recepción del email. Si Itaú cambia el timing de envío, esto
+    hay que ajustarlo.
+- Encabezados de la tabla ("Retiros", "Depósitos", etc.) a veces se
+  renderizan con cada carácter duplicado (falso-negrita, ej.
+  `"RReettiirrooss"`) en la primera página de cada sección; páginas de
+  continuación los renderizan planos. El extractor matchea ambas formas.
+- Columna Retiros/Depósitos: el monto no lleva signo, se clasifica por
+  **posición x** relativa al punto medio entre ambos headers. Verificado
+  contra los totales oficiales del extracto (saldo anterior + créditos −
+  débitos = saldo final, al centavo) sobre el fixture real de junio 2026.
+- Asume exactamente un token de "Número de Documento" por fila (siempre `"0"`
+  en los fixtures observados) — si algún día viene poblado con texto real,
+  la heurística de columna de descripción (`line[2:]`) se rompe.
+- El fixture PDF real tiene PII (nombre, email, cuentas) — está gitignoreado
+  (`backend/tests/fixtures/itau_co_extracto/*.pdf`). Los tests
+  (`tests/parsers/test_itau_statement.py`) generan un PDF sintético con
+  `reportlab` en tiempo de test, no dependen del archivo real.
+
+---
+
 ## Convenciones del dispatcher
 
 El componente que despacha emails a parsers (a implementar como parte del

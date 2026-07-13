@@ -1,9 +1,21 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
 from app.models.transaction import TransactionType
+
+
+@dataclass
+class EmailAttachment:
+    """Metadata for one attachment part — bytes are fetched lazily via
+    `GmailClient.get_attachment(message_id, attachment_id)`, since Gmail
+    returns attachment data as a separate API call."""
+
+    filename: str
+    mime_type: str
+    attachment_id: str
+    size: int
 
 
 @dataclass
@@ -22,6 +34,7 @@ class EmailEnvelope:
     received_at: datetime
     html_body: str | None = None
     text_body: str | None = None
+    attachments: list[EmailAttachment] = field(default_factory=list)
 
 
 @dataclass

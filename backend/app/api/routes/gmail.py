@@ -24,6 +24,7 @@ from app.services.google_oauth import (
     exchange_code_for_tokens,
     verify_id_token,
 )
+from app.services.statement_sync import sync_statements
 
 router = APIRouter(prefix="/gmail", tags=["gmail"])
 log = logging.getLogger(__name__)
@@ -248,4 +249,83 @@ async def gmail_sync(
         skipped_parser_returned_none=result.skipped_parser_returned_none,
         errors=result.errors,
         last_sync_at=result.last_sync_at,
+    )
+
+
+class StatementSyncResponse(BaseModel):
+    processed: int
+    accounts_reconciled: int
+    matched: int
+    inserted: int
+    skipped_no_attachment: int
+    errors: int
+    last_statement_sync_at: datetime | None
+
+
+@router.post("/sync-statements", response_model=StatementSyncResponse)
+async def gmail_sync_statements(
+    current_user: CurrentUser,
+    db: DbSession,
+    days: int = Query(
+        default=None,
+        ge=1,
+        le=365,
+        description=(
+            "Only used on the first statement sync; subsequent runs resume "
+            "from last_statement_sync_at."
+        ),
+    ),
+    max_messages: int = Query(default=None, ge=1, le=2000),
+) -> StatementSyncResponse:
+    existing = await db.execute(
+        select(ProviderConnection).where(
+            ProviderConnection.user_id == current_user.id,
+            ProviderConnection.provider_type == ProviderType.gmail,
+        )
+    )
+    connection = existing.scalars().first()
+    if connection is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="no_gmail_connection",
+        )
+
+    lookback = days if days is not None else settings.gmail_sync_default_lookback_days
+    limit = (
+        max_messages if max_messages is not None else settings.gmail_sync_max_messages
+    )
+
+    try:
+        result = await sync_statements(
+            db,
+            connection,
+            fallback_lookback_days=lookback,
+            max_messages=limit,
+        )
+    except HttpError as exc:
+        log.warning("Gmail API error during statement sync: %s", exc)
+        if exc.resp.status in (401, 403):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="gmail_reauth_required",
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="gmail_api_error",
+        ) from exc
+    except ValueError as exc:
+        log.warning("Statement sync token decrypt failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="gmail_reauth_required",
+        ) from exc
+
+    return StatementSyncResponse(
+        processed=result.processed,
+        accounts_reconciled=result.accounts_reconciled,
+        matched=result.matched,
+        inserted=result.inserted,
+        skipped_no_attachment=result.skipped_no_attachment,
+        errors=result.errors,
+        last_statement_sync_at=result.last_statement_sync_at,
     )

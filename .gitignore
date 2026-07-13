@@ -58,3 +58,7 @@ backend/alembic/versions/__pycache__/
 
 # Personal bank statements (never commit)
 backend/statements/
+
+# Real statement PDF fixtures (PII) — synthetic fixtures are committed instead
+backend/tests/fixtures/itau_co_extracto/*.pdf
+!backend/tests/fixtures/itau_co_extracto/synthetic_*.pdf

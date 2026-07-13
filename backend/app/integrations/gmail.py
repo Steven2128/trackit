@@ -24,7 +24,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 from app.core.config import settings
-from app.parsers.base import EmailEnvelope
+from app.parsers.base import EmailAttachment, EmailEnvelope
 
 GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"
 GMAIL_API_SCOPES = ("https://www.googleapis.com/auth/gmail.readonly",)
@@ -101,6 +101,19 @@ class GmailClient:
                 .execute()
             )
 
+    def get_attachment(self, message_id: str, attachment_id: str) -> bytes:
+        """Fetch attachment bytes — Gmail only inlines small parts; larger
+        ones (like statement PDFs) require this separate call."""
+        with self._refresh_guard():
+            response = (
+                self._service.users()
+                .messages()
+                .attachments()
+                .get(userId="me", messageId=message_id, id=attachment_id)
+                .execute()
+            )
+        return base64.urlsafe_b64decode(response["data"].encode("ascii"))
+
     def _refresh_guard(self) -> _RefreshGuard:
         return _RefreshGuard(self._creds, self._on_refresh)
 
@@ -148,6 +161,7 @@ def gmail_message_to_envelope(msg: dict[str, Any]) -> EmailEnvelope:
     )
 
     html_body, text_body = _extract_bodies(payload)
+    attachments = _extract_attachments(payload)
 
     return EmailEnvelope(
         sender=sender,
@@ -156,6 +170,7 @@ def gmail_message_to_envelope(msg: dict[str, Any]) -> EmailEnvelope:
         received_at=received_at,
         html_body=html_body,
         text_body=text_body,
+        attachments=attachments,
     )
 
 
@@ -178,6 +193,26 @@ def _extract_bodies(payload: dict[str, Any]) -> tuple[str | None, str | None]:
             break
 
     return html_body, text_body
+
+
+def _extract_attachments(payload: dict[str, Any]) -> list[EmailAttachment]:
+    """Walk a Gmail payload tree and collect attachment metadata (no bytes —
+    fetch those on demand via `GmailClient.get_attachment`)."""
+    attachments: list[EmailAttachment] = []
+    for part in _walk_parts(payload):
+        filename = part.get("filename") or ""
+        attachment_id = part.get("body", {}).get("attachmentId")
+        if not filename or not attachment_id:
+            continue
+        attachments.append(
+            EmailAttachment(
+                filename=filename,
+                mime_type=part.get("mimeType", ""),
+                attachment_id=attachment_id,
+                size=part.get("body", {}).get("size", 0),
+            )
+        )
+    return attachments
 
 
 def _walk_parts(part: dict[str, Any]) -> Iterable[dict[str, Any]]:

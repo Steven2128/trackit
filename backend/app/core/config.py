@@ -31,8 +31,16 @@ class Settings(BaseSettings):
     gmail_sync_default_lookback_days: int = 30
     gmail_sync_max_messages: int = 200
 
+    itau_statement_pdf_password: str = Field(default="")
+
     sync_interval_hours: int = Field(default=6)
     sync_scheduler_enabled: bool = Field(default=True)
+
+    resend_api_key: str = Field(default="")
+    weekly_summary_from_email: str = Field(default="TrackIt <onboarding@resend.dev>")
+    weekly_summary_enabled: bool = Field(default=True)
+    weekly_summary_day_of_week: str = Field(default="mon")
+    weekly_summary_hour: int = Field(default=8)
 
     user_timezone: str = Field(default="America/Bogota")
 

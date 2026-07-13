@@ -57,13 +57,12 @@ class SyncResult:
     last_sync_at: datetime | None = None
 
 
-async def sync_provider_connection(
-    db: AsyncSession,
-    connection: ProviderConnection,
-    *,
-    fallback_lookback_days: int,
-    max_messages: int,
-) -> SyncResult:
+def build_gmail_client(connection: ProviderConnection) -> GmailClient:
+    """Decrypt the stored OAuth tokens and build a `GmailClient` for
+    ``connection``, wiring a refresh callback that re-encrypts and stages
+    the new access token on the connection row (caller commits). Shared by
+    the per-transaction sync (`sync_provider_connection`) and the statement
+    sync (`app/services/statement_sync.py`)."""
     if not connection.refresh_token_encrypted:
         raise RuntimeError("provider_connection has no refresh token stored")
 
@@ -74,7 +73,7 @@ async def sync_provider_connection(
         connection.access_token_encrypted = encrypt_token(new_token)
         connection.expires_at = new_expiry
 
-    client = GmailClient(
+    return GmailClient(
         GmailCredentials(
             access_token=access_token,
             refresh_token=refresh_token,
@@ -82,6 +81,16 @@ async def sync_provider_connection(
         ),
         on_token_refresh=_persist_refreshed_token,
     )
+
+
+async def sync_provider_connection(
+    db: AsyncSession,
+    connection: ProviderConnection,
+    *,
+    fallback_lookback_days: int,
+    max_messages: int,
+) -> SyncResult:
+    client = build_gmail_client(connection)
 
     query = build_query(
         REGISTERED_PARSERS,
