@@ -58,6 +58,10 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [ ] Flujo de caja proyectado (ingresos fijos - gastos fijos = disponible)
 - [ ] Alertas de gasto inusual (vs promedio histórico por categoría)
 - [ ] Score de salud financiera (0-100, sube al pagar deudas y ahorrar)
+- [ ] Calendario de ingresos configurable: patrón de pago real (ej. quincena 1 monto X, quincena 2 monto Y con variaciones tipo aux/tiquetera, bonificación aparte a comienzos de mes). Muestra "esperado día N: $X" y avisa si el depósito real no matchea la expectativa.
+- [ ] "Apartado" / dinero comprometido: marcar plata reservada (arriendo, cuota fija) para que el dashboard muestre "disponible calculado" (ingreso esperado − apartados − gastado) separado del saldo total. No reemplaza el banco (TrackIt no tiene acceso a saldo real, solo lee emails de transacciones) — el banco sigue siendo la fuente de verdad del saldo; esto solo ahorra el cálculo mental de cuánto queda libre después de lo comprometido.
+- [ ] Checklist de "pagar primero" ligado al día de pago detectado (vía sync de Gmail existente): recordatorio con el orden fijo de pagos (deudas antes de gasto discrecional).
+- [ ] Recordatorios de pagos con fecha límite (arriendo, cuotas fijas, deudas): cada pago programado con su propia fecha de vencimiento (ej. arriendo: corte día 24 + 15 días de gracia), alerta N días antes. Distinto del checklist de "pagar primero" (ese dispara con el día de pago/ingreso; este dispara con el vencimiento). El modelo `Debt` actual no tiene fecha límite ni es semánticamente correcto para gastos sin interés (arriendo) — necesita modelo propio o extensión.
 
 ## Fase 4 — Inteligencia (futuro)
 
