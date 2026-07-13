@@ -7,7 +7,18 @@ from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, budgets, dashboard, debts, gmail, subscriptions, transactions
+from app.api.routes import (
+    auth,
+    budgets,
+    dashboard,
+    debts,
+    gmail,
+    goals,
+    insights,
+    plan,
+    subscriptions,
+    transactions,
+)
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.time_utils import user_tz
@@ -85,6 +96,9 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router)
     app.include_router(budgets.router)
     app.include_router(subscriptions.router)
+    app.include_router(goals.router)
+    app.include_router(plan.router)
+    app.include_router(insights.router)
 
     return app
 
