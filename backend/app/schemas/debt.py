@@ -28,3 +28,27 @@ class DebtOut(DebtBase):
 
     id: uuid.UUID
     created_at: datetime
+
+
+class DebtPayoffOut(BaseModel):
+    name: str
+    payoff_month: int | None
+    interest_paid: Decimal
+
+
+class StrategyResultOut(BaseModel):
+    strategy: str
+    months_to_free: int | None
+    total_interest: Decimal
+    total_paid: Decimal
+    payoff_order: list[str]
+    per_debt: list[DebtPayoffOut]
+    converges: bool
+
+
+class StrategyComparisonOut(BaseModel):
+    avalanche: StrategyResultOut
+    snowball: StrategyResultOut
+    interest_saved_by_avalanche: Decimal
+    months_saved_by_avalanche: int | None
+    recommended: str

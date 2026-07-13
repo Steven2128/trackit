@@ -1,11 +1,20 @@
 import uuid
+from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.debt import Debt
-from app.schemas.debt import DebtCreate, DebtOut, DebtUpdate
+from app.schemas.debt import (
+    DebtCreate,
+    DebtOut,
+    DebtPayoffOut,
+    DebtUpdate,
+    StrategyComparisonOut,
+    StrategyResultOut,
+)
+from app.services.debt_strategy import DebtLike, StrategyResult, compare_strategies
 
 router = APIRouter(prefix="/debts", tags=["debts"])
 
@@ -18,6 +27,62 @@ async def list_debts(current_user: CurrentUser, db: DbSession) -> list[DebtOut]:
         .order_by(Debt.created_at.desc())
     )
     return [DebtOut.model_validate(d) for d in result.scalars().all()]
+
+
+@router.get("/strategy", response_model=StrategyComparisonOut)
+async def debt_strategy(
+    current_user: CurrentUser,
+    db: DbSession,
+    extra_monthly: Decimal = Query(
+        default=Decimal("0"),
+        ge=0,
+        description="Monthly amount available on top of all minimum payments.",
+    ),
+) -> StrategyComparisonOut:
+    """Compare avalanche vs snowball payoff plans over the user's debts.
+
+    Computed on the fly like /dashboard and /subscriptions — no persisted state.
+    """
+    result = await db.execute(select(Debt).where(Debt.user_id == current_user.id))
+    debts = [
+        DebtLike(
+            name=d.bank_name,
+            balance=d.total_amount,
+            annual_rate=d.interest_rate,
+            minimum_payment=d.minimum_payment,
+        )
+        for d in result.scalars().all()
+    ]
+    if not debts:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no_debts")
+
+    comparison = compare_strategies(debts, extra_monthly)
+    return StrategyComparisonOut(
+        avalanche=_to_result_out(comparison.avalanche),
+        snowball=_to_result_out(comparison.snowball),
+        interest_saved_by_avalanche=comparison.interest_saved_by_avalanche,
+        months_saved_by_avalanche=comparison.months_saved_by_avalanche,
+        recommended=comparison.recommended,
+    )
+
+
+def _to_result_out(result: StrategyResult) -> StrategyResultOut:
+    return StrategyResultOut(
+        strategy=result.strategy,
+        months_to_free=result.months_to_free,
+        total_interest=result.total_interest,
+        total_paid=result.total_paid,
+        payoff_order=result.payoff_order,
+        per_debt=[
+            DebtPayoffOut(
+                name=p.name,
+                payoff_month=p.payoff_month,
+                interest_paid=p.interest_paid,
+            )
+            for p in result.per_debt
+        ],
+        converges=result.converges,
+    )
 
 
 @router.post("", response_model=DebtOut, status_code=status.HTTP_201_CREATED)

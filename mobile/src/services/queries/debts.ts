@@ -19,6 +19,30 @@ export type DebtPayload = {
   minimum_payment?: string | null;
 };
 
+export type DebtPayoffOut = {
+  name: string;
+  payoff_month: number | null;
+  interest_paid: string;
+};
+
+export type StrategyResultOut = {
+  strategy: "avalanche" | "snowball";
+  months_to_free: number | null;
+  total_interest: string;
+  total_paid: string;
+  payoff_order: string[];
+  per_debt: DebtPayoffOut[];
+  converges: boolean;
+};
+
+export type StrategyComparisonOut = {
+  avalanche: StrategyResultOut;
+  snowball: StrategyResultOut;
+  interest_saved_by_avalanche: string;
+  months_saved_by_avalanche: number | null;
+  recommended: "avalanche" | "snowball";
+};
+
 export const debtsQueryKey = ["debts"] as const;
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
@@ -33,6 +57,19 @@ export function useDebts() {
       const res = await api.get<DebtOut[]>("/debts");
       return res.data;
     },
+  });
+}
+
+export function useDebtStrategy(extraMonthly: number, enabled: boolean) {
+  return useQuery({
+    queryKey: [...debtsQueryKey, "strategy", extraMonthly],
+    queryFn: async () => {
+      const res = await api.get<StrategyComparisonOut>("/debts/strategy", {
+        params: { extra_monthly: extraMonthly },
+      });
+      return res.data;
+    },
+    enabled,
   });
 }
 

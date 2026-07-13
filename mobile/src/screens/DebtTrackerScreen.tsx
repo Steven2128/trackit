@@ -13,12 +13,14 @@ import {
 import DebtCard from "../components/DebtCard";
 import DebtFormSheet from "../components/DebtFormSheet";
 import MoneyText from "../components/MoneyText";
+import StrategySheet from "../components/StrategySheet";
 import { useDebts, type DebtOut } from "../services/queries/debts";
 import { colors } from "../theme/colors";
 
 export default function DebtTrackerScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useDebts();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [strategyOpen, setStrategyOpen] = useState(false);
   const [editing, setEditing] = useState<DebtOut | undefined>(undefined);
 
   const { totalDebt, totalMin, count } = useMemo(() => {
@@ -75,14 +77,26 @@ export default function DebtTrackerScreen() {
           />
         }
         ListHeaderComponent={
-          <View style={styles.hero}>
-            <Text style={styles.heroLabel}>Deuda total</Text>
-            <MoneyText value={totalDebt} size="xl" style={styles.heroMoney} />
-            <Text style={styles.heroSub}>
-              {count} {count === 1 ? "deuda" : "deudas"} · pago mínimo {" "}
-              <MoneyText value={totalMin} size="sm" style={styles.heroSubMoney} />
-              /mes
-            </Text>
+          <View>
+            <View style={styles.hero}>
+              <Text style={styles.heroLabel}>Deuda total</Text>
+              <MoneyText value={totalDebt} size="xl" style={styles.heroMoney} />
+              <Text style={styles.heroSub}>
+                {count} {count === 1 ? "deuda" : "deudas"} · pago mínimo {" "}
+                <MoneyText value={totalMin} size="sm" style={styles.heroSubMoney} />
+                /mes
+              </Text>
+            </View>
+            {debts.length > 0 ? (
+              <Pressable
+                style={({ pressed }) => [styles.strategyBtn, pressed && styles.pressed]}
+                onPress={() => setStrategyOpen(true)}
+              >
+                <Ionicons name="trending-down" size={18} color={colors.primary} />
+                <Text style={styles.strategyText}>Estrategia de pago</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+              </Pressable>
+            ) : null}
           </View>
         }
         ListEmptyComponent={
@@ -118,6 +132,8 @@ export default function DebtTrackerScreen() {
           setEditing(undefined);
         }}
       />
+
+      <StrategySheet isVisible={strategyOpen} onClose={() => setStrategyOpen(false)} />
     </View>
   );
 }
@@ -162,6 +178,18 @@ const styles = StyleSheet.create({
   heroMoney: { color: colors.danger, marginTop: 4 },
   heroSub: { color: colors.textSecondary, fontSize: 12, marginTop: 6 },
   heroSubMoney: { color: colors.textPrimary, fontWeight: "600" },
+  strategyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  strategyText: { color: colors.textPrimary, fontSize: 14, fontWeight: "600", flex: 1 },
   emptyBox: { alignItems: "center", paddingVertical: 40, gap: 12 },
   emptyText: { color: colors.textSecondary, fontSize: 14 },
   emptyBtn: {
