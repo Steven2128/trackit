@@ -10,15 +10,20 @@ import { Pressable } from "react-native";
 import BudgetsScreen from "../screens/BudgetsScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import DebtTrackerScreen from "../screens/DebtTrackerScreen";
+import GoalsScreen from "../screens/GoalsScreen";
+import PlanScreen from "../screens/PlanScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import SubscriptionsScreen from "../screens/SubscriptionsScreen";
 import TransactionsScreen from "../screens/TransactionsScreen";
 import { colors } from "../theme/colors";
 
-// Profile lives outside the tab bar (header avatar) to keep bottom nav at 5 items.
+// Profile, Goals and Plan live outside the tab bar (header avatar / dashboard
+// shortcuts) to keep bottom nav at 5 items.
 export type AppStackParamList = {
   Tabs: undefined;
   Profile: undefined;
+  Goals: undefined;
+  Plan: undefined;
 };
 
 export type AppTabParamList = {
@@ -111,6 +116,13 @@ function Tabs() {
   );
 }
 
+const stackHeader = {
+  headerStyle: { backgroundColor: colors.background },
+  headerTitleStyle: { color: colors.textPrimary, fontWeight: "700" as const },
+  headerTintColor: colors.primary,
+  headerShadowVisible: false,
+};
+
 export default function AppStack() {
   return (
     <Stack.Navigator>
@@ -118,14 +130,17 @@ export default function AppStack() {
       <Stack.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{
-          title: "Perfil",
-          presentation: "modal",
-          headerStyle: { backgroundColor: colors.background },
-          headerTitleStyle: { color: colors.textPrimary, fontWeight: "700" },
-          headerTintColor: colors.primary,
-          headerShadowVisible: false,
-        }}
+        options={{ title: "Perfil", presentation: "modal", ...stackHeader }}
+      />
+      <Stack.Screen
+        name="Goals"
+        component={GoalsScreen}
+        options={{ title: "Metas de ahorro", ...stackHeader }}
+      />
+      <Stack.Screen
+        name="Plan"
+        component={PlanScreen}
+        options={{ title: "Plan del mes", ...stackHeader }}
       />
     </Stack.Navigator>
   );

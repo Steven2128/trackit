@@ -52,16 +52,16 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [x] Resumen semanal automático (email) — cron `CronTrigger` lunes 8am hora local (`app/services/scheduler.py::send_weekly_summaries_job`), envía por usuario el resumen de la semana Mon-Sun anterior (gastado, recibido, breakdown por categoría) vía Resend (`app/services/email_sender.py`). Sin tabla nueva — se calcula al vuelo igual que dashboard/subscriptions. Salta usuarios sin actividad en la semana (no manda email vacío). Requiere `RESEND_API_KEY` en `.env`.
 - [x] Estrategia de pago de deudas: modo avalancha vs bola de nieve — `GET /debts/strategy?extra_monthly=N` (sin tabla nueva, simulación pura en `app/services/debt_strategy.py`: interés EA→mensual, presupuesto total constante con rollover de mínimos, cap 600 meses si no converge). Compara ambas estrategias (meses hasta libre, intereses totales, orden de pago) y recomienda: avalancha si ahorra intereses, bola de nieve si empatan. Mobile: botón "Estrategia de pago" en Deudas abre sheet con input de abono extra y comparación.
 
-## Fase 3 — Construir hábitos (mes 3)
+## Fase 3 — Construir hábitos (mes 3) ✅
 
-- [ ] Metas de ahorro con fecha y progreso visual
-- [ ] Flujo de caja proyectado (ingresos fijos - gastos fijos = disponible)
-- [ ] Alertas de gasto inusual (vs promedio histórico por categoría)
-- [ ] Score de salud financiera (0-100, sube al pagar deudas y ahorrar)
-- [ ] Calendario de ingresos configurable: patrón de pago real (ej. quincena 1 monto X, quincena 2 monto Y con variaciones tipo aux/tiquetera, bonificación aparte a comienzos de mes). Muestra "esperado día N: $X" y avisa si el depósito real no matchea la expectativa.
-- [ ] "Apartado" / dinero comprometido: marcar plata reservada (arriendo, cuota fija) para que el dashboard muestre "disponible calculado" (ingreso esperado − apartados − gastado) separado del saldo total. No reemplaza el banco (TrackIt no tiene acceso a saldo real, solo lee emails de transacciones) — el banco sigue siendo la fuente de verdad del saldo; esto solo ahorra el cálculo mental de cuánto queda libre después de lo comprometido.
-- [ ] Checklist de "pagar primero" ligado al día de pago detectado (vía sync de Gmail existente): recordatorio con el orden fijo de pagos (deudas antes de gasto discrecional).
-- [ ] Recordatorios de pagos con fecha límite (arriendo, cuotas fijas, deudas): cada pago programado con su propia fecha de vencimiento (ej. arriendo: corte día 24 + 15 días de gracia), alerta N días antes. Distinto del checklist de "pagar primero" (ese dispara con el día de pago/ingreso; este dispara con el vencimiento). El modelo `Debt` actual no tiene fecha límite ni es semánticamente correcto para gastos sin interés (arriendo) — necesita modelo propio o extensión.
+- [x] Metas de ahorro con fecha y progreso visual — tabla `savings_goals` (monto objetivo, `current_amount` reportado por el usuario — TrackIt no ve saldos, solo emails), CRUD `/goals` con `pct` calculado. Pantalla mobile "Metas de ahorro" (stack, acceso desde Dashboard) con barras de progreso y sheet de edición.
+- [x] Flujo de caja proyectado — `GET /cashflow` (calculado al vuelo desde `income_sources` + `planned_payments`, lógica pura en `app/services/cash_flow.py`): ingresos fijos − compromisos = disponible mensual, próximo ingreso esperado, vencimientos próximos y checklist. Pantalla mobile "Plan del mes".
+- [x] Alertas de gasto inusual — `GET /insights/unusual-spending` (`app/services/spending_anomalies.py`, puro): mes actual vs promedio de hasta 6 meses de historia por categoría; alerta si ≥1.5× el promedio, ≥$50k y ≥2 meses de baseline. Banner en Dashboard.
+- [x] Score de salud financiera — `GET /insights/health-score` (`app/services/health_score.py`, puro): 0-100 en 4 componentes explicables — deuda 30 (carga de mínimos vs ingreso mensual), presupuestos 25, metas 25 (progreso promedio), gasto inusual 20. Sin datos configurados → crédito neutral parcial. Card en Dashboard con color por rango.
+- [x] Calendario de ingresos configurable — tabla `income_sources` (una fila por depósito recurrente: quincena 1, quincena 2, bonificación), CRUD `/income-sources`. "Próximo ingreso: X el día N por $Y" en la pantalla Plan. La comparación contra el depósito real queda como mejora futura.
+- [x] "Apartado" / dinero comprometido — tabla `planned_payments` (una tabla sirve apartados + recordatorios + checklist): el disponible calculado del `/cashflow` resta todos los compromisos del ingreso esperado. El banco sigue siendo la fuente de verdad del saldo.
+- [x] Checklist de "pagar primero" — `checklist` en `/cashflow`: pagos ordenados deudas-primero (`is_debt_payment`) y luego por vencimiento más próximo. Sección "Al cobrar, pagá en este orden" en la pantalla Plan.
+- [x] Recordatorios de pagos con fecha límite — `due_day` + `grace_days` en `planned_payments` (ej. arriendo: corte 24 + 15 días) → `deadline` y `days_left` en `/cashflow.upcoming`; mobile colorea vencimientos ≤3 días (rojo) y ≤7 (amarillo). Push notifications quedan para futuro; hoy es in-app.
 
 ## Fase 4 — Inteligencia (futuro)
 

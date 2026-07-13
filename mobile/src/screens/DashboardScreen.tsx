@@ -20,6 +20,7 @@ import TrendChart from "../components/TrendChart";
 import type { AppStackParamList } from "../navigation/AppStack";
 import { useBudgetStatus, type BudgetAlertStatus } from "../services/queries/budgets";
 import { useDashboard, type DashboardResponse } from "../services/queries/dashboard";
+import { useHealthScore, useUnusualSpending } from "../services/queries/insights";
 import { useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
 import { getCategory } from "../utils/categories";
@@ -64,6 +65,8 @@ function DashboardContent({
 }) {
   const { current_month, debts, monthly_trend } = data;
   const { data: budgetStatus } = useBudgetStatus();
+  const { data: healthScore } = useHealthScore();
+  const { data: unusual } = useUnusualSpending();
   const user = useAuthStore((s) => s.user);
   const firstName = user?.name?.split(" ")[0];
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
@@ -117,6 +120,54 @@ function DashboardContent({
           <Ionicons name="person-circle-outline" size={32} color={colors.textPrimary} />
         </Pressable>
       </View>
+
+      <View style={styles.quickRow}>
+        {healthScore ? (
+          <View style={styles.scoreCard}>
+            <Text style={styles.scoreValue}>
+              <Text style={{ color: scoreColor(healthScore.total) }}>{healthScore.total}</Text>
+              <Text style={styles.scoreMax}>/100</Text>
+            </Text>
+            <Text style={styles.scoreLabel}>Salud financiera</Text>
+          </View>
+        ) : null}
+        <View style={styles.quickCol}>
+          <Pressable
+            style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
+            onPress={() => navigation.navigate("Plan")}
+          >
+            <Ionicons name="map-outline" size={16} color={colors.primary} />
+            <Text style={styles.quickText}>Plan del mes</Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
+            onPress={() => navigation.navigate("Goals")}
+          >
+            <Ionicons name="flag-outline" size={16} color={colors.primary} />
+            <Text style={styles.quickText}>Metas de ahorro</Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+      </View>
+
+      {unusual && unusual.items.length > 0 ? (
+        <View style={styles.unusualBox}>
+          {unusual.items.map((a) => {
+            const cat = getCategory(a.category);
+            return (
+              <View key={a.category} style={styles.unusualRow}>
+                <Ionicons name="trending-up" size={16} color={colors.warning} />
+                <Text style={styles.unusualText}>
+                  Gasto inusual en {cat.label}: vas {a.ratio}× tu promedio (
+                  <MoneyText value={a.current} size="sm" style={{ color: colors.warning }} />
+                  )
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
 
       <View style={styles.heroRow}>
         <View style={styles.hero}>
@@ -176,6 +227,12 @@ function DashboardContent({
   );
 }
 
+function scoreColor(total: number): string {
+  if (total >= 75) return colors.success;
+  if (total >= 50) return colors.warning;
+  return colors.danger;
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 32 },
@@ -206,6 +263,43 @@ const styles = StyleSheet.create({
   greetingBody: { flex: 1 },
   greetingName: { color: colors.textPrimary, fontSize: 24, fontWeight: "700" },
   greetingSub: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
+  quickRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  scoreCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 110,
+    gap: 2,
+  },
+  scoreValue: { fontSize: 24, fontWeight: "700" },
+  scoreMax: { color: colors.textSecondary, fontSize: 13, fontWeight: "600" },
+  scoreLabel: { color: colors.textSecondary, fontSize: 11 },
+  quickCol: { flex: 1, gap: 8 },
+  quickBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    flex: 1,
+  },
+  quickText: { color: colors.textPrimary, fontSize: 13, fontWeight: "600", flex: 1 },
+  unusualBox: {
+    backgroundColor: colors.warningSoft,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  unusualRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  unusualText: { color: colors.textPrimary, fontSize: 13, flex: 1 },
   heroRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
   hero: {
     flex: 1,
