@@ -22,10 +22,14 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.time_utils import last_completed_week_bounds
 from app.db.session import AsyncSessionLocal
+from app.models.notification_log import NotificationLog
 from app.models.provider_connection import ProviderConnection, ProviderType
+from app.models.push_token import PushToken
 from app.models.user import User
 from app.services.email_sender import send_email
 from app.services.email_sync import sync_provider_connection
+from app.services.push_alerts import collect_user_alerts
+from app.services.push_sender import PushMessage, send_push_messages
 from app.services.weekly_summary import build_weekly_summary, render_weekly_summary_email
 
 log = logging.getLogger(__name__)
@@ -127,6 +131,83 @@ async def send_weekly_summaries_job() -> None:
     duration_ms = int((time.monotonic() - started) * 1000)
     log.info(
         "send_weekly_summaries_job completed",
+        extra={
+            "total": len(user_ids),
+            "ok": ok,
+            "skipped": skipped,
+            "failed": failed,
+            "duration_ms": duration_ms,
+        },
+    )
+
+
+async def send_push_alerts_job() -> None:
+    """Daily push fan-out: budget 80/100% alerts, due dates <=3 days out and
+    unusual-spending flags — the same data the app shows, pushed so the user
+    hears about it without opening the app.
+
+    Dedupe: each alert's `dedupe_key` is checked against (and then recorded
+    in) `notification_logs`, so an alert fires once per period, not once per
+    day. Same per-user failure isolation as the other jobs.
+    """
+    started = time.monotonic()
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(PushToken.user_id).distinct())
+        user_ids = list(result.scalars())
+
+    ok = 0
+    skipped = 0
+    failed = 0
+    for user_id in user_ids:
+        async with AsyncSessionLocal() as db:
+            try:
+                alerts = await collect_user_alerts(db, user_id)
+                if alerts:
+                    sent_result = await db.execute(
+                        select(NotificationLog.dedupe_key).where(
+                            NotificationLog.user_id == user_id,
+                            NotificationLog.dedupe_key.in_(
+                                [a.dedupe_key for a in alerts]
+                            ),
+                        )
+                    )
+                    already_sent = set(sent_result.scalars())
+                    alerts = [a for a in alerts if a.dedupe_key not in already_sent]
+                if not alerts:
+                    skipped += 1
+                    continue
+
+                tokens_result = await db.execute(
+                    select(PushToken).where(PushToken.user_id == user_id)
+                )
+                tokens = tokens_result.scalars().all()
+                if not tokens:
+                    skipped += 1
+                    continue
+
+                dead_tokens = await send_push_messages(
+                    [
+                        PushMessage(token=t.token, title=a.title, body=a.body)
+                        for a in alerts
+                        for t in tokens
+                    ]
+                )
+                for token_row in tokens:
+                    if token_row.token in dead_tokens:
+                        await db.delete(token_row)
+                for alert in alerts:
+                    db.add(NotificationLog(user_id=user_id, dedupe_key=alert.dedupe_key))
+                await db.commit()
+                ok += 1
+            except Exception:  # noqa: BLE001 — one bad user must not stop the batch
+                log.exception(
+                    "send_push_alerts_job user_failed", extra={"user_id": str(user_id)}
+                )
+                failed += 1
+
+    duration_ms = int((time.monotonic() - started) * 1000)
+    log.info(
+        "send_push_alerts_job completed",
         extra={
             "total": len(user_ids),
             "ok": ok,

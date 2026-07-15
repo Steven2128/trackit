@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     weekly_summary_day_of_week: str = Field(default="mon")
     weekly_summary_hour: int = Field(default=8)
 
+    push_alerts_enabled: bool = Field(default=True)
+    push_alerts_hour: int = Field(default=8)
+
     user_timezone: str = Field(default="America/Bogota")
 
     cors_origins: str = Field(default="*")

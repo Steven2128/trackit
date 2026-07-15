@@ -2,6 +2,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { useEffect } from "react";
 
 import SplashScreen from "../screens/SplashScreen";
+import { registerForPushNotifications } from "../services/notifications";
 import { useAuthStore } from "../store/auth";
 import AppStack from "./AppStack";
 import AuthStack from "./AuthStack";
@@ -16,6 +17,12 @@ export default function RootNavigator() {
       hydrate();
     }
   }, [hydrated, hydrate]);
+
+  useEffect(() => {
+    if (accessToken) {
+      registerForPushNotifications();
+    }
+  }, [accessToken]);
 
   if (!hydrated) {
     return <SplashScreen />;

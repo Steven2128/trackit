@@ -15,6 +15,7 @@ from app.api.routes import (
     gmail,
     goals,
     insights,
+    notifications,
     plan,
     subscriptions,
     transactions,
@@ -22,7 +23,12 @@ from app.api.routes import (
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.time_utils import user_tz
-from app.services.scheduler import build_scheduler, send_weekly_summaries_job, sync_all_users_job
+from app.services.scheduler import (
+    build_scheduler,
+    send_push_alerts_job,
+    send_weekly_summaries_job,
+    sync_all_users_job,
+)
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +62,16 @@ async def lifespan(app: FastAPI):
                     "day_of_week": settings.weekly_summary_day_of_week,
                     "hour": settings.weekly_summary_hour,
                 },
+            )
+        if settings.push_alerts_enabled:
+            scheduler.add_job(
+                send_push_alerts_job,
+                CronTrigger(hour=settings.push_alerts_hour, timezone=user_tz()),
+                id="push_alerts",
+                replace_existing=True,
+            )
+            log.info(
+                "push_alerts_scheduled", extra={"hour": settings.push_alerts_hour}
             )
 
         scheduler.start()
@@ -99,6 +115,7 @@ def create_app() -> FastAPI:
     app.include_router(goals.router)
     app.include_router(plan.router)
     app.include_router(insights.router)
+    app.include_router(notifications.router)
 
     return app
 
