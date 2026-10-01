@@ -6,7 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "trackit-backend"
 version = "0.1.0"
 description = "TrackIt — personal finance backend (FastAPI)"
-readme = "../README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
