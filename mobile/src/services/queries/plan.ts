@@ -23,6 +23,7 @@ export type PlannedPaymentOut = {
   due_day: number | null;
   grace_days: number;
   is_debt_payment: boolean;
+  paid_month: string | null;
   created_at: string;
 };
 
@@ -35,11 +36,13 @@ export type PlannedPaymentPayload = {
 };
 
 export type UpcomingPaymentOut = {
+  id: string | null;
   name: string;
   amount: string;
   deadline: string | null;
   days_left: number | null;
   is_debt_payment: boolean;
+  is_paid: boolean;
 };
 
 export type CashFlowResponse = {
@@ -137,6 +140,21 @@ export function useUpdatePlannedPayment() {
   return useMutation({
     mutationFn: async ({ id, payload }: { id: string; payload: Partial<PlannedPaymentPayload> }) => {
       const res = await api.patch<PlannedPaymentOut>(`/planned-payments/${id}`, payload);
+      return res.data;
+    },
+    onSuccess: () => invalidatePlan(qc),
+  });
+}
+
+// Check/un-check a commitment for the current local month. paid_month is
+// month-scoped on the backend, so checks reset themselves on month change.
+export function useTogglePaymentPaid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, paidMonth }: { id: string; paidMonth: string | null }) => {
+      const res = await api.patch<PlannedPaymentOut>(`/planned-payments/${id}`, {
+        paid_month: paidMonth,
+      });
       return res.data;
     },
     onSuccess: () => invalidatePlan(qc),

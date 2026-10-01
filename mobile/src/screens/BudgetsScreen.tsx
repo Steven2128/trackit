@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -15,11 +16,12 @@ import CategoryIcon from "../components/CategoryIcon";
 import MoneyText from "../components/MoneyText";
 import {
   useBudgetStatus,
+  useDeleteBudget,
   type BudgetAlertStatus,
   type BudgetStatusItem,
 } from "../services/queries/budgets";
 import { colors } from "../theme/colors";
-import { CATEGORIES, getCategory } from "../utils/categories";
+import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
 import { humanizeMonth } from "../utils/dates";
 
 // Budgets make sense for spending categories only — internal movements
@@ -37,6 +39,34 @@ const STATUS_COLOR: Record<BudgetAlertStatus, string> = {
 export default function BudgetsScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useBudgetStatus();
   const [editing, setEditing] = useState<{ category: string; limit: string | null } | null>(null);
+  const [creatingCustom, setCreatingCustom] = useState(false);
+  const deleteMut = useDeleteBudget();
+
+  function confirmDelete(category: string) {
+    const isCustom = !CATEGORIES.some((c) => c.key === category);
+    const label = getCategory(category).label;
+    Alert.alert(
+      isCustom ? "Eliminar categoría" : "Quitar presupuesto",
+      isCustom
+        ? `¿Eliminar "${label}"? Sus transacciones pasan a "Otros".`
+        : `¿Quitar el límite de ${label}?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: isCustom ? "Eliminar" : "Quitar",
+          style: "destructive",
+          onPress: () =>
+            deleteMut.mutate(category, {
+              onError: (e) =>
+                Alert.alert(
+                  "Error",
+                  e instanceof Error ? e.message : "Error al eliminar.",
+                ),
+            }),
+        },
+      ],
+    );
+  }
 
   const byCategory = useMemo(() => {
     const map = new Map<string, BudgetStatusItem>();
@@ -64,6 +94,8 @@ export default function BudgetsScreen() {
   }
 
   const alerts = data.items.filter((i) => i.status !== "ok");
+  // User-created budget categories, rendered after the built-in list.
+  const customKeys = customCategoryKeys(data.items.map((i) => i.category));
 
   return (
     <View style={styles.root}>
@@ -132,18 +164,84 @@ export default function BudgetsScreen() {
                 </View>
                 {item ? <ProgressBar pct={Number(item.pct)} status={item.status} /> : null}
               </View>
+              {item ? (
+                <Pressable
+                  onPress={() => confirmDelete(cat.key)}
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.trashBtn, pressed && styles.rowPressed]}
+                  accessibilityLabel={`Quitar presupuesto de ${cat.label}`}
+                >
+                  <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                </Pressable>
+              ) : null}
             </Pressable>
           );
         })}
 
-        <Text style={styles.hint}>Tocá una categoría para fijar o editar su límite.</Text>
+        {customKeys.map((key) => {
+          const item = byCategory.get(key);
+          const cat = getCategory(key);
+          return (
+            <Pressable
+              key={key}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+              onPress={() =>
+                setEditing({ category: key, limit: item?.monthly_limit ?? null })
+              }
+            >
+              <CategoryIcon categoryKey={key} />
+              <View style={styles.rowBody}>
+                <View style={styles.rowTop}>
+                  <Text style={styles.rowLabel}>{cat.label}</Text>
+                  {item ? (
+                    <Text style={styles.rowAmounts}>
+                      <MoneyText value={item.spent} size="sm" /> /{" "}
+                      <MoneyText
+                        value={item.monthly_limit}
+                        size="sm"
+                        style={{ color: colors.textSecondary }}
+                      />
+                    </Text>
+                  ) : (
+                    <Text style={styles.noLimit}>Sin límite</Text>
+                  )}
+                </View>
+                {item ? <ProgressBar pct={Number(item.pct)} status={item.status} /> : null}
+              </View>
+              <Pressable
+                onPress={() => confirmDelete(key)}
+                hitSlop={10}
+                style={({ pressed }) => [styles.trashBtn, pressed && styles.rowPressed]}
+                accessibilityLabel={`Eliminar categoría ${cat.label}`}
+              >
+                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+              </Pressable>
+            </Pressable>
+          );
+        })}
+
+        <Pressable
+          style={({ pressed }) => [styles.addBtn, pressed && styles.rowPressed]}
+          onPress={() => setCreatingCustom(true)}
+        >
+          <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+          <Text style={styles.addText}>Agregar categoría de presupuesto</Text>
+        </Pressable>
+
+        <Text style={styles.hint}>
+          Tocá una categoría para fijar, editar o quitar su límite.
+        </Text>
       </ScrollView>
 
       <BudgetFormSheet
-        isVisible={editing !== null}
+        isVisible={editing !== null || creatingCustom}
         category={editing?.category ?? null}
         currentLimit={editing?.limit ?? null}
-        onClose={() => setEditing(null)}
+        createCustom={creatingCustom}
+        onClose={() => {
+          setEditing(null);
+          setCreatingCustom(false);
+        }}
       />
     </View>
   );
@@ -229,4 +327,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 12,
   },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: "dashed",
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 4,
+  },
+  addText: { color: colors.primary, fontSize: 14, fontWeight: "600" },
+  trashBtn: { padding: 4 },
 });

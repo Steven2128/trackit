@@ -30,5 +30,30 @@ export function getCategory(key: string | null | undefined): CategoryDef {
   if (!key) return FALLBACK;
   const found = CATEGORIES.find((c) => c.key === key);
   if (found) return found;
-  return { key, label: key, icon: "cube", color: "#A3A8B3" };
+  // User-defined category: prettify the slug ("gastos_mascota" → "Gastos mascota").
+  const label = key.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+  return { key, label, icon: "pricetag", color: "#8FD0C6" };
+}
+
+// Display name → backend category slug (must satisfy ^[a-z0-9_]{1,64}$).
+export function slugifyCategory(name: string): string {
+  return name
+    .normalize("NFKD")
+    // strip combining accents left by NFKD ("á" → "a" + U+0301)
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 64);
+}
+
+// Custom category keys present in a list (e.g. budget status items) that
+// aren't part of the built-in set.
+export function customCategoryKeys(keys: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  for (const key of keys) {
+    if (key && !CATEGORIES.some((c) => c.key === key)) seen.add(key);
+  }
+  return [...seen].sort();
 }

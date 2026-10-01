@@ -28,7 +28,8 @@ export type AppStackParamList = {
 
 export type AppTabParamList = {
   Dashboard: undefined;
-  Transactions: undefined;
+  // category preselects the filter chip (used by Dashboard's category rows).
+  Transactions: { category?: string | null } | undefined;
   Budgets: undefined;
   Subscriptions: undefined;
   DebtTracker: undefined;
@@ -74,7 +75,11 @@ function Tabs() {
           borderTopColor: colors.border,
           paddingTop: 6,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        // 10px + no per-item padding so long Spanish labels
+        // ("Suscripciones") fit in a 5-tab bar without truncating.
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
+        tabBarItemStyle: { paddingHorizontal: 0 },
+        tabBarAllowFontScaling: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarIcon: ({ focused, color, size }) => (

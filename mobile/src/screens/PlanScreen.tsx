@@ -16,9 +16,11 @@ import {
   useCashFlow,
   useIncomeSources,
   usePlannedPayments,
+  useTogglePaymentPaid,
   type UpcomingPaymentOut,
 } from "../services/queries/plan";
 import { colors } from "../theme/colors";
+import { currentMonthYYYYMM } from "../utils/dates";
 
 function formatDeadline(iso: string | null): string | null {
   if (!iso) return null;
@@ -118,10 +120,16 @@ export default function PlanScreen() {
 
             {flow.checklist.length > 0 ? (
               <>
-                <Text style={styles.sectionLabel}>Al cobrar, pagá en este orden</Text>
+                <View style={styles.checklistHeader}>
+                  <Text style={styles.sectionLabel}>Al cobrar, pagá en este orden</Text>
+                  <Text style={styles.checklistProgress}>
+                    {flow.checklist.filter((c) => c.is_paid).length}/
+                    {flow.checklist.length} pagados
+                  </Text>
+                </View>
                 <View style={styles.checklistBox}>
                   {flow.checklist.map((item, i) => (
-                    <ChecklistRow key={item.name + i} item={item} index={i} />
+                    <ChecklistRow key={item.id ?? item.name + i} item={item} index={i} />
                   ))}
                 </View>
               </>
@@ -210,19 +218,46 @@ export default function PlanScreen() {
 
 function ChecklistRow({ item, index }: { item: UpcomingPaymentOut; index: number }) {
   const dateLabel = formatDeadline(item.deadline);
+  const toggleMut = useTogglePaymentPaid();
+  const paid = item.is_paid;
+
+  function toggle() {
+    if (!item.id || toggleMut.isPending) return;
+    toggleMut.mutate({ id: item.id, paidMonth: paid ? null : currentMonthYYYYMM() });
+  }
+
   return (
-    <View style={[styles.checkRow, index > 0 && styles.checkRowBorder]}>
-      <Text style={styles.checkIndex}>{index + 1}</Text>
+    <Pressable
+      style={({ pressed }) => [
+        styles.checkRow,
+        index > 0 && styles.checkRowBorder,
+        pressed && styles.pressed,
+      ]}
+      onPress={toggle}
+      accessibilityLabel={paid ? `Desmarcar ${item.name}` : `Marcar ${item.name} como pagado`}
+    >
+      <Ionicons
+        name={paid ? "checkmark-circle" : "ellipse-outline"}
+        size={22}
+        color={paid ? colors.success : colors.textSecondary}
+      />
       <View style={styles.rowBody}>
         <View style={styles.checkNameRow}>
-          <Text style={styles.rowName} numberOfLines={1}>
+          <Text
+            style={[styles.rowName, paid && styles.rowNamePaid]}
+            numberOfLines={1}
+          >
             {item.name}
           </Text>
           {item.is_debt_payment ? (
             <Ionicons name="card" size={13} color={colors.danger} />
           ) : null}
         </View>
-        {dateLabel ? (
+        {paid ? (
+          <Text style={[styles.rowMeta, { color: colors.success }]}>
+            pagado este mes
+          </Text>
+        ) : dateLabel ? (
           <Text style={[styles.rowMeta, { color: deadlineColor(item.days_left) }]}>
             vence {dateLabel}
             {item.days_left !== null ? ` · ${item.days_left} días` : ""}
@@ -231,8 +266,12 @@ function ChecklistRow({ item, index }: { item: UpcomingPaymentOut; index: number
           <Text style={styles.rowMeta}>sin fecha límite</Text>
         )}
       </View>
-      <MoneyText value={item.amount} size="sm" />
-    </View>
+      <MoneyText
+        value={item.amount}
+        size="sm"
+        style={paid ? styles.amountPaid : undefined}
+      />
+    </Pressable>
   );
 }
 
@@ -335,6 +374,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   checkNameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  checklistHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  checklistProgress: { color: colors.textSecondary, fontSize: 11, fontWeight: "600" },
+  rowNamePaid: {
+    color: colors.textSecondary,
+    textDecorationLine: "line-through",
+  },
+  amountPaid: { color: colors.textSecondary, textDecorationLine: "line-through" },
   row: {
     flexDirection: "row",
     alignItems: "center",

@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../api";
+import { budgetsQueryKey } from "./budgets";
+import { dashboardQueryKey } from "./dashboard";
 
 export type TransactionType = "debit" | "credit";
 
@@ -13,6 +15,7 @@ export type TransactionOut = {
   currency: string;
   card_last_digits: string | null;
   occurred_at: string;
+  note: string | null;
 };
 
 export type TransactionListResponse = {
@@ -44,6 +47,31 @@ export function useTransactions(filters: TransactionFilters) {
       if (filters.type) params.type = filters.type;
       const res = await api.get<TransactionListResponse>("/transactions", { params });
       return res.data;
+    },
+  });
+}
+
+export type TransactionPatch = {
+  id: string;
+  category?: string | null;
+  merchant?: string | null;
+  note?: string | null;
+};
+
+export function useUpdateTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...fields }: TransactionPatch) => {
+      const res = await api.patch<TransactionOut>(`/transactions/${id}`, fields);
+      return res.data;
+    },
+    onSuccess: () => {
+      // Recategorizing moves spending between categories — everything
+      // derived from transaction categories must refetch.
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: budgetsQueryKey });
+      qc.invalidateQueries({ queryKey: dashboardQueryKey });
+      qc.invalidateQueries({ queryKey: ["insights"] });
     },
   });
 }

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMemo } from "react";
@@ -14,10 +15,11 @@ import {
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import BudgetOverview from "../components/BudgetOverview";
 import CategoryIcon from "../components/CategoryIcon";
 import MoneyText from "../components/MoneyText";
 import TrendChart from "../components/TrendChart";
-import type { AppStackParamList } from "../navigation/AppStack";
+import type { AppStackParamList, AppTabParamList } from "../navigation/AppStack";
 import { useBudgetStatus, type BudgetAlertStatus } from "../services/queries/budgets";
 import { useDashboard, type DashboardResponse } from "../services/queries/dashboard";
 import { useHealthScore, useUnusualSpending } from "../services/queries/insights";
@@ -70,6 +72,8 @@ function DashboardContent({
   const user = useAuthStore((s) => s.user);
   const firstName = user?.name?.split(" ")[0];
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  // Closest navigator is the tab bar — used to jump to the Budgets tab.
+  const tabNavigation = useNavigation<BottomTabNavigationProp<AppTabParamList>>();
   // Screen hides the navigator header, so it must clear the notch itself.
   const insets = useSafeAreaInsets();
 
@@ -195,6 +199,16 @@ function DashboardContent({
       <Text style={styles.sectionLabel}>Tendencia 6 meses</Text>
       <TrendChart months={trendMonths} totals={trendTotals} />
 
+      {budgetStatus && budgetStatus.items.length > 0 ? (
+        <>
+          <Text style={styles.sectionLabel}>Presupuesto del mes</Text>
+          <BudgetOverview
+            items={budgetStatus.items}
+            onPress={() => tabNavigation.navigate("Budgets")}
+          />
+        </>
+      ) : null}
+
       <Text style={styles.sectionLabel}>Por categoría</Text>
       {sortedCategories.length === 0 ? (
         <Text style={styles.emptyCat}>Sin gastos este mes</Text>
@@ -203,7 +217,14 @@ function DashboardContent({
           const cat = getCategory(c.category);
           const alert = c.category ? budgetAlertByCategory.get(c.category) : undefined;
           return (
-            <View key={`${c.category ?? "null"}-${i}`} style={styles.catRow}>
+            <Pressable
+              key={`${c.category ?? "null"}-${i}`}
+              style={({ pressed }) => [styles.catRow, pressed && styles.pressed]}
+              onPress={() =>
+                tabNavigation.navigate("Transactions", { category: c.category })
+              }
+              accessibilityLabel={`Ver movimientos de ${cat.label}`}
+            >
               <CategoryIcon categoryKey={c.category} />
               <View style={styles.catBody}>
                 <View style={styles.catLabelRow}>
@@ -219,7 +240,8 @@ function DashboardContent({
                 <Text style={styles.catCount}>{c.count} {c.count === 1 ? "tx" : "txs"}</Text>
               </View>
               <MoneyText value={c.total} size="md" />
-            </View>
+              <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+            </Pressable>
           );
         })
       )}

@@ -53,12 +53,38 @@ export function useUpsertBudget() {
   });
 }
 
+export function useRenameBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ category, newCategory }: { category: string; newCategory: string }) => {
+      const res = await api.patch<BudgetOut>(`/budgets/${category}`, {
+        new_category: newCategory,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      invalidateBudgets(qc);
+      // Renaming moves transactions to the new slug.
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["insights"] });
+    },
+  });
+}
+
 export function useDeleteBudget() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (category: string) => {
       await api.delete(`/budgets/${category}`);
     },
-    onSuccess: () => invalidateBudgets(qc),
+    onSuccess: () => {
+      invalidateBudgets(qc);
+      // Deleting a custom category moves its transactions to "Otros" on the
+      // backend — refresh everything derived from transaction categories.
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["insights"] });
+    },
   });
 }
