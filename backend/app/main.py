@@ -18,6 +18,7 @@ from app.api.routes import (
     insights,
     notifications,
     plan,
+    public_pages,
     subscriptions,
     transactions,
 )
@@ -118,6 +119,7 @@ def create_app() -> FastAPI:
     app.include_router(insights.router)
     app.include_router(notifications.router)
     app.include_router(cron.router)
+    app.include_router(public_pages.router)
 
     return app
 
