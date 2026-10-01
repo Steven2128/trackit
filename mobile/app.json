@@ -34,7 +34,7 @@
       "expo-web-browser"
     ],
     "extra": {
-      "apiUrl": "https://roamer-curvature-ecology.ngrok-free.dev"
+      "apiUrl": "https://trackit-api-20ya.onrender.com"
     }
   }
 }
