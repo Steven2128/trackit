@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import (
     auth,
     budgets,
+    cron,
     dashboard,
     debts,
     gmail,
@@ -116,6 +117,7 @@ def create_app() -> FastAPI:
     app.include_router(plan.router)
     app.include_router(insights.router)
     app.include_router(notifications.router)
+    app.include_router(cron.router)
 
     return app
 

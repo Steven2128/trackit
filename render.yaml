@@ -1,0 +1,44 @@
+# Render Blueprint — backend API on the free plan.
+# Database lives on Neon (Render's free Postgres is deleted after 30 days).
+# Deploys automatically on every push to master once CI passes.
+# Values marked `sync: false` are entered once in the Render dashboard.
+services:
+  - type: web
+    name: trackit-api
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: master
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeployTrigger: checksPass
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: FERNET_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: API_BASE_URL
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: ITAU_STATEMENT_PDF_PASSWORD
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MOBILE_RETURN_SCHEME
+        value: trackit
+      # Instance sleeps when idle — jobs come from .github/workflows/cron.yml.
+      - key: SYNC_SCHEDULER_ENABLED
+        value: "false"
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: LOG_LEVEL
+        value: INFO

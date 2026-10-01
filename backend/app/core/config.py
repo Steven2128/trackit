@@ -1,6 +1,7 @@
+import re
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +37,11 @@ class Settings(BaseSettings):
     sync_interval_hours: int = Field(default=6)
     sync_scheduler_enabled: bool = Field(default=True)
 
+    # Shared secret for `/internal/cron/*`. On hosts that sleep when idle
+    # (Render free) the in-process scheduler can't be trusted, so an external
+    # cron (GitHub Actions) calls those endpoints instead. Empty = disabled.
+    cron_secret: str = Field(default="")
+
     resend_api_key: str = Field(default="")
     weekly_summary_from_email: str = Field(default="TrackIt <onboarding@resend.dev>")
     weekly_summary_enabled: bool = Field(default=True)
@@ -49,6 +55,23 @@ class Settings(BaseSettings):
 
     cors_origins: str = Field(default="*")
     log_level: str = Field(default="INFO")
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_database_url(cls, value: str) -> str:
+        """Accept the plain `postgres://...?sslmode=require` URLs that hosted
+        Postgres providers (Neon, Render) hand out: force the asyncpg driver
+        and translate libpq's `sslmode` into asyncpg's `ssl` query param."""
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                value = "postgresql+asyncpg://" + value[len(prefix) :]
+                break
+        value = value.replace("sslmode=", "ssl=")
+        # libpq-only param that asyncpg rejects as an unknown server setting.
+        value = re.sub(r"[?&]channel_binding=[^&]*", "", value)
+        if "?" not in value and "&" in value:
+            value = value.replace("&", "?", 1)
+        return value
 
     @property
     def cors_origin_list(self) -> list[str]:

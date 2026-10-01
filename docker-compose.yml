@@ -21,6 +21,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_DEV: "true"
     container_name: trackit-backend
     restart: unless-stopped
     depends_on:
@@ -44,6 +46,7 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       PUSH_ALERTS_ENABLED: ${PUSH_ALERTS_ENABLED:-true}
       PUSH_ALERTS_HOUR: ${PUSH_ALERTS_HOUR:-8}
+      CRON_SECRET: ${CRON_SECRET:-}
     ports:
       - "8000:8000"
     volumes:

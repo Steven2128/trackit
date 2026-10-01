@@ -55,6 +55,14 @@ Keep `app.json` `extra.apiUrl` and `.env`'s `EXPO_PUBLIC_API_URL` in sync — dr
 
 After changing `extra.apiUrl`, run `npx expo start --clear` — Metro caches the manifest.
 
+## Production deploy (Render + Neon) — ADR-008
+
+- `git push origin master` → GitHub CI (`.github/workflows/ci.yml`, pytest) → Render redeploys only if CI is green (`render.yaml`, `autoDeployTrigger: checksPass`). Pushing to master **is** deploying.
+- Container runs `alembic upgrade head` on boot — a new migration ships with the push, no manual step.
+- Render free sleeps when idle → `SYNC_SCHEDULER_ENABLED=false` there. Scheduled jobs come from `.github/workflows/cron.yml` hitting `POST /internal/cron/{gmail-sync,push-alerts,weekly-summary}` with `Bearer $CRON_SECRET`. If you add a scheduled job to `app/main.py`'s lifespan, also add it to `app/api/routes/cron.py::_JOBS` and the workflow.
+- `DATABASE_URL` from Neon is pasted raw (`postgresql://…?sslmode=require`); `Settings._normalize_database_url` converts it. Use Neon's direct endpoint, not `-pooler`.
+- The Render URL replaces ngrok for the phone; the ngrok flow below is only for testing local backend changes on a device.
+
 ## Physical device testing — ngrok is required
 
 Google rejects HTTP redirect URIs unless they're `localhost` / `127.0.0.1`. Your phone can't reach `localhost`, so:

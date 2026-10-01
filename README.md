@@ -91,6 +91,43 @@ simulator. Make sure `EXPO_PUBLIC_API_URL` in `.env` points to a host
 that the device can reach (for physical devices on the same Wi-Fi, use
 your machine's LAN IP instead of `localhost`).
 
+## Deploy (Render + Neon, free)
+
+Pushing to `master` deploys automatically once CI passes. Rationale in
+`DECISIONS.md` → ADR-008. One-time setup:
+
+1. **Neon** (neon.tech) → new project, region *AWS us-east-1*. Copy the
+   **direct** connection string (turn off "Connection pooling") — it looks
+   like `postgresql://user:pass@ep-xxx.us-east-1.aws.neon.tech/neondb?sslmode=require`.
+   Paste it as-is; the backend converts it for asyncpg.
+2. **Render** (render.com) → *New → Blueprint* → pick this GitHub repo. It
+   reads `render.yaml` and asks for the `sync: false` values:
+   - `DATABASE_URL` — the Neon string.
+   - `SECRET_KEY`, `FERNET_KEY` — reuse your local ones if you migrate data
+     (step 5), otherwise generate new ones.
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ITAU_STATEMENT_PDF_PASSWORD`, `RESEND_API_KEY` — same as `.env`.
+   - `API_BASE_URL` — the service URL, e.g. `https://trackit-api.onrender.com`.
+   - `CRON_SECRET` — `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+3. **Google Cloud Console** → OAuth Web client → add redirect URIs
+   `<API_BASE_URL>/auth/google/callback` and `<API_BASE_URL>/gmail/callback`.
+   Also move the OAuth consent screen from *Testing* to *In production* —
+   in Testing, refresh tokens expire after 7 days and Gmail sync dies.
+4. **GitHub** → repo Settings → Secrets and variables → Actions: secret
+   `CRON_SECRET` (same value as Render) and variable `API_URL` (= `API_BASE_URL`).
+5. *(Optional, do it right after step 1 — before Render's first deploy
+   creates empty tables)* copy local data to Neon, using the psql inside
+   the local db container:
+   ```bash
+   docker compose exec -T db pg_dump -U trackit -d trackit --no-owner --no-acl > dump.sql
+   docker compose exec -T db psql "<neon connection string>" < dump.sql
+   ```
+6. **Mobile**: set `mobile/app.json` → `extra.apiUrl` and `.env`'s
+   `EXPO_PUBLIC_API_URL` to the Render URL, then `npx expo start --clear`.
+
+Free-tier caveat: the API sleeps after ~15 min idle, so the first request
+after a while takes ~1 min. Scheduled jobs run from
+`.github/workflows/cron.yml` (also runnable by hand from the Actions tab).
+
 ## Troubleshooting
 
 - **`alembic upgrade head` hangs or errors with `connection refused`** —

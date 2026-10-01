@@ -1,0 +1,49 @@
+name: Scheduled jobs
+
+# Render's free instance sleeps when idle, so the in-process APScheduler
+# can't be trusted in prod (SYNC_SCHEDULER_ENABLED=false there). This
+# workflow wakes the API and fires each job via /internal/cron/<job>.
+#
+# Required repo config (Settings → Secrets and variables → Actions):
+#   secret   CRON_SECRET  — same value as the Render env var
+#   variable API_URL      — e.g. https://trackit-api.onrender.com
+#
+# Times are UTC; Bogotá is UTC-5. GitHub may start scheduled runs late.
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # gmail-sync every 6h
+    - cron: "0 13 * * *"    # push-alerts daily 08:00 Bogotá
+    - cron: "0 13 * * 1"    # weekly-summary Mondays 08:00 Bogotá
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Job to run
+        type: choice
+        options: [gmail-sync, push-alerts, weekly-summary]
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pick job
+        id: pick
+        run: |
+          case "${{ github.event.schedule }}" in
+            "0 */6 * * *") job=gmail-sync ;;
+            "0 13 * * *")  job=push-alerts ;;
+            "0 13 * * 1")  job=weekly-summary ;;
+            *)             job="${{ inputs.job }}" ;;
+          esac
+          echo "job=$job" >> "$GITHUB_OUTPUT"
+
+      - name: Wake API (cold start can take ~1 min)
+        run: |
+          curl -fsS --retry 10 --retry-delay 10 --retry-all-errors --max-time 60 \
+            "${{ vars.API_URL }}/health"
+
+      # No retries here: weekly-summary / push-alerts aren't safe to fire twice.
+      - name: Run ${{ steps.pick.outputs.job }}
+        run: |
+          curl -fsS -X POST --max-time 900 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.API_URL }}/internal/cron/${{ steps.pick.outputs.job }}"

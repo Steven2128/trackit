@@ -1,0 +1,13 @@
+# Personal data must never end up in an image
+statements/
+tests/fixtures/itau_co_extracto/*.pdf
+_tmp/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.venv/
+.env

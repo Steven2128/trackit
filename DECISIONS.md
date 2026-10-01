@@ -259,3 +259,40 @@ Hay que decidir cómo modelar la frontera entre HTTP y DB.
 
 - **SQLModel**: junta ambos pero pierde el control fino sobre qué se serializa.
 - **Devolver dicts manuales**: pierde tipado y validación en runtime.
+
+---
+
+## ADR-008: Hosting gratis — Render (API) + Neon (Postgres) + GitHub Actions (cron)
+
+**Fecha:** 2026-10-01
+**Estado:** Aceptado
+
+### Contexto
+
+Queremos la API en una URL pública fija (sin ngrok, sin re-registrar callbacks
+en Google Cloud cada vez) y que cada push a `master` la actualice sola, sin
+pagar. El backend tiene tareas programadas (sync Gmail cada 6h, resumen
+semanal, alertas push) que hoy corren dentro del proceso con APScheduler.
+
+### Decisión
+
+- **API en Render free** (`render.yaml`), corriendo el mismo `backend/Dockerfile`. Auto-deploy en push a `master` **después de que pase CI** (`.github/workflows/ci.yml`, `autoDeployTrigger: checksPass`). El contenedor corre `alembic upgrade head` al arrancar.
+- **Postgres en Neon free** — el Postgres free de Render se borra a los 30 días. `Settings._normalize_database_url` acepta la URL tal cual la da Neon (`postgresql://…?sslmode=require`) y la traduce a asyncpg. Usar la conexión **directa**, no la `-pooler` (PgBouncer en modo transacción rompe los prepared statements de asyncpg).
+- **Jobs programados vía GitHub Actions** (`.github/workflows/cron.yml`) → `POST /internal/cron/{job}` con `Authorization: Bearer $CRON_SECRET`. En Render `SYNC_SCHEDULER_ENABLED=false`. En local el APScheduler sigue igual.
+
+### Consecuencias
+
+**Ganamos:**
+- URL estable `https://<servicio>.onrender.com` para mobile y para los redirect URIs de Google.
+- Deploy = `git push`. CI bloquea deploys rotos.
+
+**Pagamos:**
+- Render free se duerme tras ~15 min sin tráfico; el primer request tarda ~1 min en despertar (la app se siente lenta al abrirla en frío).
+- Los crons de GitHub pueden arrancar con varios minutos de retraso, y en repos públicos se desactivan solos tras 60 días sin actividad en el repo.
+- Dos servicios más con credenciales que cuidar (Render, Neon).
+
+### Alternativas descartadas
+
+- **Vercel**: serverless — sin proceso vivo para APScheduler, cron free máximo 1 vez/día, límite de duración por request (riesgoso para un sync de 200 emails) y hay que adaptar el pool de conexiones.
+- **Fly.io / Railway**: ya no tienen plan gratis permanente.
+- **Postgres de Render**: expira a los 30 días en free.
