@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     google_client_id: str = Field(default="")
     google_client_secret: str = Field(default="")
+    # Search Console "HTML tag" token, rendered on the public home page.
+    google_site_verification: str = Field(default="")
 
     gmail_sync_default_lookback_days: int = 30
     gmail_sync_max_messages: int = 200

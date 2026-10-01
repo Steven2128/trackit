@@ -8,8 +8,12 @@ domain that's already listed as an authorized domain.
 
 from __future__ import annotations
 
+import html
+
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
+
+from app.core.config import settings
 
 router = APIRouter(tags=["public"], include_in_schema=False)
 
@@ -25,10 +29,18 @@ _STYLE = """
 
 
 def _page(title: str, body: str) -> HTMLResponse:
+    # Google Search Console ownership proof (URL-prefix property, HTML tag
+    # method) — needed for OAuth brand verification of the home page URL.
+    verification = (
+        f"<meta name='google-site-verification' "
+        f"content='{html.escape(settings.google_site_verification, quote=True)}'>"
+        if settings.google_site_verification
+        else ""
+    )
     return HTMLResponse(
         "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-        f"<title>{title}</title>{_STYLE}</head><body>{body}</body></html>"
+        f"{verification}<title>{title}</title>{_STYLE}</head><body>{body}</body></html>"
     )
 
 
