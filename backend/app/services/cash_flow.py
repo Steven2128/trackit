@@ -12,6 +12,7 @@ Also derives the two views the mobile "Plan" screen needs:
 from __future__ import annotations
 
 import calendar
+import uuid
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -31,6 +32,8 @@ class PaymentLike:
     due_day: int | None  # 1-31; None = no deadline (pure apartado)
     grace_days: int
     is_debt_payment: bool
+    id: uuid.UUID | None = None
+    is_paid: bool = False  # checked off for the current month
 
 
 @dataclass
@@ -40,6 +43,8 @@ class UpcomingPayment:
     deadline: date | None  # due date + grace; None when due_day is None
     days_left: int | None
     is_debt_payment: bool
+    id: uuid.UUID | None = None
+    is_paid: bool = False
 
 
 @dataclass
@@ -94,6 +99,8 @@ def compute_cash_flow(
                     deadline=None,
                     days_left=None,
                     is_debt_payment=p.is_debt_payment,
+                    id=p.id,
+                    is_paid=p.is_paid,
                 )
             )
             continue
@@ -106,14 +113,17 @@ def compute_cash_flow(
                 deadline=deadline,
                 days_left=(deadline - today).days,
                 is_debt_payment=p.is_debt_payment,
+                id=p.id,
+                is_paid=p.is_paid,
             )
         )
 
     far_future = date.max
     upcoming.sort(key=lambda u: u.deadline or far_future)
+    # Checked-off items sink to the bottom so the unpaid ones stay on top.
     checklist = sorted(
         upcoming,
-        key=lambda u: (not u.is_debt_payment, u.deadline or far_future),
+        key=lambda u: (u.is_paid, not u.is_debt_payment, u.deadline or far_future),
     )
 
     return CashFlowResult(

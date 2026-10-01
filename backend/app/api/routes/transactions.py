@@ -11,9 +11,11 @@ raw list, just don't inflate ``total_spent`` / ``total_received``.
 
 from __future__ import annotations
 
+import re
+import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.sql import ColumnElement
 
@@ -25,12 +27,25 @@ from app.schemas.transaction import (
     TransactionListResponse,
     TransactionOut,
     TransactionSummary,
+    TransactionUpdate,
 )
+from app.services.categorizer import RULES
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 EXCLUDED_FROM_SPENT_CATEGORIES = ("transfer", "cash_withdrawal")
 EXCLUDED_FROM_RECEIVED_CATEGORIES = ("transfer",)
+
+# Manual recategorization accepts anything the system itself can emit:
+# categorizer rules plus the layers reserved to transfer_matcher/parsers.
+ALLOWED_CATEGORIES = {rule.category for rule in RULES} | set(
+    EXCLUDED_FROM_SPENT_CATEGORIES
+)
+
+# User-defined categories are free-form slugs (mobile slugifies the display
+# name). No registry table — a custom category exists while a budget or a
+# transaction references it; budgets/status and dashboards group by string.
+CUSTOM_CATEGORY_RE = re.compile(r"^[a-z0-9_]{1,64}$")
 
 
 @router.get("", response_model=TransactionListResponse)
@@ -65,6 +80,72 @@ async def list_transactions(
     items = [TransactionOut.model_validate(t) for t in rows_result.scalars().all()]
 
     return TransactionListResponse(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.patch("/{transaction_id}", response_model=TransactionOut)
+async def update_transaction(
+    transaction_id: uuid.UUID,
+    payload: TransactionUpdate,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> TransactionOut:
+    """Manual edit (category and/or merchant name) — feeds budget bars,
+    summaries and dashboard. Partial: only fields present in the body change."""
+    provided = payload.model_fields_set
+    if not provided:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="empty_update"
+        )
+
+    if "category" in provided and payload.category is not None:
+        if (
+            payload.category not in ALLOWED_CATEGORIES
+            and not CUSTOM_CATEGORY_RE.match(payload.category)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="unknown_category",
+            )
+
+    merchant: str | None = None
+    if "merchant" in provided and payload.merchant is not None:
+        merchant = payload.merchant.strip()
+        if not merchant or len(merchant) > 255:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="invalid_merchant",
+            )
+
+    note: str | None = None
+    if "note" in provided and payload.note is not None:
+        note = payload.note.strip() or None
+        if note is not None and len(note) > 500:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="invalid_note",
+            )
+
+    result = await db.execute(
+        select(Transaction).where(
+            Transaction.id == transaction_id,
+            Transaction.user_id == current_user.id,
+        )
+    )
+    tx = result.scalar_one_or_none()
+    if tx is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="transaction_not_found"
+        )
+
+    if "category" in provided:
+        tx.category = payload.category
+    if "merchant" in provided:
+        tx.merchant = merchant
+    if "note" in provided:
+        tx.note = note
+    await db.commit()
+    await db.refresh(tx)
+    return TransactionOut.model_validate(tx)
 
 
 @router.get("/summary", response_model=TransactionSummary)

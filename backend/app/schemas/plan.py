@@ -52,6 +52,8 @@ class PlannedPaymentUpdate(BaseModel):
     due_day: int | None = Field(default=None, ge=1, le=31)
     grace_days: int | None = Field(default=None, ge=0, le=60)
     is_debt_payment: bool | None = None
+    # "YYYY-MM" to check off for that month; null to un-check.
+    paid_month: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
 
 
 class PlannedPaymentOut(PlannedPaymentBase):
@@ -59,17 +61,20 @@ class PlannedPaymentOut(PlannedPaymentBase):
 
     id: uuid.UUID
     created_at: datetime
+    paid_month: str | None
 
 
 # --- Cash flow ---
 
 
 class UpcomingPaymentOut(BaseModel):
+    id: uuid.UUID | None
     name: str
     amount: Decimal
     deadline: date | None
     days_left: int | None
     is_debt_payment: bool
+    is_paid: bool
 
 
 class CashFlowResponse(BaseModel):

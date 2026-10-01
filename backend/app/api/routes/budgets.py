@@ -11,14 +11,16 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.api.deps import CurrentUser, DbSession
+from app.api.routes.transactions import ALLOWED_CATEGORIES
 from app.core.time_utils import current_month_local, month_filter
 from app.models.budget import Budget
 from app.models.transaction import Transaction, TransactionType
 from app.schemas.budget import (
     BudgetOut,
+    BudgetRename,
     BudgetStatusItem,
     BudgetStatusResponse,
     BudgetUpsert,
@@ -63,6 +65,60 @@ async def upsert_budget(
     return BudgetOut.model_validate(budget)
 
 
+@router.patch("/{category}", response_model=BudgetOut)
+async def rename_budget_category(
+    category: str,
+    payload: BudgetRename,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> BudgetOut:
+    """Rename a CUSTOM category — moves its budget and its transactions.
+
+    System categories are fixed (parsers/categorizer emit them), so both the
+    source and the target must be outside that set.
+    """
+    if category in ALLOWED_CATEGORIES or payload.new_category in ALLOWED_CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="system_category",
+        )
+
+    result = await db.execute(
+        select(Budget).where(
+            Budget.user_id == current_user.id, Budget.category == category
+        )
+    )
+    budget = result.scalar_one_or_none()
+    if budget is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="budget_not_found"
+        )
+
+    if payload.new_category != category:
+        collision = await db.execute(
+            select(Budget).where(
+                Budget.user_id == current_user.id,
+                Budget.category == payload.new_category,
+            )
+        )
+        if collision.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="category_exists"
+            )
+        budget.category = payload.new_category
+        await db.execute(
+            update(Transaction)
+            .where(
+                Transaction.user_id == current_user.id,
+                Transaction.category == category,
+            )
+            .values(category=payload.new_category)
+        )
+    await db.commit()
+    await db.refresh(budget)
+    return BudgetOut.model_validate(budget)
+
+
 @router.delete("/{category}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_budget(
     category: str, current_user: CurrentUser, db: DbSession
@@ -78,6 +134,20 @@ async def delete_budget(
             status_code=status.HTTP_404_NOT_FOUND, detail="budget_not_found"
         )
     await db.delete(budget)
+
+    # A custom category only exists through the rows that reference it —
+    # deleting its budget deletes the category, so linked transactions fall
+    # back to uncategorized ("Otros"). System categories keep their
+    # transactions: removing the budget just removes the limit.
+    if category not in ALLOWED_CATEGORIES:
+        await db.execute(
+            update(Transaction)
+            .where(
+                Transaction.user_id == current_user.id,
+                Transaction.category == category,
+            )
+            .values(category=None)
+        )
     await db.commit()
 
 

@@ -79,10 +79,12 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 
 ### Templates
 
-1. **"¡Recibiste plata por Bre-B!"** → `credit`, `merchant="Nequi"`.
-   Dice el banco origen ("desde el banco Itau") — si es Itaú se marca
-   `is_pairing_candidate=True` (autotransferencia a emparejar); cualquier
-   otro banco es ingreso de tercero, no candidato.
+1. **"¡Recibiste plata por Bre-B!"** → `credit`, `merchant="Nequi"`,
+   `category="transfer"` **siempre** (Nequi es destino de parqueo: lo que
+   entra ahí nunca suma al "Recibido" de la app, pareado o no — decisión del
+   usuario 2026-07). Dice el banco origen ("desde el banco Itau") — si es
+   Itaú se marca `is_pairing_candidate=True` (autotransferencia a emparejar);
+   cualquier otro banco queda como transfer sin candidato.
 2. **"¡Enviaste plata por Bre-B!"** → `debit`, `merchant=<destinatario>`.
    Gasto real desde el saldo Nequi, no candidato.
 

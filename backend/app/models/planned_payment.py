@@ -39,6 +39,10 @@ class PlannedPayment(Base):
     is_debt_payment: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # "YYYY-MM" (local month) when the user last checked this off in the
+    # monthly plan. Comparing against the current month makes the check
+    # reset itself when a new month starts — no cron needed.
+    paid_month: Mapped[str | None] = mapped_column(String(7), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

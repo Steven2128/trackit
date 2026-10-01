@@ -18,6 +18,15 @@ class TransactionOut(BaseModel):
     currency: str
     card_last_digits: str | None
     occurred_at: datetime
+    note: str | None
+
+
+class TransactionUpdate(BaseModel):
+    # Partial update — only fields the client actually sent are applied
+    # (checked via model_fields_set in the route). None clears the field.
+    category: str | None = None
+    merchant: str | None = None
+    note: str | None = None
 
 
 class TransactionListResponse(BaseModel):

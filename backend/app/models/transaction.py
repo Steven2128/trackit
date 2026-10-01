@@ -52,6 +52,8 @@ class Transaction(Base):
     )
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
     card_last_digits: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    # User-written free-text note ("qué fue este gasto") — never parsed.
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     raw_email_reference: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_pairing_candidate: Mapped[bool] = mapped_column(

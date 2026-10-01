@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
-from app.core.time_utils import user_tz
+from app.core.time_utils import current_month_local, user_tz
 from app.models.income_source import IncomeSource
 from app.models.planned_payment import PlannedPayment
 from app.schemas.plan import (
@@ -153,6 +153,7 @@ async def cash_flow(current_user: CurrentUser, db: DbSession) -> CashFlowRespons
         IncomeLike(name=i.name, amount=i.amount, expected_day=i.expected_day)
         for i in incomes_result.scalars().all()
     ]
+    this_month = current_month_local()
     payments = [
         PaymentLike(
             name=p.name,
@@ -160,6 +161,9 @@ async def cash_flow(current_user: CurrentUser, db: DbSession) -> CashFlowRespons
             due_day=p.due_day,
             grace_days=p.grace_days,
             is_debt_payment=p.is_debt_payment,
+            id=p.id,
+            # Check-off is per local month; an old paid_month means unpaid now.
+            is_paid=p.paid_month == this_month,
         )
         for p in payments_result.scalars().all()
     ]
@@ -170,11 +174,13 @@ async def cash_flow(current_user: CurrentUser, db: DbSession) -> CashFlowRespons
     def _out(items) -> list[UpcomingPaymentOut]:
         return [
             UpcomingPaymentOut(
+                id=u.id,
                 name=u.name,
                 amount=u.amount,
                 deadline=u.deadline,
                 days_left=u.days_left,
                 is_debt_payment=u.is_debt_payment,
+                is_paid=u.is_paid,
             )
             for u in items
         ]

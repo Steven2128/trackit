@@ -45,7 +45,8 @@ class TestRecibiste:
         assert tx.transaction_type == TransactionType.credit
         assert tx.merchant == "Nequi"
         assert tx.currency == "COP"
-        assert tx.category is None
+        # Parking destination — inbound Nequi money is never received income.
+        assert tx.category == "transfer"
         # Sourced from the user's own Itaú — pairing candidate.
         assert tx.is_pairing_candidate is True
         # "3 de julio de 2026 a las 3:07 p.m" Bogotá → 20:07 UTC
@@ -62,13 +63,15 @@ class TestRecibiste:
         assert tx.occurred_at == datetime(2026, 7, 1, 18, 55, tzinfo=timezone.utc)
 
     def test_recibiste_from_other_bank_is_not_candidate(self, parser: NequiParser) -> None:
-        """Money from someone else's Bancolombia is income, not a self-transfer."""
+        """Money from someone else's bank isn't pairable, but it still lands
+        in the Nequi parking account — tagged transfer, excluded from income."""
         envelope = load_eml_fixture("nequi/recibiste_otro_banco.eml")
         tx = parser.parse(envelope)
 
         assert tx is not None
         assert tx.amount == Decimal("80000")
         assert tx.transaction_type == TransactionType.credit
+        assert tx.category == "transfer"
         assert tx.is_pairing_candidate is False
         # "10:20 a.m" Bogotá → 15:20 UTC
         assert tx.occurred_at == datetime(2026, 6, 29, 15, 20, tzinfo=timezone.utc)
