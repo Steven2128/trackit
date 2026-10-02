@@ -17,6 +17,7 @@ Cuando agregues un banco nuevo:
 |------------------------|------|------------|-------------------------------------|---------------------------------------|
 | Itaú                   | CO   | Done       | `notificaciones@clienteitau.co`     | `app/parsers/itau_co.py`              |
 | Nequi                  | CO   | Done       | `notificaciones@nequi.com.co`       | `app/parsers/nequi.py`                |
+| Davivienda             | CO   | Done       | `BANCO_DAVIVIENDA@davivienda.com`   | `app/parsers/davivienda.py`           |
 | Daviplata              | CO   | Backlog    | Sin notificaciones por email (0 hits en 90 días) | `app/parsers/daviplata.py` (TBD) |
 | Banco Falabella        | CO   | Backlog    | Solo marketing observado (`contacto@co.bancofalabella.com`) | `app/parsers/falabella_co.py` (TBD) |
 
@@ -96,6 +97,36 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 
 ---
 
+## Davivienda
+
+- **País**: Colombia
+- **Sender transaccional**: `BANCO_DAVIVIENDA@davivienda.com` (asunto siempre "DAVIVIENDA"). `ServicioNotificaciones@davivienda.com` manda avisos de registro/actualización de datos y `can_parse` lo rechaza.
+- **Estado**: Done (`tests/parsers/test_davivienda.py`)
+- **Parser**: `backend/app/parsers/davivienda.py`
+- **Fixtures**: `backend/tests/fixtures/davivienda/` (6 emails reales anonimizados, guardados en Latin-1 como llegan)
+- **Rol**: desde 2026-09 es la cuenta de nómina y reemplaza a Itaú como cuenta principal. El parser de Itaú queda registrado para el histórico.
+
+### Template único
+
+"se ha registrado el siguiente movimiento de su Cta de Ahorros terminada (o) en ****NNNN: Fecha · Hora · Valor Transacción · Clase de Movimiento · Lugar de Transacción". La **clase** decide:
+
+| Clase de Movimiento | Resultado |
+|---|---|
+| `Abono …` (Pago de Nomina, de Proveedores, A Otros Bancos en Linea Transfiya) | `credit`, merchant = Lugar |
+| `Descuento Transferencia a una llave` | `debit`, merchant = `Transferencia llave Davivienda`, `category="transfer"`, pairing candidate |
+| Cualquier otra con valor (Compra en Establecimiento, Descuento en Internet/PSE) | `debit`, merchant = Lugar |
+| Sin "Valor Transacción" (Cambio de Clave) | `None` |
+
+### Gotchas
+
+- **"Abono A Otros Bancos en Linea Transfiya" es una entrada**, no una salida (confirmado por el usuario: es nómina). Toda clase que empieza con "Abono" es un crédito.
+- **Transferencias a llave = puente a Nequi**: el usuario las usa para pasar plata a su Nequi y pagar desde ahí. Se marcan `transfer` de entrada (pareadas o no) y el gasto real lo registra el "Enviaste" de Nequi. Si alguna va a un tercero, hay que recategorizarla a mano desde la app.
+- **Charset**: el cuerpo viene en Latin-1 aunque el `<meta>` dice UTF-8. `app/integrations/gmail.py::_decode_part_body` respeta el charset del header y cae a cp1252 si UTF-8 falla. Además, los regex usan `.` en las letras acentuadas por si el acento llega roto.
+- **Monto en formato gringo** (`$1,186,548`), igual que Itaú.
+- Las clases vienen con espacios de relleno ("Compra       en Establecimiento,") y a veces con coma final.
+
+---
+
 ## Pareo de transferencias (Itaú → Nequi/Daviplata/Falabella)
 
 **El problema**: cuando hacés una transferencia desde Itaú a Nequi/Daviplata/
@@ -146,8 +177,10 @@ Internet pre-existentes). El matcher está en
 `app/services/transfer_matcher.py` con la lógica de pareo pura
 (`pair_transfers`) testeada en `tests/services/test_transfer_matcher.py`.
 
-**Estado actual del pareo**: lado débito (Itaú) y lado crédito **Nequi**
-completos — el pareo Itaú→Nequi está activo end-to-end. Daviplata no manda
+**Estado actual del pareo**: lado débito (Itaú `Portal Internet` y
+Davivienda `Transferencia llave Davivienda`) y lado crédito **Nequi**
+completos — Itaú→Nequi y Davivienda→Nequi activos end-to-end. Nequi marca
+como candidato el "Recibiste" que viene "desde el banco" Itaú o Davivienda. Daviplata no manda
 notificaciones por email y de Falabella solo se observó marketing; esos dos
 lados crédito siguen pendientes de emails reales.
 

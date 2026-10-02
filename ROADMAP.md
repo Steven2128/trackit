@@ -72,7 +72,8 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 
 - [x] Push notifications — tabla `push_tokens` (registro vía `POST /notifications/token` post-login en mobile con `expo-notifications`) + job diario 8am (`send_push_alerts_job`): presupuestos al 80/100%, vencimientos ≤3 días y gasto inusual, con dedupe por periodo en `notification_logs` (una alerta suena una vez por mes/vencimiento, no todos los días). Envío vía Expo Push API (`app/services/push_sender.py`); tokens muertos (`DeviceNotRegistered`) se purgan solos. Nota: en Expo Go (SDK 53+) push remoto no funciona — requiere development build; el registro falla silencioso en dev.
 - [ ] Análisis de patrones con IA (Claude API)
-- [ ] Soporte para más bancos: Bancolombia, Davivienda, Nu Colombia
+- [x] Parser Davivienda (cuenta de nómina desde 2026-09): compras, PSE, abonos, transferencias a llave → Nequi pareadas (ver PARSERS.md)
+- [ ] Soporte para más bancos: Bancolombia, Nu Colombia
 - [ ] Reporte mensual exportable en PDF
 - [ ] Modo finanzas en pareja (gastos compartidos)
 

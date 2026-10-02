@@ -9,7 +9,7 @@ decisions that bite if you forget them.
 
 - **`ROADMAP.md`** — current MVP scope, "Now" priorities, open questions. **Always read first** before suggesting new features; don't propose work that isn't on the list.
 - **`DECISIONS.md`** — ADRs with the rationale for each weird choice (OAuth server-side, Fernet, async SQLA, etc.). Read when about to refactor something architectural — there's likely a reason it's that way.
-- **`PARSERS.md`** — per-bank email parser registry. Currently only **Itaú Colombia** is parsed (it's the user's primary bank — all income and outflow goes through it). Other accounts (Falabella, Nequi, Daviplata, cash) are "parking destinations" detected from Itaú's outbound transfer emails and tagged `category="transfer"` so they don't count as spending. Read this file before adding a new bank or touching transfer detection.
+- **`PARSERS.md`** — per-bank email parser registry. Parsed today: **Davivienda** (primary/payroll bank since 2026-09), **Itaú Colombia** (former primary, kept for history) and **Nequi**. Nequi, Falabella, Daviplata and cash are "parking destinations": inbound money there and outbound self-transfers from Itaú/Davivienda are tagged `category="transfer"` so they don't count as spending. Read this file before adding a new bank or touching transfer detection.
 
 ## Layout
 

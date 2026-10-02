@@ -1,7 +1,8 @@
-"""Pair outgoing Itaú transfers with incoming credits at destination banks.
+"""Pair outgoing Itaú/Davivienda transfers with incoming credits at destination banks.
 
 Itaú's outgoing-transfer email carries no recipient — only "Canal: Portal
-Internet". To avoid counting transfers to the user's own Nequi/Daviplata/
+Internet" — and Davivienda's Bre-B key transfers don't name the destination
+bank either. To avoid counting transfers to the user's own Nequi/Daviplata/
 Falabella accounts as spending, we pair those debits with the "you received
 $X" notifications from the destination banks: exact amount, ±10 minute
 window. Paired rows get ``category="transfer"`` and share a
@@ -22,14 +23,16 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.transaction import Transaction, TransactionType
+from app.parsers.davivienda import LLAVE_MERCHANT
 
 log = logging.getLogger(__name__)
 
 PAIRING_WINDOW = timedelta(minutes=10)
 LOOKBACK = timedelta(days=7)
 
-# Merchant values produced by the (future) destination-bank parsers.
-SOURCE_MERCHANT = "Portal Internet"
+# Debit merchants set by the source-bank parsers (Itaú, Davivienda).
+SOURCE_MERCHANTS = ("Portal Internet", LLAVE_MERCHANT)
+# Credit merchants set by the destination-bank parsers.
 DESTINATION_MERCHANTS = ("Nequi", "Daviplata", "Banco Falabella")
 
 
@@ -90,7 +93,7 @@ async def match_transfers(db: AsyncSession, user_id: uuid.UUID) -> int:
         await db.execute(
             base.where(
                 Transaction.transaction_type == TransactionType.debit,
-                Transaction.merchant == SOURCE_MERCHANT,
+                Transaction.merchant.in_(SOURCE_MERCHANTS),
             )
         )
     ).all()

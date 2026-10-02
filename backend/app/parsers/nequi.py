@@ -12,9 +12,9 @@ Supported templates:
    → credit, merchant = "Nequi", category = "transfer". Nequi is a parking
    destination (PARSERS.md): money arriving there is never real income for
    the app's totals, so every inbound credit is tagged "transfer" up front —
-   not only the ones the matcher later pairs. When <BANK> is Itaú it's also
-   flagged ``is_pairing_candidate=True`` so the matcher can link it to the
-   Itaú outbound debit.
+   not only the ones the matcher later pairs. When <BANK> is Itaú or
+   Davivienda it's also flagged ``is_pairing_candidate=True`` so the matcher
+   can link it to that bank's outbound debit.
 
 2. Enviaste ("¡Enviaste plata por Bre-B!")
    "Enviaste de manera exitosa 23.000 a la llave @<KEY> de <RECIPIENT> el
@@ -40,6 +40,9 @@ from app.models.transaction import TransactionType
 from app.parsers.base import EmailEnvelope, EmailParser, ParsedTransaction
 
 NEQUI_SENDER = "notificaciones@nequi.com.co"
+
+# Source banks whose outbound debits the matcher can pair with a Recibiste.
+_SELF_TRANSFER_BANKS = ("itau", "davivienda")
 
 # Colombia is UTC-5 year-round (no DST).
 COLOMBIA_TZ = timezone(timedelta(hours=-5))
@@ -121,10 +124,12 @@ class NequiParser(EmailParser):
                 category="transfer",
                 currency="COP",
                 raw_email_reference=envelope.message_id,
-                # Money arriving from the user's own Itaú is a self-transfer
-                # the matcher should pair; anything else stays an unpaired
-                # transfer.
-                is_pairing_candidate="itau" in bank.lower(),
+                # Money arriving from the user's own Itaú/Davivienda is a
+                # self-transfer the matcher should pair; anything else stays
+                # an unpaired transfer.
+                is_pairing_candidate=any(
+                    b in bank.lower() for b in _SELF_TRANSFER_BANKS
+                ),
             )
 
         # 2. Enviaste (outgoing debit)

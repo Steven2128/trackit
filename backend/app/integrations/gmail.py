@@ -14,6 +14,7 @@ token. We snapshot the token/expiry before each call and invoke
 from __future__ import annotations
 
 import base64
+import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -184,7 +185,7 @@ def _extract_bodies(payload: dict[str, Any]) -> tuple[str | None, str | None]:
         data = part.get("body", {}).get("data")
         if not data:
             continue
-        decoded = _decode_part_body(data)
+        decoded = _decode_part_body(data, _part_charset(part))
         if mime == "text/html" and html_body is None:
             html_body = decoded
         elif mime == "text/plain" and text_body is None:
@@ -221,9 +222,29 @@ def _walk_parts(part: dict[str, Any]) -> Iterable[dict[str, Any]]:
         yield from _walk_parts(child)
 
 
-def _decode_part_body(data: str) -> str:
+def _part_charset(part: dict[str, Any]) -> str | None:
+    """Charset from the part's Content-Type header, if declared."""
+    for header in part.get("headers", []) or []:
+        if header.get("name", "").lower() == "content-type":
+            match = re.search(r'charset="?([\w.:-]+)"?', header.get("value", ""), re.IGNORECASE)
+            if match:
+                return match.group(1)
+    return None
+
+
+def _decode_part_body(data: str, charset: str | None = None) -> str:
+    """Decode a body part. Honors the declared charset, then falls back to
+    UTF-8 and finally cp1252 — Davivienda sends Latin-1 bodies, and a blind
+    UTF-8 decode turned every accent into U+FFFD."""
     raw = base64.urlsafe_b64decode(data.encode("ascii"))
-    return raw.decode("utf-8", errors="replace")
+    for encoding in (charset, "utf-8"):
+        if not encoding:
+            continue
+        try:
+            return raw.decode(encoding)
+        except (LookupError, UnicodeDecodeError):
+            continue
+    return raw.decode("cp1252", errors="replace")
 
 
 def _parse_date_header(value: str | None) -> datetime | None:
