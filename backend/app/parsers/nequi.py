@@ -1,8 +1,9 @@
-"""Parser for Nequi (Colombia) Bre-B notification emails.
+"""Parser for Nequi (Colombia) movement notification emails.
 
-Sender: notificaciones@nequi.com.co (transactional). Marketing comes from
-somos@nequi.com.co / somos@notificaciones.nequi.com.co and is rejected by
-``can_parse``.
+Senders: notificaciones@nequi.com.co (Bre-B) and somos@nequi.com.co (PSE and
+bill payments — it also sends login notices and onboarding mail, which match
+no template and return None). Marketing from somos@notificaciones.nequi.com.co
+is rejected by ``can_parse``.
 
 Supported templates:
 
@@ -22,11 +23,25 @@ Supported templates:
    → debit, merchant = <RECIPIENT>. Real outflow from the Nequi balance —
    NOT a pairing candidate.
 
+3. Pago exitoso ("¡Pago exitoso!", PSE from Nequi)
+   "Hiciste un pago en <MERCHANT> por $92.990 Fecha: El 6 de abril de 2026
+    Hora: 2:28 p. m. CUS: ..."
+   → debit, merchant = <MERCHANT>.
+
+4. Comprobante de factura ("Comprobante de pago Enel", "Tu comprobante de
+   pago Claro Hogar")
+   "Listo tu pago en <BILLER> Pagaste con Nequi tu factura por $92.670 ...
+    Fecha del pago: 06/Ago/2026"
+   → debit, merchant = <BILLER>. The body has no time, so occurred_at is the
+   email's received time (sent the moment the bill is paid).
+
 Format gotchas (differ from Itaú):
 - Amounts use Colombian formatting: dot = thousands, optional comma =
   decimals, no "$" sign ("1.647.000").
 - Dates are Spanish long form in Bogotá local time, 12h clock, and the
   article is "a las" except at one o'clock where it's "a la 1:55 p.m".
+  Pago exitoso splits it instead: "El 6 de abril de 2026 Hora: 2:28 p. m."
+- Payment templates prefix the amount with "$"; Bre-B ones don't.
 """
 
 from __future__ import annotations
@@ -40,6 +55,7 @@ from app.models.transaction import TransactionType
 from app.parsers.base import EmailEnvelope, EmailParser, ParsedTransaction
 
 NEQUI_SENDER = "notificaciones@nequi.com.co"
+NEQUI_PAYMENTS_SENDER = "somos@nequi.com.co"
 
 # Source banks whose outbound debits the matcher can pair with a Recibiste.
 _SELF_TRANSFER_BANKS = ("itau", "davivienda")
@@ -82,6 +98,24 @@ _SOURCE_BANK_RE = re.compile(
     re.IGNORECASE,
 )
 
+# "El 6 de abril de 2026 Hora: 2:28 p. m."
+_PAGO_DATETIME_RE = re.compile(
+    r"El\s+(?P<day>\d{1,2})\s+de\s+(?P<month>[a-záéíóú]+)\s+de\s+(?P<year>\d{4})"
+    r"\s+Hora\s*:\s*(?P<hour>\d{1,2}):(?P<minute>\d{2})\s*(?P<meridiem>[ap])\.?\s*m",
+    re.IGNORECASE,
+)
+
+_PAGO_RE = re.compile(
+    rf"Hiciste\s+un\s+pago\s+en\s+(?P<merchant>.+?)\s+por\s+\$\s*{_AMOUNT}",
+    re.IGNORECASE,
+)
+
+_FACTURA_RE = re.compile(
+    rf"Listo\s+tu\s+pago\s+en\s+(?P<merchant>.+?)\s+Pagaste\s+con\s+Nequi"
+    rf"\s+tu\s+factura\s+por\s+\$\s*{_AMOUNT}",
+    re.IGNORECASE,
+)
+
 _ENVIASTE_RE = re.compile(
     rf"Enviaste\s+de\s+manera\s+exitosa\s+{_AMOUNT}"
     r"\s+a\s+la\s+llave\s+\S+\s+de\s+(?P<recipient>.+?)\s+el\s+\d",
@@ -91,16 +125,22 @@ _ENVIASTE_RE = re.compile(
 
 class NequiParser(EmailParser):
     name = "nequi"
-    sender_filter = NEQUI_SENDER
+    sender_filter = (NEQUI_SENDER, NEQUI_PAYMENTS_SENDER)
 
     def can_parse(self, envelope: EmailEnvelope) -> bool:
-        return NEQUI_SENDER in envelope.sender.lower()
+        sender = envelope.sender.lower()
+        return NEQUI_SENDER in sender or NEQUI_PAYMENTS_SENDER in sender
 
     def parse(self, envelope: EmailEnvelope) -> ParsedTransaction | None:
         if not envelope.html_body:
             return None
 
         text = self._normalize_html(envelope.html_body)
+
+        # 3-4. PSE / bill payments — own date formats, checked first.
+        payment = self._parse_payment(envelope, text)
+        if payment is not None:
+            return payment
 
         occurred_at = self._extract_datetime(text)
         if occurred_at is None:
@@ -150,6 +190,29 @@ class NequiParser(EmailParser):
 
         return None
 
+    @classmethod
+    def _parse_payment(cls, envelope: EmailEnvelope, text: str) -> ParsedTransaction | None:
+        pago = _PAGO_RE.search(text)
+        if pago:
+            occurred_at = cls._extract_datetime(text, _PAGO_DATETIME_RE)
+        else:
+            pago = _FACTURA_RE.search(text)
+            occurred_at = envelope.received_at.astimezone(timezone.utc) if pago else None
+        if pago is None or occurred_at is None:
+            return None
+        amount = cls._parse_amount(pago.group("amount"))
+        if amount is None:
+            return None
+        return ParsedTransaction(
+            amount=amount,
+            transaction_type=TransactionType.debit,
+            occurred_at=occurred_at,
+            merchant=pago.group("merchant").strip(),
+            category=None,
+            currency="COP",
+            raw_email_reference=envelope.message_id,
+        )
+
     @staticmethod
     def _normalize_html(html_body: str) -> str:
         """Decode HTML entities, strip tags, collapse whitespace."""
@@ -164,9 +227,9 @@ class NequiParser(EmailParser):
         except Exception:
             return None
 
-    @classmethod
-    def _extract_datetime(cls, text: str) -> datetime | None:
-        match = _DATETIME_RE.search(text)
+    @staticmethod
+    def _extract_datetime(text: str, pattern: re.Pattern[str] = _DATETIME_RE) -> datetime | None:
+        match = pattern.search(text)
         if not match:
             return None
         month = _MONTHS.get(match.group("month").lower())

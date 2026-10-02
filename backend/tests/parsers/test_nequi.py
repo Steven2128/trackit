@@ -21,16 +21,19 @@ class TestCanParse:
         envelope = load_eml_fixture("nequi/recibiste_itau.eml")
         assert parser.can_parse(envelope) is True
 
-    def test_rejects_marketing_senders(self, parser: NequiParser) -> None:
-        for sender in ("somos@nequi.com.co", "somos@notificaciones.nequi.com.co"):
-            envelope = EmailEnvelope(
-                sender=sender,
-                subject="Conoce los términos y condiciones",
-                message_id="<x@nequi.com.co>",
-                received_at=datetime.now(timezone.utc),
-                html_body="<html><body>marketing</body></html>",
-            )
-            assert parser.can_parse(envelope) is False
+    def test_accepts_payments_sender(self, parser: NequiParser) -> None:
+        envelope = load_eml_fixture("nequi/pago_exitoso.eml")
+        assert parser.can_parse(envelope) is True
+
+    def test_rejects_marketing_sender(self, parser: NequiParser) -> None:
+        envelope = EmailEnvelope(
+            sender="somos@notificaciones.nequi.com.co",
+            subject="Conoce los términos y condiciones",
+            message_id="<x@nequi.com.co>",
+            received_at=datetime.now(timezone.utc),
+            html_body="<html><body>marketing</body></html>",
+        )
+        assert parser.can_parse(envelope) is False
 
 
 class TestRecibiste:
@@ -93,6 +96,56 @@ class TestEnviaste:
         assert tx.occurred_at == datetime(2026, 7, 1, 1, 45, tzinfo=timezone.utc)
 
 
+class TestPagos:
+    """PSE and bill payments from the Nequi balance (somos@nequi.com.co)."""
+
+    def test_pago_exitoso(self, parser: NequiParser) -> None:
+        tx = parser.parse(load_eml_fixture("nequi/pago_exitoso.eml"))
+
+        assert tx is not None
+        assert tx.amount == Decimal("92990")
+        assert tx.transaction_type == TransactionType.debit
+        assert tx.merchant == "Colombia Telecomunicaciones S.A. E.S.P. (Movil)"
+        assert tx.category is None
+        assert tx.currency == "COP"
+        assert tx.is_pairing_candidate is False
+        # "El 6 de abril de 2026 Hora: 2:28 p. m." Bogotá → 19:28 UTC
+        assert tx.occurred_at == datetime(2026, 4, 6, 19, 28, tzinfo=timezone.utc)
+
+    def test_pago_exitoso_after_midnight(self, parser: NequiParser) -> None:
+        """"12:47 a. m." is 00:47, not 12:47."""
+        tx = parser.parse(load_eml_fixture("nequi/pago_exitoso_madrugada.eml"))
+
+        assert tx is not None
+        assert tx.amount == Decimal("24700")
+        assert tx.merchant == "PATRIMONIOS AUTONOMOS AVAL FIDUCIARIA S.A"
+        # 5 ago 00:47 Bogotá → 05:47 UTC
+        assert tx.occurred_at == datetime(2026, 8, 5, 5, 47, tzinfo=timezone.utc)
+
+    @pytest.mark.parametrize(
+        ("fixture", "merchant", "amount"),
+        [
+            ("nequi/comprobante_enel.eml", "Enel", "92670"),
+            ("nequi/comprobante_claro.eml", "Claro Hogar", "92101"),
+        ],
+    )
+    def test_comprobante_de_factura(
+        self, parser: NequiParser, fixture: str, merchant: str, amount: str
+    ) -> None:
+        envelope = load_eml_fixture(fixture)
+        tx = parser.parse(envelope)
+
+        assert tx is not None
+        assert tx.amount == Decimal(amount)
+        assert tx.transaction_type == TransactionType.debit
+        assert tx.merchant == merchant
+        # No time in the body — falls back to when the email arrived.
+        assert tx.occurred_at == envelope.received_at.astimezone(timezone.utc)
+
+    def test_login_notice_from_payments_sender_returns_none(self, parser: NequiParser) -> None:
+        assert parser.parse(load_eml_fixture("nequi/acceso_somos.eml")) is None
+
+
 class TestUnrecognized:
     def test_unrecognized_body_returns_none(self, parser: NequiParser) -> None:
         envelope = EmailEnvelope(
@@ -113,3 +166,12 @@ class TestUnrecognized:
             html_body=None,
         )
         assert parser.parse(envelope) is None
+
+
+def test_sync_query_includes_both_nequi_senders() -> None:
+    from app.services.email_sync import build_query
+
+    query = build_query([NequiParser()], last_sync_at=None, fallback_lookback_days=30)
+
+    assert "from:notificaciones@nequi.com.co" in query
+    assert "from:somos@nequi.com.co" in query

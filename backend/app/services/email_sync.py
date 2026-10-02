@@ -208,7 +208,16 @@ def build_query(
     last_sync_at: datetime | None,
     fallback_lookback_days: int,
 ) -> str:
-    senders = sorted({p.sender_filter.lower() for p in parsers if p.sender_filter})
+    senders = sorted(
+        {
+            s.lower()
+            for p in parsers
+            if p.sender_filter
+            for s in (
+                (p.sender_filter,) if isinstance(p.sender_filter, str) else p.sender_filter
+            )
+        }
+    )
     if not senders:
         raise RuntimeError(
             "No parsers declare a sender_filter — cannot build a Gmail query"

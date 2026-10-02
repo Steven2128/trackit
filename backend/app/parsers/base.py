@@ -54,7 +54,8 @@ class EmailParser(ABC):
     """Base class for bank-specific email parsers."""
 
     name: str = "base"
-    sender_filter: str | None = None
+    # Gmail `from:` address(es) the sync query must include for this parser.
+    sender_filter: str | tuple[str, ...] | None = None
 
     @abstractmethod
     def can_parse(self, envelope: EmailEnvelope) -> bool:

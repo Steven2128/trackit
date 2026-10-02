@@ -1,0 +1,134 @@
+Delivered-To: user@example.test
+From: somos@nequi.com.co
+To: user@example.test
+Message-ID: <comprobante_enel@nequi.test>
+Subject: =?utf-8?q?Comprobante_de_pago_Enel?=
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 8bit
+Date: Thu, 06 Aug 2026 17:02:46 +0000
+
+<html>
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NEQUI</title>
+</head>
+
+<body><img alt="" src="https://example.test/t" width="1" height="1">
+  <table width="100%" align="center" border="0" cellspacing="0" cellpadding="0" style="max-width:768px;">
+    <tr>
+      <td>
+        <table width="100%" align="center" border="0" cellspacing="0px" cellpadding="0"
+          style="max-width:670px; border:solid 1px #dcdcdc;">
+
+          <tr>
+            <td style="padding: 0px 5% 0px">
+              <table width="100%" align="center" cellspacing="0" cellpadding="0" border="0"
+                style="max-width: 550px; font-family: sans-serif; font-size: 16px; color: #210049; text-align: center; ">
+                <tr>
+                  <td width="100%"
+                    style=" font-size: 18px; font-weight: normal; color:#DA0081; padding-top:50px; text-align:center; font-size: 18px">
+                    <img src="https://mail-nequi-co.s3.amazonaws.com/facturas/facturas_babel.png" alt="">
+                  </td>
+                </tr>
+                <tr>
+                  <td width="100%"
+                    style=" font-size: 18px; font-weight: normal; color:#200020; padding:30px 0 20px; text-align:center; font-size: 18px">
+                    Listo tu pago en Enel</td>
+                </tr>
+
+                <tr>
+                  <td width="100%" style="font-size: 18px;  color:#646464; text-align:left;padding-top: 30px;">
+                    Pagaste con Nequi tu factura por $92.670.</td>
+                </tr>
+
+                <tr>
+                  <td width="100%"
+                    style="font-size: 18px; font-weight: normal; color:#646464;padding-top: 30px; text-align:left;">
+                    Estado: Exitoso</td>
+                </tr>
+
+                <tr>
+                  <td width="100%"
+                    style="font-size: 18px; color:#646464; padding-top: 30px; text-align:left;">
+                    Comprobante de Pago</td>
+                </tr>
+
+                <tr>
+                  <td width="100%" style="font-size: 18px; color:#646464; text-align:left;padding-top: 30px;">
+                    Enel</td>
+                </tr>
+                <tr><td width="100%" style="font-size: 16px; color:#646464; text-align:left;padding-top: 10px;"> Número de cuenta: 1234567</td></tr><tr><td width="100%" style="font-size: 16px; color:#646464; text-align:left;padding-top: 10px;"> Factura: 9876543210</td></tr><tr><td width="100%" style="font-size: 16px; color:#646464; text-align:left;padding-top: 10px;"> Nombre: JUAN PEREZ</td></tr><tr><td width="100%" style="font-size: 16px; color:#646464; text-align:left;padding-top: 10px;"> Fecha del pago: 06/Ago/2026</td></tr><tr><td width="100%" style="font-size: 16px; color:#DA0081; text-align:left;padding-top: 10px;"> Valor: <span style="color: #DA0081">$92.670</span></td></tr>
+
+                <tr>
+                  <td width="100%"
+                    style="padding-top: 30px;padding-bottom: 50px; color:#848484; font-size: 16px;text-align:left;">
+                    Si no fuiste tú, es un error o tienes dudas, escríbenos a nuestro chat <span><a
+                        style="color: #DA0081; text-decoration: none;" href="https://example.test/t"
+                        target="_blank">www.nequi.com.co</a><br></span> Estamos por aquí todos los días de 8 a.m. a 10 p.m.
+                  </td>
+
+                </tr>
+
+                <tr>
+                  <td width="100%"
+                    style="padding: 40px 60px 20px; font-size: 16px; color:#848484; border-top:dotted 1px #dcdcdc;">
+                    ¿Ya nos sigues en redes? ¡Siempre tenemos cosas nuevas!
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <table align="center" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td><a href="https://example.test/t" target="_blank"><img
+                          src="https://mail-nequi-co.s3.amazonaws.com/facturas/ico_tw_babel.png" alt="twitter"
+                          style="width: 39px; height: 38px; padding:0px 10px 0px" /></a></td>
+
+                        <td><a href="https://example.test/t" target="_blank"><img
+                              src="https://mail-nequi-co.s3.amazonaws.com/facturas/ico_fb_babel.png" alt="facebook"
+                              style="width: 39px; height: 38px; padding:0px 10px 0px" /></a></td>
+
+                        <td><a href="https://example.test/t" target="_blank"><img
+                              src="https://mail-nequi-co.s3.amazonaws.com/facturas/ico_insta_babel.png" alt="instagram"
+                              style="width: 39px; height: 38px; padding:0px 10px 0px" /></a></td>
+
+                        <td><a href="https://example.test/t" target="_blank"><img
+                              src="https://mail-nequi-co.s3.amazonaws.com/facturas/ico_yt_babel.png" alt="YouTube"
+                              style="width: 39px; height: 38px; padding:0px 10px 0px" /></a></td>
+
+                        <td><a href="https://example.test/t" target="_blank"><img
+                              src="https://mail-nequi-co.s3.amazonaws.com/facturas/ico_in_babel.png" alt="LinkedIn"
+                              style="width: 39px; height: 38px; padding:0px 10px 0px" /></a></td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+          <tr>
+            <td style="text-align: center; max-width:670px;">
+              <table align="center" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="width: 80%;"></td>
+
+                    <td style="width: 20%;text-align:right;"><a href="https://example.test/t" target="_blank"><img
+                      src="https://mail-nequi-co.s3.amazonaws.com/facturas/footer_babel.png" alt=" NEQUI"
+                      style="width: 85%; padding:29px 11px;"></a>
+                </tr>
+              </table>
+            </td>
+            
+        </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+
+</html>

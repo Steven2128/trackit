@@ -16,7 +16,7 @@ Cuando agregues un banco nuevo:
 | Banco / Proveedor      | País | Estado     | Sender                              | Parser                                |
 |------------------------|------|------------|-------------------------------------|---------------------------------------|
 | Itaú                   | CO   | Done       | `notificaciones@clienteitau.co`     | `app/parsers/itau_co.py`              |
-| Nequi                  | CO   | Done       | `notificaciones@nequi.com.co`       | `app/parsers/nequi.py`                |
+| Nequi                  | CO   | Done       | `notificaciones@nequi.com.co`, `somos@nequi.com.co` | `app/parsers/nequi.py` |
 | Davivienda             | CO   | Done       | `BANCO_DAVIVIENDA@davivienda.com`   | `app/parsers/davivienda.py`           |
 | Daviplata              | CO   | Backlog    | Sin notificaciones por email (0 hits en 90 días) | `app/parsers/daviplata.py` (TBD) |
 | Banco Falabella        | CO   | Backlog    | Solo marketing observado (`contacto@co.bancofalabella.com`) | `app/parsers/falabella_co.py` (TBD) |
@@ -73,7 +73,7 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 ## Nequi
 
 - **País**: Colombia
-- **Sender transaccional**: `notificaciones@nequi.com.co` — el marketing viene de `somos@nequi.com.co` / `somos@notificaciones.nequi.com.co` y `can_parse` lo rechaza.
+- **Senders transaccionales**: `notificaciones@nequi.com.co` (Bre-B) y `somos@nequi.com.co` (pagos PSE y facturas; también manda avisos de acceso y onboarding, que no matchean ningún template → `None`). El marketing de `somos@notificaciones.nequi.com.co` lo rechaza `can_parse`. Un parser puede declarar varios `sender_filter` (tupla) y `build_query` los suma al `from:` de Gmail.
 - **Estado**: Done (`tests/parsers/test_nequi.py`)
 - **Parser**: `backend/app/parsers/nequi.py`
 - **Fixtures**: `backend/tests/fixtures/nequi/` (anonimizados de emails reales; `recibiste_otro_banco.eml` es **sintético** — construido para fijar el comportamiento de no-candidato, no se observó un email real de otro banco).
@@ -88,10 +88,19 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
    cualquier otro banco queda como transfer sin candidato.
 2. **"¡Enviaste plata por Bre-B!"** → `debit`, `merchant=<destinatario>`.
    Gasto real desde el saldo Nequi, no candidato.
+3. **"¡Pago exitoso!"** (PSE desde Nequi, `somos@`): "Hiciste un pago en
+   <COMERCIO> por $92.990 Fecha: El 6 de abril de 2026 Hora: 2:28 p. m." →
+   `debit`, `merchant=<COMERCIO>`.
+4. **Comprobante de factura** ("Comprobante de pago Enel", "Tu comprobante de
+   pago Claro Hogar"): "Listo tu pago en <EMPRESA> Pagaste con Nequi tu
+   factura por $92.670" → `debit`, `merchant=<EMPRESA>`. El cuerpo no trae
+   hora, solo "Fecha del pago: 06/Ago/2026": `occurred_at` = hora de llegada
+   del email.
 
 ### Gotchas
 
-- **Monto en formato colombiano**: `1.647.000` (punto = miles, coma = decimal opcional, sin `$`) — al revés de Itaú que usa formato gringo.
+- **Monto en formato colombiano**: `1.647.000` (punto = miles, coma = decimal opcional) — al revés de Itaú que usa formato gringo. Bre-B va sin `$`, los pagos con `$`.
+- Los pagos PSE a bancos ("Banco Davivienda SA", "BBVA Colombia") pueden ser abonos a tarjeta o crédito, y los pagos a fondos de inversión pueden ser ahorro. Se guardan como gasto sin categoría y el usuario los recategoriza.
 - **Fecha en español largo hora Bogotá**: "el 3 de julio de 2026 a las 3:07 p.m". Con la 1 en singular: "a la 1:55 p.m" — el regex acepta `a las?`.
 - Notificaciones de acceso ("Notificación de acceso a tu Nequi") no matchean ningún template → `None`.
 
