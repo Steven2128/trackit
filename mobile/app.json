@@ -7,12 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0E0F12"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.trackit.app"
@@ -23,7 +17,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E0F12"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -31,7 +24,18 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-status-bar",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0E0F12",
+          "imageWidth": 200
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "https://trackit-api-20ya.onrender.com"
