@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import re
 from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -119,7 +120,7 @@ class TestGmailDecoding:
 
     def _raw_body(self) -> str:
         raw = (FIXTURES_DIR / "davivienda/compra_establecimiento.eml").read_bytes()
-        body = raw.split(b"\n\n", 1)[1]
+        body = re.split(rb"\r?\n\r?\n", raw, maxsplit=1)[1]
         return base64.urlsafe_b64encode(body).decode("ascii")
 
     def test_declared_charset_is_honored(self) -> None:
