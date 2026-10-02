@@ -11,29 +11,14 @@ import {
 } from "react-native";
 
 import MoneyText from "../components/MoneyText";
+import PaymentChecklistRow, { formatDeadline } from "../components/PaymentChecklistRow";
 import PlanItemSheet, { type PlanItemEditing } from "../components/PlanItemSheet";
 import {
   useCashFlow,
   useIncomeSources,
   usePlannedPayments,
-  useTogglePaymentPaid,
-  type UpcomingPaymentOut,
 } from "../services/queries/plan";
 import { colors } from "../theme/colors";
-import { currentMonthYYYYMM } from "../utils/dates";
-
-function formatDeadline(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(`${iso}T12:00:00`);
-  return d.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
-}
-
-function deadlineColor(daysLeft: number | null): string {
-  if (daysLeft === null) return colors.textSecondary;
-  if (daysLeft <= 3) return colors.danger;
-  if (daysLeft <= 7) return colors.warning;
-  return colors.textSecondary;
-}
 
 export default function PlanScreen() {
   const cashflow = useCashFlow();
@@ -129,7 +114,7 @@ export default function PlanScreen() {
                 </View>
                 <View style={styles.checklistBox}>
                   {flow.checklist.map((item, i) => (
-                    <ChecklistRow key={item.id ?? item.name + i} item={item} index={i} />
+                    <PaymentChecklistRow key={item.id ?? item.name + i} item={item} index={i} />
                   ))}
                 </View>
               </>
@@ -213,65 +198,6 @@ export default function PlanScreen() {
 
       <PlanItemSheet editing={editing} onClose={() => setEditing(null)} />
     </View>
-  );
-}
-
-function ChecklistRow({ item, index }: { item: UpcomingPaymentOut; index: number }) {
-  const dateLabel = formatDeadline(item.deadline);
-  const toggleMut = useTogglePaymentPaid();
-  const paid = item.is_paid;
-
-  function toggle() {
-    if (!item.id || toggleMut.isPending) return;
-    toggleMut.mutate({ id: item.id, paidMonth: paid ? null : currentMonthYYYYMM() });
-  }
-
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.checkRow,
-        index > 0 && styles.checkRowBorder,
-        pressed && styles.pressed,
-      ]}
-      onPress={toggle}
-      accessibilityLabel={paid ? `Desmarcar ${item.name}` : `Marcar ${item.name} como pagado`}
-    >
-      <Ionicons
-        name={paid ? "checkmark-circle" : "ellipse-outline"}
-        size={22}
-        color={paid ? colors.success : colors.textSecondary}
-      />
-      <View style={styles.rowBody}>
-        <View style={styles.checkNameRow}>
-          <Text
-            style={[styles.rowName, paid && styles.rowNamePaid]}
-            numberOfLines={1}
-          >
-            {item.name}
-          </Text>
-          {item.is_debt_payment ? (
-            <Ionicons name="card" size={13} color={colors.danger} />
-          ) : null}
-        </View>
-        {paid ? (
-          <Text style={[styles.rowMeta, { color: colors.success }]}>
-            pagado este mes
-          </Text>
-        ) : dateLabel ? (
-          <Text style={[styles.rowMeta, { color: deadlineColor(item.days_left) }]}>
-            vence {dateLabel}
-            {item.days_left !== null ? ` · ${item.days_left} días` : ""}
-          </Text>
-        ) : (
-          <Text style={styles.rowMeta}>sin fecha límite</Text>
-        )}
-      </View>
-      <MoneyText
-        value={item.amount}
-        size="sm"
-        style={paid ? styles.amountPaid : undefined}
-      />
-    </Pressable>
   );
 }
 
@@ -359,21 +285,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginTop: 8,
   },
-  checkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-  },
-  checkRowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
-  checkIndex: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: "700",
-    width: 20,
-    textAlign: "center",
-  },
-  checkNameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   checklistHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -381,11 +292,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   checklistProgress: { color: colors.textSecondary, fontSize: 11, fontWeight: "600" },
-  rowNamePaid: {
-    color: colors.textSecondary,
-    textDecorationLine: "line-through",
-  },
-  amountPaid: { color: colors.textSecondary, textDecorationLine: "line-through" },
   row: {
     flexDirection: "row",
     alignItems: "center",
