@@ -11,19 +11,21 @@ import BudgetsScreen from "../screens/BudgetsScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import DebtTrackerScreen from "../screens/DebtTrackerScreen";
 import GoalsScreen from "../screens/GoalsScreen";
+import NetWorthScreen from "../screens/NetWorthScreen";
 import PlanScreen from "../screens/PlanScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import SubscriptionsScreen from "../screens/SubscriptionsScreen";
 import TransactionsScreen from "../screens/TransactionsScreen";
 import { colors } from "../theme/colors";
 
-// Profile, Goals and Plan live outside the tab bar (header avatar / dashboard
-// shortcuts) to keep bottom nav at 5 items.
+// Profile, Goals, Plan and NetWorth live outside the tab bar (header avatar /
+// dashboard shortcuts) to keep bottom nav at 5 items.
 export type AppStackParamList = {
   Tabs: undefined;
   Profile: undefined;
   Goals: undefined;
   Plan: undefined;
+  NetWorth: undefined;
 };
 
 export type AppTabParamList = {
@@ -146,6 +148,11 @@ export default function AppStack() {
         name="Plan"
         component={PlanScreen}
         options={{ title: "Plan del mes", ...stackHeader }}
+      />
+      <Stack.Screen
+        name="NetWorth"
+        component={NetWorthScreen}
+        options={{ title: "Patrimonio", ...stackHeader }}
       />
     </Stack.Navigator>
   );

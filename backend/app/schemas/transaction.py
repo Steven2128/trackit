@@ -21,6 +21,8 @@ class TransactionOut(BaseModel):
     note: str | None
     # Set on credit-card purchases/payments read from a debt's email sender.
     debt_id: uuid.UUID | None = None
+    # Account the money moved in ("davivienda", "nequi", "card", "cash", ...).
+    source: str | None = None
 
 
 class TransactionUpdate(BaseModel):

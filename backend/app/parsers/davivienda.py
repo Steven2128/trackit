@@ -21,6 +21,9 @@ The direction comes from "Clase de Movimiento":
   The user only sends to a Bre-B key to move money into their own Nequi and
   pay from there; the real spend is Nequi's "Enviaste" email. Flagged as a
   pairing candidate so the matcher links it to Nequi's "Recibiste".
+- "Retiro ..." (ATM) → debit, category = "cash_withdrawal" — the money moves
+  to the user's cash account, it isn't spent yet. No real sample yet; the
+  class name is assumed from Davivienda's naming.
 - Anything else with an amount (Compra en Establecimiento, Descuento en
   Internet / PSE, ...) → debit, merchant = Lugar de Transacción.
 
@@ -119,6 +122,7 @@ class DaviviendaParser(EmailParser):
         return ParsedTransaction(
             transaction_type=TransactionType.debit,
             merchant=place,
+            category="cash_withdrawal" if lowered.startswith("retiro") else None,
             **common,
         )
 

@@ -284,6 +284,10 @@ los movimientos, solo que no inflen el total de gasto.
 
 ---
 
+## `transactions.source` (de qué cuenta salió la plata)
+
+`email_sync` guarda en `source` el `name` del parser que leyó el email (`davivienda`, `nequi`, `itau_co`), `card` para los emails de tarjetas y `cash` para los gastos en efectivo cargados a mano. El patrimonio (`app/services/net_worth.py`) depende de esto: **un parser nuevo para una cuenta que se quiera seguir necesita su `AccountKind` y su entrada en `BANK_SOURCES`**. Las filas sincronizadas antes de la columna (2026-10-02) tienen `source = NULL`. No afectan los saldos, porque cada cuenta arranca de un saldo inicial cargado después.
+
 ## Convenciones del dispatcher
 
 El componente que despacha emails a parsers (a implementar como parte del

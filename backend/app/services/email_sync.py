@@ -193,7 +193,11 @@ async def _process_message(
     # the race after our dedupe SELECT; the unique index is the source of truth.
     try:
         async with db.begin_nested():
-            db.add(_to_transaction(parsed, connection, fallback_message_id=message_id))
+            db.add(
+                _to_transaction(
+                    parsed, connection, fallback_message_id=message_id, source=parser.name
+                )
+            )
             await db.flush()
     except IntegrityError:
         result.skipped_duplicate += 1
@@ -271,6 +275,7 @@ def card_event_to_transaction(
             occurred_at=event.occurred_at,
             raw_email_reference=message_id,
             debt_id=debt.id,
+            source="card",
         )
     # Card payment: neither income nor spending. The matcher pairs it with the
     # bank debit that funded it and re-tags that debit "debt_payment" too.
@@ -286,6 +291,7 @@ def card_event_to_transaction(
         raw_email_reference=message_id,
         is_pairing_candidate=True,
         debt_id=debt.id,
+        source="card",
     )
 
 
@@ -313,6 +319,7 @@ def _to_transaction(
     connection: ProviderConnection,
     *,
     fallback_message_id: str,
+    source: str | None = None,
 ) -> Transaction:
     category = parsed.category if parsed.category is not None else categorize(parsed.merchant)
     return Transaction(
@@ -327,6 +334,7 @@ def _to_transaction(
         occurred_at=parsed.occurred_at,
         raw_email_reference=parsed.raw_email_reference or fallback_message_id,
         is_pairing_candidate=parsed.is_pairing_candidate,
+        source=source,
     )
 
 

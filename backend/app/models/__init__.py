@@ -1,3 +1,4 @@
+from app.models.account import Account, AccountAdjustment, AccountKind
 from app.models.budget import Budget
 from app.models.debt import Debt
 from app.models.income_source import IncomeSource
@@ -10,6 +11,9 @@ from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 
 __all__ = [
+    "Account",
+    "AccountAdjustment",
+    "AccountKind",
     "Budget",
     "Debt",
     "IncomeSource",

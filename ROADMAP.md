@@ -74,6 +74,7 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [ ] Análisis de patrones con IA (Claude API)
 - [x] Parser Davivienda (cuenta de nómina desde 2026-09): compras, PSE, abonos, transferencias a llave → Nequi pareadas (ver PARSERS.md)
 - [x] Tarjetas de crédito conectadas por email, con remitente configurable desde la app (RappiCard primero): compras = gasto + suben la deuda, pagos bajan la deuda y su débito bancario pasa a `debt_payment`, el extracto actualiza mínimo y fecha límite (ver PARSERS.md)
+- [x] Patrimonio — tablas `accounts` (Davivienda, Nequi, Efectivo) + `account_adjustments`, `GET /accounts`, `PUT /accounts/{kind}`, `POST /accounts/{kind}/reconcile`, `POST /transactions/cash`. El saldo se **calcula** (saldo inicial + movimientos de esa cuenta desde entonces + ajustes) usando `transactions.source`, nunca se acumula. Patrimonio neto = cuentas − deudas. Conciliar guarda la diferencia con el saldo real como ajuste visible ("sin explicar"), no como gasto. Pantalla mobile "Patrimonio" (acceso desde Inicio). Lógica en `app/services/net_worth.py`.
 - [ ] Soporte para más bancos: Bancolombia, Nu Colombia
 - [ ] Reporte mensual exportable en PDF
 - [ ] Modo finanzas en pareja (gastos compartidos)

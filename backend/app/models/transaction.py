@@ -38,10 +38,11 @@ class Transaction(Base):
         nullable=False,
         index=True,
     )
-    provider_connection_id: Mapped[uuid.UUID] = mapped_column(
+    # NULL for movements the user typed in (cash expenses).
+    provider_connection_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("provider_connections.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
@@ -62,6 +63,11 @@ class Transaction(Base):
     transfer_pair_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True, index=True
     )
+    # Which account the money moved in: the parser name for bank emails
+    # ("davivienda", "nequi", "itau_co"), "card" for credit-card emails and
+    # "cash" for typed-in cash expenses. Drives account balances (net_worth).
+    # NULL on rows synced before the column existed.
+    source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # Credit-card movement (purchase or card payment) read from the card's
     # email sender — see Debt.email_sender.
     debt_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -22,6 +23,7 @@ from sqlalchemy.sql import ColumnElement
 from app.api.deps import CurrentUser, DbSession
 from app.core.time_utils import current_month_local, month_filter, not_in_excluded
 from app.models.transaction import Transaction, TransactionType
+from app.schemas.account import CashExpenseIn
 from app.schemas.transaction import (
     CategorySummaryItem,
     TransactionListResponse,
@@ -85,6 +87,58 @@ async def list_transactions(
     return TransactionListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
+@router.post("/cash", response_model=TransactionOut, status_code=status.HTTP_201_CREATED)
+async def create_cash_expense(
+    payload: CashExpenseIn, current_user: CurrentUser, db: DbSession
+) -> TransactionOut:
+    """A cash expense typed by the user — no email exists for it. Counts as
+    spending and lowers the cash account (services/net_worth.py)."""
+    if payload.category is not None and not _is_allowed_category(payload.category):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="unknown_category"
+        )
+    tx = Transaction(
+        user_id=current_user.id,
+        provider_connection_id=None,
+        amount=payload.amount,
+        merchant=payload.merchant.strip(),
+        category=payload.category,
+        transaction_type=TransactionType.debit,
+        currency="COP",
+        occurred_at=payload.occurred_at or datetime.now(timezone.utc),
+        source="cash",
+    )
+    db.add(tx)
+    await db.commit()
+    await db.refresh(tx)
+    return TransactionOut.model_validate(tx)
+
+
+@router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_cash_expense(
+    transaction_id: uuid.UUID, current_user: CurrentUser, db: DbSession
+) -> None:
+    """Only typed-in cash expenses can be deleted; email rows would just come
+    back on the next sync."""
+    tx = (
+        await db.execute(
+            select(Transaction).where(
+                Transaction.id == transaction_id, Transaction.user_id == current_user.id
+            )
+        )
+    ).scalar_one_or_none()
+    if tx is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="transaction_not_found")
+    if tx.source != "cash":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="not_a_manual_transaction")
+    await db.delete(tx)
+    await db.commit()
+
+
+def _is_allowed_category(category: str) -> bool:
+    return category in ALLOWED_CATEGORIES or bool(CUSTOM_CATEGORY_RE.match(category))
+
+
 @router.patch("/{transaction_id}", response_model=TransactionOut)
 async def update_transaction(
     transaction_id: uuid.UUID,
@@ -101,10 +155,7 @@ async def update_transaction(
         )
 
     if "category" in provided and payload.category is not None:
-        if (
-            payload.category not in ALLOWED_CATEGORIES
-            and not CUSTOM_CATEGORY_RE.match(payload.category)
-        ):
+        if not _is_allowed_category(payload.category):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="unknown_category",

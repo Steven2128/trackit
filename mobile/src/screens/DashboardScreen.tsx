@@ -24,6 +24,7 @@ import type { AppStackParamList, AppTabParamList } from "../navigation/AppStack"
 import { useBudgetStatus, type BudgetAlertStatus } from "../services/queries/budgets";
 import { useDashboard, type DashboardResponse } from "../services/queries/dashboard";
 import { useHealthScore, useUnusualSpending } from "../services/queries/insights";
+import { useNetWorth } from "../services/queries/accounts";
 import { useCashFlow } from "../services/queries/plan";
 import { useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
@@ -72,6 +73,7 @@ function DashboardContent({
   const { data: healthScore } = useHealthScore();
   const { data: unusual } = useUnusualSpending();
   const cashflow = useCashFlow();
+  const { data: netWorth, refetch: refetchNetWorth } = useNetWorth();
   const user = useAuthStore((s) => s.user);
   const firstName = user?.name?.split(" ")[0];
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
@@ -111,6 +113,7 @@ function DashboardContent({
           onRefresh={() => {
             refetch();
             cashflow.refetch();
+            refetchNetWorth();
           }}
           tintColor={colors.primary}
         />
@@ -160,6 +163,17 @@ function DashboardContent({
           >
             <Ionicons name="flag-outline" size={16} color={colors.primary} />
             <Text style={styles.quickText}>Metas de ahorro</Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
+            onPress={() => navigation.navigate("NetWorth")}
+          >
+            <Ionicons name="wallet-outline" size={16} color={colors.primary} />
+            <Text style={styles.quickText}>Patrimonio</Text>
+            {netWorth?.accounts.length ? (
+              <MoneyText value={netWorth.net_worth} size="sm" style={styles.quickMoney} />
+            ) : null}
             <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
           </Pressable>
         </View>
@@ -351,6 +365,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   quickText: { color: colors.textPrimary, fontSize: 13, fontWeight: "600", flex: 1 },
+  quickMoney: { color: colors.textSecondary, fontWeight: "600" },
   unusualBox: {
     backgroundColor: colors.warningSoft,
     borderRadius: 12,

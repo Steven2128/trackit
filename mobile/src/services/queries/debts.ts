@@ -63,6 +63,8 @@ export const debtsQueryKey = ["debts"] as const;
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: debtsQueryKey });
   qc.invalidateQueries({ queryKey: dashboardQueryKey });
+  // Net worth subtracts debt balances.
+  qc.invalidateQueries({ queryKey: ["accounts"] });
 }
 
 export function useDebts() {

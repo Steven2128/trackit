@@ -177,6 +177,7 @@ async def reconcile_rows(
                 # inside the same local day after any UTC conversion.
                 occurred_at=datetime.combine(row.local_date, time(12, 0), tz),
                 raw_email_reference=reference,
+                source="itau_co",
             )
         )
         inserted += 1
