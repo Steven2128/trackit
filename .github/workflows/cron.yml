@@ -4,7 +4,8 @@ name: Scheduled jobs
 # can't be trusted in prod (SYNC_SCHEDULER_ENABLED=false there). This
 # workflow wakes the API and fires each job via /internal/cron/<job>.
 #
-# Required repo config (Settings → Secrets and variables → Actions):
+# Required config, stored in the "master - trackit-api" environment
+# (Settings → Environments), not at repo level:
 #   secret   CRON_SECRET  — same value as the Render env var
 #   variable API_URL      — e.g. https://trackit-api.onrender.com
 #
@@ -24,6 +25,7 @@ on:
 jobs:
   trigger:
     runs-on: ubuntu-latest
+    environment: master - trackit-api
     steps:
       - name: Pick job
         id: pick
