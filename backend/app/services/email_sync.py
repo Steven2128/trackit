@@ -9,11 +9,13 @@ End-to-end flow per call:
 3. Compute the Gmail search window. First sync: ``newer_than:Nd``.
    Subsequent syncs: ``after:<epoch>`` using ``last_sync_at``.
 4. List candidate message IDs filtered by the senders that registered
-   parsers care about (``EmailParser.sender_filter``).
+   parsers care about (``EmailParser.sender_filter``) plus the credit-card
+   senders the user linked to a ``Debt`` from the app.
 5. For each ID: skip if we already stored it (dedupe by
-   ``raw_email_reference``), otherwise fetch + dispatch to the first
-   matching parser and persist a ``Transaction``.
-6. Update ``last_sync_at`` and commit.
+   ``raw_email_reference``), otherwise fetch + dispatch. Card senders go to
+   the debt's card format (``app/parsers/cards``) and move its balance; the
+   rest go to the first matching bank parser. Persist a ``Transaction``.
+6. Update ``last_sync_at`` and commit, then pair transfers and card payments.
 
 Failures in a single message (parser raised, decode failed) are logged and
 counted in ``SyncResult.errors`` — they never abort the whole sync.
@@ -23,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -36,11 +39,13 @@ from app.integrations.gmail import (
     GmailCredentials,
     gmail_message_to_envelope,
 )
+from app.models.debt import Debt
 from app.models.provider_connection import ProviderConnection
-from app.models.transaction import Transaction
+from app.models.transaction import Transaction, TransactionType
 from app.parsers import REGISTERED_PARSERS
+from app.parsers.cards import CARD_FORMATS, CardEvent, CardEventKind
 from app.services.categorizer import categorize
-from app.services.transfer_matcher import match_transfers
+from app.services.transfer_matcher import match_debt_payments, match_transfers
 from app.parsers.base import EmailEnvelope, EmailParser, ParsedTransaction
 
 log = logging.getLogger(__name__)
@@ -53,6 +58,7 @@ class SyncResult:
     skipped_duplicate: int = 0
     skipped_no_parser: int = 0
     skipped_parser_returned_none: int = 0
+    card_statements: int = 0
     errors: int = 0
     last_sync_at: datetime | None = None
 
@@ -91,11 +97,13 @@ async def sync_provider_connection(
     max_messages: int,
 ) -> SyncResult:
     client = build_gmail_client(connection)
+    card_debts = await load_card_debts(db, connection.user_id)
 
     query = build_query(
         REGISTERED_PARSERS,
         last_sync_at=connection.last_sync_at,
         fallback_lookback_days=fallback_lookback_days,
+        extra_senders=[d.email_sender for d in card_debts if d.email_sender],
     )
     log.info("gmail_sync query=%s max_messages=%s", query, max_messages)
 
@@ -105,7 +113,7 @@ async def sync_provider_connection(
     for message_id in message_ids:
         result.processed += 1
         try:
-            await _process_message(db, client, connection, message_id, result)
+            await _process_message(db, client, connection, message_id, result, card_debts)
         except Exception:  # noqa: BLE001 — never abort the batch on one bad email
             log.exception("gmail_sync parser_error message_id=%s", message_id)
             result.errors += 1
@@ -116,10 +124,23 @@ async def sync_provider_connection(
 
     try:
         await match_transfers(db, connection.user_id)
+        await match_debt_payments(db, connection.user_id)
     except Exception:  # noqa: BLE001 — pairing is best-effort, never fail the sync
         log.exception("transfer_matcher failed user_id=%s", connection.user_id)
 
     return result
+
+
+async def load_card_debts(db: AsyncSession, user_id) -> list[Debt]:
+    """Debts linked to a credit-card email sender with a known format."""
+    rows = await db.execute(
+        select(Debt).where(
+            Debt.user_id == user_id,
+            Debt.email_sender.is_not(None),
+            Debt.email_format.is_not(None),
+        )
+    )
+    return [d for d in rows.scalars().all() if d.email_format in CARD_FORMATS]
 
 
 async def _process_message(
@@ -128,6 +149,7 @@ async def _process_message(
     connection: ProviderConnection,
     message_id: str,
     result: SyncResult,
+    card_debts: Sequence[Debt] = (),
 ) -> None:
     existing = await db.execute(
         select(Transaction.id)
@@ -143,6 +165,12 @@ async def _process_message(
 
     raw_message = await asyncio.to_thread(client.get_message, message_id)
     envelope = gmail_message_to_envelope(raw_message)
+
+    sender = envelope.sender.lower()
+    linked = [d for d in card_debts if d.email_sender and d.email_sender.lower() in sender]
+    if linked:
+        await _process_card_email(db, connection, envelope, message_id, linked, result)
+        return
 
     parser = _pick_parser(envelope)
     if parser is None:
@@ -171,6 +199,106 @@ async def _process_message(
         result.skipped_duplicate += 1
         return
     result.created += 1
+
+
+async def _process_card_email(
+    db: AsyncSession,
+    connection: ProviderConnection,
+    envelope: EmailEnvelope,
+    message_id: str,
+    linked: list[Debt],
+    result: SyncResult,
+) -> None:
+    event = CARD_FORMATS[linked[0].email_format].parse(envelope)
+    if event is None:
+        log.info("gmail_sync card_skipped message_id=%s", message_id)
+        result.skipped_parser_returned_none += 1
+        return
+
+    debt = pick_card_debt(linked, event)
+    if debt is None:
+        log.info("gmail_sync card_unmatched message_id=%s", message_id)
+        result.skipped_parser_returned_none += 1
+        return
+
+    if event.kind is CardEventKind.statement:
+        if debt.payment_due_date is None or event.payment_due_date >= debt.payment_due_date:
+            debt.minimum_payment = event.minimum_payment
+            debt.payment_due_date = event.payment_due_date
+        result.card_statements += 1
+        return
+
+    tx = card_event_to_transaction(event, debt, connection, message_id)
+    try:
+        async with db.begin_nested():
+            db.add(tx)
+            await db.flush()
+    except IntegrityError:
+        result.skipped_duplicate += 1
+        return
+    apply_card_event_to_balance(debt, event)
+    result.created += 1
+
+
+def pick_card_debt(linked: list[Debt], event: CardEvent) -> Debt | None:
+    """Several cards can share a sender: purchases carry the card digits;
+    payments/statements don't, so they only resolve when one debt is linked."""
+    if event.kind is CardEventKind.purchase and event.card_last_digits:
+        exact = [d for d in linked if d.card_last_digits == event.card_last_digits]
+        if exact:
+            return exact[0]
+        linked = [d for d in linked if not d.card_last_digits]
+    return linked[0] if len(linked) == 1 else None
+
+
+def card_event_to_transaction(
+    event: CardEvent,
+    debt: Debt,
+    connection: ProviderConnection,
+    message_id: str,
+) -> Transaction:
+    if event.kind is CardEventKind.purchase:
+        # Real spending, counted the day it happens; categorized like any purchase.
+        return Transaction(
+            user_id=connection.user_id,
+            provider_connection_id=connection.id,
+            amount=event.amount,
+            merchant=event.merchant,
+            category=categorize(event.merchant),
+            transaction_type=TransactionType.debit,
+            currency="COP",
+            card_last_digits=event.card_last_digits,
+            occurred_at=event.occurred_at,
+            raw_email_reference=message_id,
+            debt_id=debt.id,
+        )
+    # Card payment: neither income nor spending. The matcher pairs it with the
+    # bank debit that funded it and re-tags that debit "debt_payment" too.
+    return Transaction(
+        user_id=connection.user_id,
+        provider_connection_id=connection.id,
+        amount=event.amount,
+        merchant=f"Pago {debt.bank_name}",
+        category="debt_payment",
+        transaction_type=TransactionType.credit,
+        currency="COP",
+        occurred_at=event.occurred_at,
+        raw_email_reference=message_id,
+        is_pairing_candidate=True,
+        debt_id=debt.id,
+    )
+
+
+def apply_card_event_to_balance(debt: Debt, event: CardEvent) -> None:
+    """Purchases raise the balance, payments lower it (never below 0). Only
+    movements after the user linked the sender count: the balance typed then
+    already includes everything older."""
+    if debt.email_linked_at is None or event.occurred_at < debt.email_linked_at:
+        return
+    if event.kind is CardEventKind.purchase:
+        debt.total_amount = debt.total_amount + event.amount
+    elif event.kind is CardEventKind.payment:
+        debt.total_amount = max(debt.total_amount - event.amount, 0)
 
 
 def _pick_parser(envelope: EmailEnvelope) -> EmailParser | None:
@@ -207,6 +335,7 @@ def build_query(
     *,
     last_sync_at: datetime | None,
     fallback_lookback_days: int,
+    extra_senders: Iterable[str] = (),
 ) -> str:
     senders = sorted(
         {
@@ -217,6 +346,7 @@ def build_query(
                 (p.sender_filter,) if isinstance(p.sender_filter, str) else p.sender_filter
             )
         }
+        | {s.strip().lower() for s in extra_senders if s and s.strip()}
     )
     if not senders:
         raise RuntimeError(

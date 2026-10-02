@@ -27,7 +27,7 @@ import { humanizeMonth } from "../utils/dates";
 // Budgets make sense for spending categories only — internal movements
 // (transfer, cash_withdrawal) are excluded from spending everywhere else.
 const BUDGETABLE = CATEGORIES.filter(
-  (c) => !["transfer", "cash_withdrawal"].includes(c.key),
+  (c) => !["transfer", "cash_withdrawal", "debt_payment"].includes(c.key),
 );
 
 const STATUS_COLOR: Record<BudgetAlertStatus, string> = {

@@ -19,6 +19,8 @@ class TransactionOut(BaseModel):
     card_last_digits: str | None
     occurred_at: datetime
     note: str | None
+    # Set on credit-card purchases/payments read from a debt's email sender.
+    debt_id: uuid.UUID | None = None
 
 
 class TransactionUpdate(BaseModel):

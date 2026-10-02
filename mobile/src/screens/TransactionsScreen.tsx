@@ -34,13 +34,13 @@ import {
 type Section = { title: string; sortKey: string; total: number; data: TransactionOut[] };
 
 const FILTERABLE = CATEGORIES.filter(
-  (c) => !["transfer", "cash_withdrawal"].includes(c.key),
+  (c) => !["transfer", "cash_withdrawal", "debt_payment"].includes(c.key),
 );
 
 // Mirror of the backend's spending semantics (transactions.py) so the
 // header tiles match /transactions/summary for the same rows.
-const EXCLUDED_FROM_SPENT = ["transfer", "cash_withdrawal"];
-const EXCLUDED_FROM_RECEIVED = ["transfer"];
+const EXCLUDED_FROM_SPENT = ["transfer", "cash_withdrawal", "debt_payment"];
+const EXCLUDED_FROM_RECEIVED = ["transfer", "debt_payment"];
 
 export default function TransactionsScreen() {
   const [month, setMonth] = useState<string>(currentMonthYYYYMM());

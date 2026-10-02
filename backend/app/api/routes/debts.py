@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -6,7 +7,9 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.debt import Debt
+from app.parsers.cards import CARD_FORMATS
 from app.schemas.debt import (
+    CardFormatOut,
     DebtCreate,
     DebtOut,
     DebtPayoffOut,
@@ -27,6 +30,15 @@ async def list_debts(current_user: CurrentUser, db: DbSession) -> list[DebtOut]:
         .order_by(Debt.created_at.desc())
     )
     return [DebtOut.model_validate(d) for d in result.scalars().all()]
+
+
+@router.get("/card-formats", response_model=list[CardFormatOut])
+async def list_card_formats(current_user: CurrentUser) -> list[CardFormatOut]:
+    """Credit-card email templates the app can link a debt's sender to."""
+    return [
+        CardFormatOut(key=p.key, label=p.label, default_sender=p.default_sender)
+        for p in CARD_FORMATS.values()
+    ]
 
 
 @router.get("/strategy", response_model=StrategyComparisonOut)
@@ -89,7 +101,11 @@ def _to_result_out(result: StrategyResult) -> StrategyResultOut:
 async def create_debt(
     payload: DebtCreate, current_user: CurrentUser, db: DbSession
 ) -> DebtOut:
-    debt = Debt(user_id=current_user.id, **payload.model_dump())
+    data = payload.model_dump()
+    _validate_email_link(data.get("email_sender"), data.get("email_format"))
+    debt = Debt(user_id=current_user.id, **data)
+    if debt.email_sender:
+        debt.email_linked_at = datetime.now(timezone.utc)
     db.add(debt)
     await db.commit()
     await db.refresh(debt)
@@ -104,8 +120,20 @@ async def update_debt(
     db: DbSession,
 ) -> DebtOut:
     debt = await _get_own_debt(debt_id, current_user.id, db)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    sender = changes.get("email_sender", debt.email_sender)
+    email_format = changes.get("email_format", debt.email_format)
+    _validate_email_link(sender, email_format)
+    relinked = sender != debt.email_sender or email_format != debt.email_format
+    for field, value in changes.items():
         setattr(debt, field, value)
+    if relinked:
+        # The balance the user sees now is the new starting point; only card
+        # movements after this instant move it (see apply_card_event_to_balance).
+        debt.email_linked_at = datetime.now(timezone.utc) if sender else None
+        if not sender:
+            debt.email_format = None
+            debt.card_last_digits = None
     await db.commit()
     await db.refresh(debt)
     return DebtOut.model_validate(debt)
@@ -130,3 +158,10 @@ async def _get_own_debt(debt_id: uuid.UUID, user_id: uuid.UUID, db: DbSession) -
     if debt is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="debt_not_found")
     return debt
+
+
+def _validate_email_link(sender: str | None, email_format: str | None) -> None:
+    if sender and email_format not in CARD_FORMATS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="unknown_card_format"
+        )

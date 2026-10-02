@@ -62,6 +62,14 @@ class Transaction(Base):
     transfer_pair_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True, index=True
     )
+    # Credit-card movement (purchase or card payment) read from the card's
+    # email sender — see Debt.email_sender.
+    debt_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("debts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

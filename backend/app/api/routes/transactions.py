@@ -33,8 +33,8 @@ from app.services.categorizer import RULES
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
-EXCLUDED_FROM_SPENT_CATEGORIES = ("transfer", "cash_withdrawal")
-EXCLUDED_FROM_RECEIVED_CATEGORIES = ("transfer",)
+EXCLUDED_FROM_SPENT_CATEGORIES = ("transfer", "cash_withdrawal", "debt_payment")
+EXCLUDED_FROM_RECEIVED_CATEGORIES = ("transfer", "debt_payment")
 
 # Manual recategorization accepts anything the system itself can emit:
 # categorizer rules plus the layers reserved to transfer_matcher/parsers.
@@ -55,6 +55,7 @@ async def list_transactions(
     month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
     category: str | None = Query(default=None),
     type: TransactionType | None = Query(default=None),
+    debt_id: uuid.UUID | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> TransactionListResponse:
@@ -64,6 +65,8 @@ async def list_transactions(
         filters.append(Transaction.category == category)
     if type is not None:
         filters.append(Transaction.transaction_type == type)
+    if debt_id is not None:
+        filters.append(Transaction.debt_id == debt_id)
 
     total_result = await db.execute(
         select(func.count()).select_from(Transaction).where(*filters)

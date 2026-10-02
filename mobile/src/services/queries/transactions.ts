@@ -16,6 +16,7 @@ export type TransactionOut = {
   card_last_digits: string | null;
   occurred_at: string;
   note: string | null;
+  debt_id: string | null;
 };
 
 export type TransactionListResponse = {
@@ -26,9 +27,11 @@ export type TransactionListResponse = {
 };
 
 export type TransactionFilters = {
-  month: string;
+  // Omitted month = all time (used by a debt's movement list).
+  month?: string;
   category?: string | null;
   type?: TransactionType | null;
+  debtId?: string | null;
   limit?: number;
 };
 
@@ -40,9 +43,10 @@ export function useTransactions(filters: TransactionFilters) {
     queryKey: transactionsQueryKey(filters),
     queryFn: async () => {
       const params: Record<string, string | number> = {
-        month: filters.month,
         limit: filters.limit ?? 200,
       };
+      if (filters.month) params.month = filters.month;
+      if (filters.debtId) params.debt_id = filters.debtId;
       if (filters.category) params.category = filters.category;
       if (filters.type) params.type = filters.type;
       const res = await api.get<TransactionListResponse>("/transactions", { params });

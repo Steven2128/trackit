@@ -33,7 +33,7 @@ from app.schemas.dashboard import (
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
-_EXCLUDED = ("transfer", "cash_withdrawal")
+_EXCLUDED = ("transfer", "cash_withdrawal", "debt_payment")
 
 
 @router.get("", response_model=DashboardResponse)

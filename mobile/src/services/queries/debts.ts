@@ -9,6 +9,12 @@ export type DebtOut = {
   total_amount: string;
   interest_rate: string | null;
   minimum_payment: string | null;
+  // Credit-card email link (purchases/payments move total_amount).
+  email_sender: string | null;
+  email_format: string | null;
+  card_last_digits: string | null;
+  payment_due_date: string | null;
+  email_linked_at: string | null;
   created_at: string;
 };
 
@@ -17,6 +23,15 @@ export type DebtPayload = {
   total_amount: string;
   interest_rate?: string | null;
   minimum_payment?: string | null;
+  email_sender?: string | null;
+  email_format?: string | null;
+  card_last_digits?: string | null;
+};
+
+export type CardFormatOut = {
+  key: string;
+  label: string;
+  default_sender: string | null;
 };
 
 export type DebtPayoffOut = {
@@ -57,6 +72,17 @@ export function useDebts() {
       const res = await api.get<DebtOut[]>("/debts");
       return res.data;
     },
+  });
+}
+
+export function useCardFormats() {
+  return useQuery({
+    queryKey: [...debtsQueryKey, "card-formats"],
+    queryFn: async () => {
+      const res = await api.get<CardFormatOut[]>("/debts/card-formats");
+      return res.data;
+    },
+    staleTime: Infinity,
   });
 }
 

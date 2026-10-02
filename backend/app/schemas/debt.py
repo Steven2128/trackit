@@ -1,8 +1,16 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+_EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+
+
+def _normalize_sender(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return value.strip().lower() or None
 
 
 class DebtBase(BaseModel):
@@ -10,6 +18,12 @@ class DebtBase(BaseModel):
     total_amount: Decimal
     interest_rate: Decimal | None = None
     minimum_payment: Decimal | None = None
+    # Credit-card email link: sender + one of GET /debts/card-formats.
+    email_sender: str | None = Field(default=None, max_length=255, pattern=_EMAIL_PATTERN)
+    email_format: str | None = Field(default=None, max_length=32)
+    card_last_digits: str | None = Field(default=None, pattern=r"^\d{4}$")
+
+    _sender = field_validator("email_sender", mode="before")(_normalize_sender)
 
 
 class DebtCreate(DebtBase):
@@ -21,13 +35,26 @@ class DebtUpdate(BaseModel):
     total_amount: Decimal | None = None
     interest_rate: Decimal | None = None
     minimum_payment: Decimal | None = None
+    email_sender: str | None = Field(default=None, max_length=255, pattern=_EMAIL_PATTERN)
+    email_format: str | None = Field(default=None, max_length=32)
+    card_last_digits: str | None = Field(default=None, pattern=r"^\d{4}$")
+
+    _sender = field_validator("email_sender", mode="before")(_normalize_sender)
 
 
 class DebtOut(DebtBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    payment_due_date: date | None = None
+    email_linked_at: datetime | None = None
     created_at: datetime
+
+
+class CardFormatOut(BaseModel):
+    key: str
+    label: str
+    default_sender: str | None
 
 
 class DebtPayoffOut(BaseModel):

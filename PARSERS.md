@@ -136,6 +136,29 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 
 ---
 
+## Tarjetas de crédito (remitente configurable)
+
+A diferencia de los bancos de arriba, **el remitente no está en el código**: desde la app, el usuario conecta una deuda (pantalla Deudas → editar) a un remitente de email y elige un **formato** (`GET /debts/card-formats`). Columnas en `debts`: `email_sender`, `email_format`, `card_last_digits` (opcional, para separar varias tarjetas del mismo remitente), `payment_due_date` y `email_linked_at`.
+
+- **Formatos**: `backend/app/parsers/cards/` — `CardEmailParser.parse()` devuelve un `CardEvent` (`purchase` / `payment` / `statement`). Registro en `CARD_FORMATS`. Un banco nuevo = una plantilla nueva ahí. El remitente lo sigue cargando el usuario.
+- **Sync** (`email_sync.py`): los remitentes conectados se suman al `from:` de Gmail. Un email de esos va al formato de la deuda, no a los parsers de bancos.
+  - `purchase` → `debit` con categoría por comercio y `debt_id`. **Cuenta como gasto** y sube `total_amount`.
+  - `payment` → `credit` `category="debt_payment"` con `debt_id` (no es ingreso) y baja `total_amount` (nunca por debajo de 0).
+  - `statement` → actualiza `minimum_payment` y `payment_due_date`. No crea transacción.
+- **Saldo**: solo los movimientos posteriores a `email_linked_at` lo mueven, porque el saldo que el usuario carga al conectar ya incluye todo lo anterior. Los anteriores quedan como historial. Los intereses y cargos del banco no llegan por email, así que el saldo se corrige a mano.
+- **Pago de la tarjeta = débito del banco**: `transfer_matcher.match_debt_payments` parea cada comprobante con el débito que lo pagó (PSE de Davivienda, "Pago exitoso" de Nequi): monto exacto, ±30 min. Ese débito pasa a `debt_payment`. Así el pago no se cuenta como gasto encima de las compras.
+- `debt_payment` está excluida del gasto y del "Recibido" en todos los totales. También se puede asignar a mano, por ejemplo a un pago de tarjeta que no llega por email.
+
+### RappiCard (`rappicard`)
+
+- **Sender típico**: `noreply@rappicard.co` (el marketing viene de `rappicard@hello.rappicard.co`).
+- **Fixtures**: `backend/tests/fixtures/rappicard/` — compra, comprobante de pago, extracto y contrato firmado (marketing → `None`).
+- "Resumen de transacción" → compra (monto colombiano `$23.350`, hora local en el cuerpo, tarjeta `*NNNN`).
+- "Comprobante de pago" → pago. **La hora del cuerpo va ~5 h atrasada** respecto del débito del banco, así que `occurred_at` = hora de llegada del email. Los dígitos de "Destino de pago" no son los de la tarjeta.
+- "Llegó el extracto" → pago mínimo y fecha límite (`20 sept 2026`). Acá los montos vienen en formato gringo (`$ 92,392.00`).
+
+---
+
 ## Pareo de transferencias (Itaú → Nequi/Daviplata/Falabella)
 
 **El problema**: cuando hacés una transferencia desde Itaú a Nequi/Daviplata/

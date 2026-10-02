@@ -10,7 +10,8 @@ export type CategoryDef = {
 };
 
 // Keys must match what the backend emits: categorizer.py rules plus
-// `transfer` (transfer_matcher) and `cash_withdrawal` (parsers).
+// `transfer` (transfer_matcher), `cash_withdrawal` (parsers) and
+// `debt_payment` (credit-card payments and the bank debit that funded them).
 // Uncategorized rows arrive as null and render via FALLBACK.
 export const CATEGORIES: CategoryDef[] = [
   { key: "food", label: "Comida", icon: "restaurant", color: "#F2B441" },
@@ -22,6 +23,7 @@ export const CATEGORIES: CategoryDef[] = [
   { key: "subscriptions", label: "Suscripciones", icon: "repeat", color: "#5B8DEF" },
   { key: "transfer", label: "Transferencia", icon: "swap-horizontal", color: "#A3A8B3" },
   { key: "cash_withdrawal", label: "Retiro", icon: "cash", color: "#D9A053" },
+  { key: "debt_payment", label: "Pago de deuda", icon: "card", color: "#E5484D" },
 ];
 
 const FALLBACK: CategoryDef = { key: "other", label: "Otros", icon: "cube", color: "#A3A8B3" };

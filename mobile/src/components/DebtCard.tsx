@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors } from "../theme/colors";
@@ -12,6 +13,13 @@ type Props = {
 export default function DebtCard({ debt, onPress }: Props) {
   const rate = debt.interest_rate ? `${Number(debt.interest_rate)}% EA` : null;
   const min = debt.minimum_payment ? `Pago mín ${Number(debt.minimum_payment).toLocaleString("es-CO")}` : null;
+  const due = debt.payment_due_date
+    ? `vence ${new Date(`${debt.payment_due_date}T12:00:00`).toLocaleDateString("es-CO", {
+        day: "numeric",
+        month: "short",
+      })}`
+    : null;
+  const meta = [min, due].filter(Boolean).join(" · ");
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
@@ -25,8 +33,11 @@ export default function DebtCard({ debt, onPress }: Props) {
               <Text style={styles.pillText}>{rate}</Text>
             </View>
           ) : null}
+          {debt.email_sender ? (
+            <Ionicons name="mail" size={13} color={colors.primary} accessibilityLabel="Conectada por email" />
+          ) : null}
         </View>
-        {min ? <Text style={styles.meta}>{min}</Text> : null}
+        {meta ? <Text style={styles.meta}>{meta}</Text> : null}
       </View>
       <MoneyText value={debt.total_amount} size="md" />
     </Pressable>

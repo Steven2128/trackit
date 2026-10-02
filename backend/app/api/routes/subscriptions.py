@@ -19,7 +19,7 @@ router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 # Transfers between own accounts and cash withdrawals aren't recurring
 # spending — same exclusion as /transactions/summary.
-EXCLUDED_CATEGORIES = ("transfer", "cash_withdrawal")
+EXCLUDED_CATEGORIES = ("transfer", "cash_withdrawal", "debt_payment")
 
 
 @router.get("", response_model=list[SubscriptionOut])

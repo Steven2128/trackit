@@ -31,7 +31,7 @@ from app.services.spending_anomalies import SpendingAnomaly, detect_anomalies
 
 router = APIRouter(prefix="/insights", tags=["insights"])
 
-_EXCLUDED = ("transfer", "cash_withdrawal")
+_EXCLUDED = ("transfer", "cash_withdrawal", "debt_payment")
 HISTORY_MONTHS = 6
 
 

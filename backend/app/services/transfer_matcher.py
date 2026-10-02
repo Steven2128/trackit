@@ -19,7 +19,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Protocol, Sequence
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.transaction import Transaction, TransactionType
@@ -29,6 +29,9 @@ log = logging.getLogger(__name__)
 
 PAIRING_WINDOW = timedelta(minutes=10)
 LOOKBACK = timedelta(days=7)
+# Card payment receipts arrive within seconds of the funding bank debit
+# (PSE from Davivienda, "Pago exitoso" from Nequi); allow some slack.
+DEBT_PAYMENT_WINDOW = timedelta(minutes=30)
 
 # Debit merchants set by the source-bank parsers (Itaú, Davivienda).
 SOURCE_MERCHANTS = ("Portal Internet", LLAVE_MERCHANT)
@@ -119,6 +122,72 @@ async def match_transfers(db: AsyncSession, user_id: uuid.UUID) -> int:
         await db.commit()
         log.info(
             "transfer_matcher paired",
+            extra={"user_id": str(user_id), "pairs": len(pairs)},
+        )
+    return len(pairs)
+
+
+async def match_debt_payments(
+    db: AsyncSession, user_id: uuid.UUID, *, since: datetime | None = None
+) -> int:
+    """Pair credit-card payment receipts with the bank debit that funded them.
+
+    The receipt (credit, category "debt_payment", linked to a debt) and the
+    bank debit are the same money: the debit is re-tagged "debt_payment" so
+    the card payment isn't counted as spending on top of the card purchases.
+    Exact amount, ±30 min. Returns pairs created.
+    """
+    since = since or datetime.now(timezone.utc) - LOOKBACK
+
+    unpaired = (
+        Transaction.user_id == user_id,
+        Transaction.transfer_pair_id.is_(None),
+        Transaction.occurred_at >= since,
+    )
+    receipts = (
+        await db.execute(
+            select(Transaction.id, Transaction.amount, Transaction.occurred_at).where(
+                *unpaired,
+                Transaction.transaction_type == TransactionType.credit,
+                Transaction.category == "debt_payment",
+                Transaction.debt_id.is_not(None),
+            )
+        )
+    ).all()
+    if not receipts:
+        return 0
+    debits = (
+        await db.execute(
+            select(Transaction.id, Transaction.amount, Transaction.occurred_at).where(
+                *unpaired,
+                Transaction.transaction_type == TransactionType.debit,
+                Transaction.debt_id.is_(None),
+                or_(
+                    Transaction.category.is_(None),
+                    Transaction.category.notin_(("transfer", "debt_payment")),
+                ),
+            )
+        )
+    ).all()
+
+    pairs = pair_transfers(debits, receipts, window=DEBT_PAYMENT_WINDOW)
+    for debit_id, receipt_id in pairs:
+        pair_id = uuid.uuid4()
+        await db.execute(
+            update(Transaction)
+            .where(Transaction.id == debit_id)
+            .values(category="debt_payment", transfer_pair_id=pair_id)
+        )
+        await db.execute(
+            update(Transaction)
+            .where(Transaction.id == receipt_id)
+            .values(transfer_pair_id=pair_id)
+        )
+
+    if pairs:
+        await db.commit()
+        log.info(
+            "debt_payment_matcher paired",
             extra={"user_id": str(user_id), "pairs": len(pairs)},
         )
     return len(pairs)
