@@ -20,6 +20,7 @@ import { colors } from "../theme/colors";
 import { parseCOP } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import MoneyText from "./MoneyText";
+import { useWebSheet } from "./useWebSheet";
 
 type Props = {
   isVisible: boolean;
@@ -65,6 +66,7 @@ function fromDebt(d?: DebtOut): FormState {
 
 export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
   const sheetRef = useRef<BottomSheet>(null);
+  const sheet = useWebSheet(isVisible);
   const snapPoints = useMemo(() => ["80%"], []);
   const [form, setForm] = useState<FormState>(fromDebt(debt));
   const isEdit = !!debt;
@@ -159,6 +161,8 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
     );
   }
 
+  if (!sheet.mounted) return null;
+
   return (
     <BottomSheet
       ref={sheetRef}
@@ -168,6 +172,7 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
       onClose={onClose}
       backgroundStyle={styles.bg}
       handleIndicatorStyle={styles.handle}
+      {...sheet.props}
     >
       <BottomSheetScrollView contentContainerStyle={styles.body}>
         <Text style={styles.title}>{isEdit ? "Editar deuda" : "Nueva deuda"}</Text>

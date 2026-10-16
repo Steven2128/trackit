@@ -18,6 +18,7 @@ import { colors } from "../theme/colors";
 import { CATEGORIES } from "../utils/categories";
 import { formatCOP, parseCOP } from "../utils/currency";
 import { Alert } from "../utils/alert";
+import { useWebSheet } from "./useWebSheet";
 
 export type AccountSheetMode =
   // First balance, or start over from today's real balance.
@@ -38,6 +39,7 @@ const SPENDABLE = CATEGORIES.filter(
 
 export default function AccountSheet({ editing, onClose }: Props) {
   const sheetRef = useRef<BottomSheet>(null);
+  const sheet = useWebSheet(editing !== null);
   const snapPoints = useMemo(() => ["70%"], []);
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -116,6 +118,8 @@ export default function AccountSheet({ editing, onClose }: Props) {
         ? `La app calcula ${formatCOP(editing.computed)}. Escribí el saldo real; si no coincide, la diferencia queda registrada.`
         : "Resta del efectivo y cuenta como gasto del mes.";
 
+  if (!sheet.mounted) return null;
+
   return (
     <BottomSheet
       ref={sheetRef}
@@ -125,6 +129,7 @@ export default function AccountSheet({ editing, onClose }: Props) {
       onClose={onClose}
       backgroundStyle={styles.bg}
       handleIndicatorStyle={styles.handle}
+      {...sheet.props}
     >
       <BottomSheetScrollView contentContainerStyle={styles.body}>
         <Text style={styles.title}>{title}</Text>

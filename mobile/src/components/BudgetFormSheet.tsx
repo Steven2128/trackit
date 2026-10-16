@@ -13,6 +13,7 @@ import { colors } from "../theme/colors";
 import { getCategory, slugifyCategory, CATEGORIES } from "../utils/categories";
 import { parseCOP } from "../utils/currency";
 import { Alert } from "../utils/alert";
+import { useWebSheet } from "./useWebSheet";
 
 type Props = {
   isVisible: boolean;
@@ -31,6 +32,7 @@ export default function BudgetFormSheet({
   onClose,
 }: Props) {
   const sheetRef = useRef<BottomSheet>(null);
+  const sheet = useWebSheet(isVisible);
   const [limit, setLimit] = useState("");
   const [customName, setCustomName] = useState("");
   const hasBudget = currentLimit !== null;
@@ -132,6 +134,8 @@ export default function BudgetFormSheet({
     );
   }
 
+  if (!sheet.mounted) return null;
+
   return (
     <BottomSheet
       ref={sheetRef}
@@ -141,6 +145,7 @@ export default function BudgetFormSheet({
       onClose={onClose}
       backgroundStyle={styles.bg}
       handleIndicatorStyle={styles.handle}
+      {...sheet.props}
     >
       <BottomSheetView style={styles.body}>
         <Text style={styles.title}>

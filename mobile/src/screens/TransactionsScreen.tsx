@@ -22,6 +22,7 @@ import {
   type TransactionOut,
 } from "../services/queries/transactions";
 import { colors } from "../theme/colors";
+import { pageStyle } from "../theme/layout";
 import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
 import {
   currentMonthYYYYMM,
@@ -121,163 +122,165 @@ export default function TransactionsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => setMonth((m) => shiftMonth(m, -1))}
-          hitSlop={8}
-          style={({ pressed }) => [styles.navBtn, pressed && styles.pressed]}
-          accessibilityLabel="Mes anterior"
-        >
-          <Ionicons name="chevron-back" size={18} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{humanizeMonth(month)}</Text>
-        <Pressable
-          onPress={() => setMonth((m) => shiftMonth(m, +1))}
-          hitSlop={8}
-          disabled={isCurrentMonth}
-          style={({ pressed }) => [
-            styles.navBtn,
-            pressed && styles.pressed,
-            isCurrentMonth && styles.navBtnDisabled,
-          ]}
-          accessibilityLabel="Mes siguiente"
-        >
-          <Ionicons name="chevron-forward" size={18} color={colors.textPrimary} />
-        </Pressable>
-      </View>
-
-      <View style={styles.summaryRow}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.summaryTile,
-            typeFilter === "debit" && styles.summaryTileActive,
-            pressed && styles.pressed,
-          ]}
-          onPress={() => setTypeFilter((t) => (t === "debit" ? null : "debit"))}
-          accessibilityLabel="Filtrar gastos"
-        >
-          <View style={styles.summaryLabelRow}>
-            <Text style={styles.summaryLabel}>Gastado</Text>
-            {typeFilter === "debit" ? (
-              <Ionicons name="funnel" size={12} color={colors.primary} />
-            ) : null}
-          </View>
-          <MoneyText value={totals.spent} size="lg" />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [
-            styles.summaryTile,
-            styles.summaryTileIncome,
-            typeFilter === "credit" && styles.summaryTileActive,
-            pressed && styles.pressed,
-          ]}
-          onPress={() => setTypeFilter((t) => (t === "credit" ? null : "credit"))}
-          accessibilityLabel="Filtrar ingresos"
-        >
-          <View style={styles.summaryLabelRow}>
-            <Text style={styles.summaryLabel}>Recibido</Text>
-            {typeFilter === "credit" ? (
-              <Ionicons name="funnel" size={12} color={colors.primary} />
-            ) : null}
-          </View>
-          <MoneyText value={totals.received} size="lg" positive />
-        </Pressable>
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipsScroll}
-        contentContainerStyle={styles.chipsRow}
-      >
-        <Chip label="Todas" active={category === null} onPress={() => setCategory(null)} />
-        {FILTERABLE.map((c) => (
-          <Chip
-            key={c.key}
-            label={c.label}
-            active={category === c.key}
-            onPress={() => setCategory(c.key)}
-          />
-        ))}
-        {customKeys.map((key) => (
-          <Chip
-            key={key}
-            label={getCategory(key).label}
-            active={category === key}
-            onPress={() => setCategory(key)}
-          />
-        ))}
-      </ScrollView>
-
-      {query.isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : query.isError ? (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>No pudimos cargar las transacciones.</Text>
-          <Pressable style={styles.retryBtn} onPress={() => query.refetch()}>
-            <Text style={styles.retryText}>Reintentar</Text>
+      <View style={[pageStyle, styles.page]}>
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => setMonth((m) => shiftMonth(m, -1))}
+            hitSlop={8}
+            style={({ pressed }) => [styles.navBtn, pressed && styles.pressed]}
+            accessibilityLabel="Mes anterior"
+          >
+            <Ionicons name="chevron-back" size={18} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>{humanizeMonth(month)}</Text>
+          <Pressable
+            onPress={() => setMonth((m) => shiftMonth(m, +1))}
+            hitSlop={8}
+            disabled={isCurrentMonth}
+            style={({ pressed }) => [
+              styles.navBtn,
+              pressed && styles.pressed,
+              isCurrentMonth && styles.navBtnDisabled,
+            ]}
+            accessibilityLabel="Mes siguiente"
+          >
+            <Ionicons name="chevron-forward" size={18} color={colors.textPrimary} />
           </Pressable>
         </View>
-      ) : sections.length === 0 ? (
-        <View style={styles.centered}>
-          <Ionicons name="receipt-outline" size={40} color={colors.textSecondary} />
-          <Text style={styles.emptyTitle}>Sin movimientos</Text>
-          <Text style={styles.emptyText}>
-            {typeFilter === "debit"
-              ? "No hay gastos con estos filtros en el período."
-              : typeFilter === "credit"
-                ? "No hay ingresos con estos filtros en el período."
-                : category
-                  ? "No hay transacciones de esta categoría en el período."
-                  : "No hay transacciones en este período."}
-          </Text>
-        </View>
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={query.isRefetching}
-              onRefresh={query.refetch}
-              tintColor={colors.primary}
-            />
-          }
-          renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeader}>{section.title}</Text>
-              {section.total > 0 ? (
-                <MoneyText
-                  value={section.total}
-                  size="sm"
-                  style={{ color: colors.textSecondary }}
-                />
+
+        <View style={styles.summaryRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.summaryTile,
+              typeFilter === "debit" && styles.summaryTileActive,
+              pressed && styles.pressed,
+            ]}
+            onPress={() => setTypeFilter((t) => (t === "debit" ? null : "debit"))}
+            accessibilityLabel="Filtrar gastos"
+          >
+            <View style={styles.summaryLabelRow}>
+              <Text style={styles.summaryLabel}>Gastado</Text>
+              {typeFilter === "debit" ? (
+                <Ionicons name="funnel" size={12} color={colors.primary} />
               ) : null}
             </View>
-          )}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => setRecategorizing(item)}
-              style={({ pressed }) => pressed && styles.pressed}
-              accessibilityLabel="Cambiar categoría"
-            >
-              <TransactionRow
-                merchant={item.merchant}
-                category={item.category}
-                amount={item.amount}
-                type={item.transaction_type}
-                occurredAt={item.occurred_at}
-                note={item.note}
-                showChevron
-              />
+            <MoneyText value={totals.spent} size="lg" />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.summaryTile,
+              styles.summaryTileIncome,
+              typeFilter === "credit" && styles.summaryTileActive,
+              pressed && styles.pressed,
+            ]}
+            onPress={() => setTypeFilter((t) => (t === "credit" ? null : "credit"))}
+            accessibilityLabel="Filtrar ingresos"
+          >
+            <View style={styles.summaryLabelRow}>
+              <Text style={styles.summaryLabel}>Recibido</Text>
+              {typeFilter === "credit" ? (
+                <Ionicons name="funnel" size={12} color={colors.primary} />
+              ) : null}
+            </View>
+            <MoneyText value={totals.received} size="lg" positive />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipsScroll}
+          contentContainerStyle={styles.chipsRow}
+        >
+          <Chip label="Todas" active={category === null} onPress={() => setCategory(null)} />
+          {FILTERABLE.map((c) => (
+            <Chip
+              key={c.key}
+              label={c.label}
+              active={category === c.key}
+              onPress={() => setCategory(c.key)}
+            />
+          ))}
+          {customKeys.map((key) => (
+            <Chip
+              key={key}
+              label={getCategory(key).label}
+              active={category === key}
+              onPress={() => setCategory(key)}
+            />
+          ))}
+        </ScrollView>
+
+        {query.isLoading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : query.isError ? (
+          <View style={styles.centered}>
+            <Text style={styles.errorText}>No pudimos cargar las transacciones.</Text>
+            <Pressable style={styles.retryBtn} onPress={() => query.refetch()}>
+              <Text style={styles.retryText}>Reintentar</Text>
             </Pressable>
-          )}
-        />
-      )}
+          </View>
+        ) : sections.length === 0 ? (
+          <View style={styles.centered}>
+            <Ionicons name="receipt-outline" size={40} color={colors.textSecondary} />
+            <Text style={styles.emptyTitle}>Sin movimientos</Text>
+            <Text style={styles.emptyText}>
+              {typeFilter === "debit"
+                ? "No hay gastos con estos filtros en el período."
+                : typeFilter === "credit"
+                  ? "No hay ingresos con estos filtros en el período."
+                  : category
+                    ? "No hay transacciones de esta categoría en el período."
+                    : "No hay transacciones en este período."}
+            </Text>
+          </View>
+        ) : (
+          <SectionList
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            stickySectionHeadersEnabled={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={query.isRefetching}
+                onRefresh={query.refetch}
+                tintColor={colors.primary}
+              />
+            }
+            renderSectionHeader={({ section }) => (
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionHeader}>{section.title}</Text>
+                {section.total > 0 ? (
+                  <MoneyText
+                    value={section.total}
+                    size="sm"
+                    style={{ color: colors.textSecondary }}
+                  />
+                ) : null}
+              </View>
+            )}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => setRecategorizing(item)}
+                style={({ pressed }) => pressed && styles.pressed}
+                accessibilityLabel="Cambiar categoría"
+              >
+                <TransactionRow
+                  merchant={item.merchant}
+                  category={item.category}
+                  amount={item.amount}
+                  type={item.transaction_type}
+                  occurredAt={item.occurred_at}
+                  note={item.note}
+                  showChevron
+                />
+              </Pressable>
+            )}
+          />
+        )}
+      </View>
 
       <CategoryPickerSheet
         isVisible={recategorizing !== null}
@@ -313,6 +316,8 @@ function Chip({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  // A list of rows reads best narrower than the other pages on desktop.
+  page: { flex: 1, maxWidth: 960 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -13,6 +13,7 @@ import {
 import BudgetFormSheet from "../components/BudgetFormSheet";
 import CategoryIcon from "../components/CategoryIcon";
 import MoneyText from "../components/MoneyText";
+import ResponsiveGrid from "../components/ResponsiveGrid";
 import {
   useBudgetStatus,
   useDeleteBudget,
@@ -20,6 +21,7 @@ import {
   type BudgetStatusItem,
 } from "../services/queries/budgets";
 import { colors } from "../theme/colors";
+import { pageStyle } from "../theme/layout";
 import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
 import { humanizeMonth } from "../utils/dates";
 import { Alert } from "../utils/alert";
@@ -100,7 +102,7 @@ export default function BudgetsScreen() {
   return (
     <View style={styles.root}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, pageStyle]}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -135,90 +137,92 @@ export default function BudgetsScreen() {
           </View>
         ) : null}
 
-        {BUDGETABLE.map((cat) => {
-          const item = byCategory.get(cat.key);
-          return (
-            <Pressable
-              key={cat.key}
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() =>
-                setEditing({ category: cat.key, limit: item?.monthly_limit ?? null })
-              }
-            >
-              <CategoryIcon categoryKey={cat.key} />
-              <View style={styles.rowBody}>
-                <View style={styles.rowTop}>
-                  <Text style={styles.rowLabel}>{cat.label}</Text>
-                  {item ? (
-                    <Text style={styles.rowAmounts}>
-                      <MoneyText value={item.spent} size="sm" /> /{" "}
-                      <MoneyText
-                        value={item.monthly_limit}
-                        size="sm"
-                        style={{ color: colors.textSecondary }}
-                      />
-                    </Text>
-                  ) : (
-                    <Text style={styles.noLimit}>Sin límite</Text>
-                  )}
+        <ResponsiveGrid>
+          {BUDGETABLE.map((cat) => {
+            const item = byCategory.get(cat.key);
+            return (
+              <Pressable
+                key={cat.key}
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                onPress={() =>
+                  setEditing({ category: cat.key, limit: item?.monthly_limit ?? null })
+                }
+              >
+                <CategoryIcon categoryKey={cat.key} />
+                <View style={styles.rowBody}>
+                  <View style={styles.rowTop}>
+                    <Text style={styles.rowLabel}>{cat.label}</Text>
+                    {item ? (
+                      <Text style={styles.rowAmounts}>
+                        <MoneyText value={item.spent} size="sm" /> /{" "}
+                        <MoneyText
+                          value={item.monthly_limit}
+                          size="sm"
+                          style={{ color: colors.textSecondary }}
+                        />
+                      </Text>
+                    ) : (
+                      <Text style={styles.noLimit}>Sin límite</Text>
+                    )}
+                  </View>
+                  {item ? <ProgressBar pct={Number(item.pct)} status={item.status} /> : null}
                 </View>
-                {item ? <ProgressBar pct={Number(item.pct)} status={item.status} /> : null}
-              </View>
-              {item ? (
+                {item ? (
+                  <Pressable
+                    onPress={() => confirmDelete(cat.key)}
+                    hitSlop={10}
+                    style={({ pressed }) => [styles.trashBtn, pressed && styles.rowPressed]}
+                    accessibilityLabel={`Quitar presupuesto de ${cat.label}`}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                  </Pressable>
+                ) : null}
+              </Pressable>
+            );
+          })}
+
+          {customKeys.map((key) => {
+            const item = byCategory.get(key);
+            const cat = getCategory(key);
+            return (
+              <Pressable
+                key={key}
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                onPress={() =>
+                  setEditing({ category: key, limit: item?.monthly_limit ?? null })
+                }
+              >
+                <CategoryIcon categoryKey={key} />
+                <View style={styles.rowBody}>
+                  <View style={styles.rowTop}>
+                    <Text style={styles.rowLabel}>{cat.label}</Text>
+                    {item ? (
+                      <Text style={styles.rowAmounts}>
+                        <MoneyText value={item.spent} size="sm" /> /{" "}
+                        <MoneyText
+                          value={item.monthly_limit}
+                          size="sm"
+                          style={{ color: colors.textSecondary }}
+                        />
+                      </Text>
+                    ) : (
+                      <Text style={styles.noLimit}>Sin límite</Text>
+                    )}
+                  </View>
+                  {item ? <ProgressBar pct={Number(item.pct)} status={item.status} /> : null}
+                </View>
                 <Pressable
-                  onPress={() => confirmDelete(cat.key)}
+                  onPress={() => confirmDelete(key)}
                   hitSlop={10}
                   style={({ pressed }) => [styles.trashBtn, pressed && styles.rowPressed]}
-                  accessibilityLabel={`Quitar presupuesto de ${cat.label}`}
+                  accessibilityLabel={`Eliminar categoría ${cat.label}`}
                 >
                   <Ionicons name="trash-outline" size={18} color={colors.danger} />
                 </Pressable>
-              ) : null}
-            </Pressable>
-          );
-        })}
-
-        {customKeys.map((key) => {
-          const item = byCategory.get(key);
-          const cat = getCategory(key);
-          return (
-            <Pressable
-              key={key}
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() =>
-                setEditing({ category: key, limit: item?.monthly_limit ?? null })
-              }
-            >
-              <CategoryIcon categoryKey={key} />
-              <View style={styles.rowBody}>
-                <View style={styles.rowTop}>
-                  <Text style={styles.rowLabel}>{cat.label}</Text>
-                  {item ? (
-                    <Text style={styles.rowAmounts}>
-                      <MoneyText value={item.spent} size="sm" /> /{" "}
-                      <MoneyText
-                        value={item.monthly_limit}
-                        size="sm"
-                        style={{ color: colors.textSecondary }}
-                      />
-                    </Text>
-                  ) : (
-                    <Text style={styles.noLimit}>Sin límite</Text>
-                  )}
-                </View>
-                {item ? <ProgressBar pct={Number(item.pct)} status={item.status} /> : null}
-              </View>
-              <Pressable
-                onPress={() => confirmDelete(key)}
-                hitSlop={10}
-                style={({ pressed }) => [styles.trashBtn, pressed && styles.rowPressed]}
-                accessibilityLabel={`Eliminar categoría ${cat.label}`}
-              >
-                <Ionicons name="trash-outline" size={18} color={colors.danger} />
               </Pressable>
-            </Pressable>
-          );
-        })}
+            );
+          })}
+        </ResponsiveGrid>
 
         <Pressable
           style={({ pressed }) => [styles.addBtn, pressed && styles.rowPressed]}

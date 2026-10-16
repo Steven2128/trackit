@@ -1,8 +1,8 @@
-import { useWindowDimensions } from "react-native";
+import { useState } from "react";
+import { View } from "react-native";
 import { BarChart } from "react-native-chart-kit";
 
 import { colors } from "../theme/colors";
-import { MAX_CONTENT_WIDTH } from "../theme/layout";
 
 type Props = {
   months: string[];
@@ -44,23 +44,30 @@ function compactCOP(raw: string): string {
 }
 
 export default function TrendChart({ months, totals }: Props) {
-  const { width: windowWidth } = useWindowDimensions();
-  const width = Math.min(windowWidth, MAX_CONTENT_WIDTH) - 32;
+  // Sized to its container, which is the full phone width or one column of
+  // the wide (browser) dashboard.
+  const [width, setWidth] = useState(0);
   return (
-    <BarChart
-      data={{
-        labels: months.map(labelOf),
-        datasets: [{ data: totals.length > 0 ? totals : [0] }],
-      }}
-      width={width}
-      height={200}
-      chartConfig={chartConfig}
-      fromZero
-      showValuesOnTopOfBars={false}
-      withInnerLines
-      yAxisLabel=""
-      yAxisSuffix=""
-      style={{ borderRadius: 12 }}
-    />
+    <View onLayout={(e) => setWidth(Math.floor(e.nativeEvent.layout.width))}>
+      {width > 0 ? (
+        <BarChart
+          data={{
+            labels: months.map(labelOf),
+            datasets: [{ data: totals.length > 0 ? totals : [0] }],
+          }}
+          width={width}
+          height={200}
+          chartConfig={chartConfig}
+          fromZero
+          showValuesOnTopOfBars={false}
+          withInnerLines
+          yAxisLabel=""
+          yAxisSuffix=""
+          style={{ borderRadius: 12 }}
+        />
+      ) : (
+        <View style={{ height: 200 }} />
+      )}
+    </View>
   );
 }

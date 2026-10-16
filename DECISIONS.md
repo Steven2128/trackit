@@ -312,7 +312,8 @@ poder usarse desde un navegador, sin depender de tener el teléfono.
 - **Un solo código**: `mobile/` se exporta también para web (`npx expo export --platform web`, react-native-web). No hay un frontend web aparte que mantener en paralelo.
 - **Hosting**: static site `trackit-web` en Render (`render.yaml`), deploy en cada push a `master` cuando pasa CI (nuevo job `web`: `tsc` + export).
 - **OAuth en web**: redirect de página completa en vez de `WebBrowser.openAuthSessionAsync`. El cliente manda `return_url` (login: query de `/auth/google/start`; Gmail: body de `POST /gmail/connect`); el backend lo valida contra una allowlist (`WEB_RETURN_ORIGINS` + `https://$WEB_APP_HOST`), lo guarda en el state JWT y al final redirige a `<return_url>#kind=auth&access_token=…`. Los tokens van en el **fragment** para que nunca lleguen a logs de servidor; el cliente los lee una vez (`services/webAuth.ts`) y limpia la barra de direcciones. Los clientes nativos siguen igual con `return_scheme`.
-- **Shims de plataforma**: `utils/storage.ts` (SecureStore → `localStorage` en web), `utils/alert.ts` (`Alert.alert` de react-native-web es un no-op → `window.alert`/`window.confirm`), push deshabilitado en web, `webPolyfills.ts` para `@gorhom/bottom-sheet`. En pantallas anchas la app se ve como una columna centrada de 560px (`theme/layout.ts`).
+- **Shims de plataforma**: `utils/storage.ts` (SecureStore → `localStorage` en web), `utils/alert.ts` (`Alert.alert` de react-native-web es un no-op → `window.alert`/`window.confirm`), push deshabilitado en web, `webPolyfills.ts` para `@gorhom/bottom-sheet`.
+- **Responsive** (`theme/layout.ts`, breakpoint 900px): en pantallas anchas las pestañas pasan a un sidebar (con Plan, Metas y Patrimonio como pestañas propias, así `navigate("Plan")` resuelve al tab ahí y al stack en el celu), el contenido se centra hasta 1180px y cada pantalla reparte en columnas (`ResponsiveGrid`, `numColumns`). Los formularios usan `useWebSheet`: en web se montan sólo mientras están abiertos (cerrados en `index -1` miden mal su posición al mostrarse la pestaña y asoman), con backdrop, y en desktop flotan como tarjeta centrada.
 
 ### Consecuencias
 
@@ -321,7 +322,6 @@ poder usarse desde un navegador, sin depender de tener el teléfono.
 **Pagamos:**
 - Los tokens viven en `localStorage` (no hay keychain en el navegador). Mitigación: access token de 30 min, `X-Frame-Options: DENY` en el static site, sin scripts de terceros.
 - Sin push notifications en web — quedan el resumen semanal por email y las alertas in-app.
-- La UI es mobile-first; en desktop se ve como columna, no como layout de escritorio.
 
 ### Alternativas descartadas
 

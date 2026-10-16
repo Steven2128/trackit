@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import GmailConnectCard from "../components/GmailConnectCard";
 import { useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
+import { pageStyle } from "../theme/layout";
 
 export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
@@ -11,29 +12,31 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.accountCard}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={22} color={colors.primary} />
+      <View style={[pageStyle, styles.page]}>
+        <View style={styles.accountCard}>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={22} color={colors.primary} />
+          </View>
+          <View style={styles.accountBody}>
+            <Text style={styles.accountName} numberOfLines={1}>
+              {user?.name ?? "Sin sesión"}
+            </Text>
+            <Text style={styles.accountEmail} numberOfLines={1}>
+              {user?.email ?? "—"}
+            </Text>
+          </View>
         </View>
-        <View style={styles.accountBody}>
-          <Text style={styles.accountName} numberOfLines={1}>
-            {user?.name ?? "Sin sesión"}
-          </Text>
-          <Text style={styles.accountEmail} numberOfLines={1}>
-            {user?.email ?? "—"}
-          </Text>
-        </View>
+
+        <GmailConnectCard />
+
+        <Pressable
+          style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
+          onPress={() => clearSession()}
+        >
+          <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+          <Text style={styles.signOutText}>Cerrar sesión</Text>
+        </Pressable>
       </View>
-
-      <GmailConnectCard />
-
-      <Pressable
-        style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
-        onPress={() => clearSession()}
-      >
-        <Ionicons name="log-out-outline" size={18} color={colors.danger} />
-        <Text style={styles.signOutText}>Cerrar sesión</Text>
-      </Pressable>
     </View>
   );
 }
@@ -44,6 +47,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: 16,
   },
+  // Settings-style page: keep it narrow on desktop.
+  page: { flex: 1, maxWidth: 720 },
   accountCard: {
     flexDirection: "row",
     alignItems: "center",

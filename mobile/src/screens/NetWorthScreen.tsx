@@ -12,8 +12,10 @@ import {
 
 import AccountSheet, { type AccountSheetMode } from "../components/AccountSheet";
 import MoneyText from "../components/MoneyText";
+import ResponsiveGrid from "../components/ResponsiveGrid";
 import { useNetWorth, type AccountKind, type AccountOut } from "../services/queries/accounts";
 import { colors } from "../theme/colors";
+import { pageStyle } from "../theme/layout";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -63,7 +65,7 @@ export default function NetWorthScreen() {
   return (
     <View style={styles.root}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, pageStyle]}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
         }
@@ -93,56 +95,58 @@ export default function NetWorthScreen() {
         ) : null}
 
         <Text style={styles.sectionLabel}>Cuentas</Text>
-        {KINDS.map(({ kind, name, icon, hint }) => {
-          const account = byKind.get(kind);
-          if (!account) {
-            return (
-              <Pressable
-                key={kind}
-                style={({ pressed }) => [styles.row, styles.rowEmpty, pressed && styles.pressed]}
-                onPress={() => setEditing({ mode: "setup", kind, name })}
-              >
-                <Ionicons name={icon} size={20} color={colors.textSecondary} />
-                <View style={styles.rowBody}>
-                  <Text style={styles.rowName}>{name}</Text>
-                  <Text style={styles.rowMeta}>Tocá para cargar el saldo de hoy</Text>
-                </View>
-                <Ionicons name="add-circle" size={22} color={colors.primary} />
-              </Pressable>
-            );
-          }
-          return (
-            <View key={kind} style={styles.row}>
-              <Ionicons name={icon} size={20} color={colors.primary} />
-              <Pressable
-                style={styles.rowBody}
-                onLongPress={() => setEditing({ mode: "setup", kind, name: account.name })}
-                accessibilityHint="Mantené presionado para reiniciar el saldo"
-              >
-                <Text style={styles.rowName}>{account.name}</Text>
-                <Text style={styles.rowMeta}>
-                  {hint} · {sinceLabel(account.last_reconciled_at)}
-                </Text>
-              </Pressable>
-              <View style={styles.rowRight}>
-                <MoneyText value={account.balance} size="md" />
+        <ResponsiveGrid columns={3}>
+          {KINDS.map(({ kind, name, icon, hint }) => {
+            const account = byKind.get(kind);
+            if (!account) {
+              return (
                 <Pressable
-                  hitSlop={8}
-                  onPress={() =>
-                    setEditing({
-                      mode: "reconcile",
-                      kind,
-                      name: account.name,
-                      computed: account.balance,
-                    })
-                  }
+                  key={kind}
+                  style={({ pressed }) => [styles.row, styles.rowEmpty, pressed && styles.pressed]}
+                  onPress={() => setEditing({ mode: "setup", kind, name })}
                 >
-                  <Text style={styles.reconcile}>Conciliar</Text>
+                  <Ionicons name={icon} size={20} color={colors.textSecondary} />
+                  <View style={styles.rowBody}>
+                    <Text style={styles.rowName}>{name}</Text>
+                    <Text style={styles.rowMeta}>Tocá para cargar el saldo de hoy</Text>
+                  </View>
+                  <Ionicons name="add-circle" size={22} color={colors.primary} />
                 </Pressable>
+              );
+            }
+            return (
+              <View key={kind} style={styles.row}>
+                <Ionicons name={icon} size={20} color={colors.primary} />
+                <Pressable
+                  style={styles.rowBody}
+                  onLongPress={() => setEditing({ mode: "setup", kind, name: account.name })}
+                  accessibilityHint="Mantené presionado para reiniciar el saldo"
+                >
+                  <Text style={styles.rowName}>{account.name}</Text>
+                  <Text style={styles.rowMeta}>
+                    {hint} · {sinceLabel(account.last_reconciled_at)}
+                  </Text>
+                </Pressable>
+                <View style={styles.rowRight}>
+                  <MoneyText value={account.balance} size="md" />
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() =>
+                      setEditing({
+                        mode: "reconcile",
+                        kind,
+                        name: account.name,
+                        computed: account.balance,
+                      })
+                    }
+                  >
+                    <Text style={styles.reconcile}>Conciliar</Text>
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          );
-        })}
+            );
+          })}
+        </ResponsiveGrid>
 
         {hasCash ? (
           <Pressable

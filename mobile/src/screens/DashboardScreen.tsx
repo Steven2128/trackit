@@ -28,6 +28,7 @@ import { useNetWorth } from "../services/queries/accounts";
 import { useCashFlow } from "../services/queries/plan";
 import { useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
+import { pageStyle, useIsWide } from "../theme/layout";
 import { getCategory } from "../utils/categories";
 import { humanizeMonth } from "../utils/dates";
 
@@ -81,6 +82,8 @@ function DashboardContent({
   const tabNavigation = useNavigation<BottomTabNavigationProp<AppTabParamList>>();
   // Screen hides the navigator header, so it must clear the notch itself.
   const insets = useSafeAreaInsets();
+  // Wide screens: overview on the left, budget + categories on the right.
+  const isWide = useIsWide();
 
   const budgetAlertByCategory = useMemo(() => {
     const map = new Map<string, BudgetAlertStatus>();
@@ -106,7 +109,12 @@ function DashboardContent({
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
+      contentContainerStyle={[
+        styles.content,
+        pageStyle,
+        isWide && styles.contentWide,
+        { paddingTop: insets.top + (isWide ? 24 : 12) },
+      ]}
       refreshControl={
         <RefreshControl
           refreshing={isRefetching}
@@ -138,165 +146,171 @@ function DashboardContent({
         </Pressable>
       </View>
 
-      <View style={styles.quickRow}>
-        {healthScore ? (
-          <View style={styles.scoreCard}>
-            <Text style={styles.scoreValue}>
-              <Text style={{ color: scoreColor(healthScore.total) }}>{healthScore.total}</Text>
-              <Text style={styles.scoreMax}>/100</Text>
-            </Text>
-            <Text style={styles.scoreLabel}>Salud financiera</Text>
-          </View>
-        ) : null}
-        <View style={styles.quickCol}>
-          <Pressable
-            style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
-            onPress={() => navigation.navigate("Plan")}
-          >
-            <Ionicons name="map-outline" size={16} color={colors.primary} />
-            <Text style={styles.quickText}>Plan del mes</Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
-            onPress={() => navigation.navigate("Goals")}
-          >
-            <Ionicons name="flag-outline" size={16} color={colors.primary} />
-            <Text style={styles.quickText}>Metas de ahorro</Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
-            onPress={() => navigation.navigate("NetWorth")}
-          >
-            <Ionicons name="wallet-outline" size={16} color={colors.primary} />
-            <Text style={styles.quickText}>Patrimonio</Text>
-            {netWorth?.accounts.length ? (
-              <MoneyText value={netWorth.net_worth} size="sm" style={styles.quickMoney} />
-            ) : null}
-            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-          </Pressable>
-        </View>
-      </View>
-
-      {unusual && unusual.items.length > 0 ? (
-        <View style={styles.unusualBox}>
-          {unusual.items.map((a) => {
-            const cat = getCategory(a.category);
-            return (
-              <View key={a.category} style={styles.unusualRow}>
-                <Ionicons name="trending-up" size={16} color={colors.warning} />
-                <Text style={styles.unusualText}>
-                  Gasto inusual en {cat.label}: vas {a.ratio}× tu promedio (
-                  <MoneyText value={a.current} size="sm" style={{ color: colors.warning }} />
-                  )
+      <View style={isWide ? styles.columns : undefined}>
+        <View style={isWide ? styles.column : undefined}>
+          <View style={styles.quickRow}>
+            {healthScore ? (
+              <View style={styles.scoreCard}>
+                <Text style={styles.scoreValue}>
+                  <Text style={{ color: scoreColor(healthScore.total) }}>{healthScore.total}</Text>
+                  <Text style={styles.scoreMax}>/100</Text>
                 </Text>
+                <Text style={styles.scoreLabel}>Salud financiera</Text>
               </View>
-            );
-          })}
-        </View>
-      ) : null}
-
-      {checklist.length > 0 ? (
-        <>
-          <Pressable
-            style={({ pressed }) => [styles.pendingHeader, pressed && styles.pressed]}
-            onPress={() => navigation.navigate("Plan")}
-            accessibilityLabel="Ver plan del mes"
-          >
-            <Text style={styles.pendingTitle}>Pagos fijos pendientes</Text>
-            <Text style={styles.pendingProgress}>
-              {checklist.length - pendingPayments.length}/{checklist.length} pagados
-            </Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-          </Pressable>
-          <View style={styles.pendingBox}>
-            {pendingPayments.length === 0 ? (
-              <View style={styles.allPaidRow}>
-                <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                <Text style={styles.allPaidText}>Todo pagado este mes</Text>
-              </View>
-            ) : (
-              pendingPayments.map((item, i) => (
-                <PaymentChecklistRow key={item.id ?? item.name + i} item={item} index={i} />
-              ))
-            )}
+            ) : null}
+            <View style={styles.quickCol}>
+              <Pressable
+                style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
+                onPress={() => navigation.navigate("Plan")}
+              >
+                <Ionicons name="map-outline" size={16} color={colors.primary} />
+                <Text style={styles.quickText}>Plan del mes</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
+                onPress={() => navigation.navigate("Goals")}
+              >
+                <Ionicons name="flag-outline" size={16} color={colors.primary} />
+                <Text style={styles.quickText}>Metas de ahorro</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
+                onPress={() => navigation.navigate("NetWorth")}
+              >
+                <Ionicons name="wallet-outline" size={16} color={colors.primary} />
+                <Text style={styles.quickText}>Patrimonio</Text>
+                {netWorth?.accounts.length ? (
+                  <MoneyText value={netWorth.net_worth} size="sm" style={styles.quickMoney} />
+                ) : null}
+                <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+              </Pressable>
+            </View>
           </View>
-        </>
-      ) : null}
 
-      <View style={styles.heroRow}>
-        <View style={styles.hero}>
-          <Text style={styles.heroLabel}>Gastado este mes</Text>
-          <MoneyText value={current_month.total_spent} size="lg" />
-          <Text style={styles.heroMeta}>
-            {current_month.transaction_count} transacciones
-          </Text>
-        </View>
-        <View style={[styles.hero, styles.heroDebt]}>
-          <Text style={styles.heroLabel}>Deuda total</Text>
-          {debts.debt_count === 0 ? (
-            <Text style={styles.noDebt}>Sin deudas</Text>
-          ) : (
+          {unusual && unusual.items.length > 0 ? (
+            <View style={styles.unusualBox}>
+              {unusual.items.map((a) => {
+                const cat = getCategory(a.category);
+                return (
+                  <View key={a.category} style={styles.unusualRow}>
+                    <Ionicons name="trending-up" size={16} color={colors.warning} />
+                    <Text style={styles.unusualText}>
+                      Gasto inusual en {cat.label}: vas {a.ratio}× tu promedio (
+                      <MoneyText value={a.current} size="sm" style={{ color: colors.warning }} />
+                      )
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
+
+          {checklist.length > 0 ? (
             <>
-              <MoneyText value={debts.total_debt} size="lg" />
-              <Text style={styles.heroMeta}>
-                {debts.debt_count} · mín <MoneyText value={debts.total_minimum_payment} size="sm" style={{ color: colors.textSecondary, fontWeight: "600" }} />/mes
-              </Text>
+              <Pressable
+                style={({ pressed }) => [styles.pendingHeader, pressed && styles.pressed]}
+                onPress={() => navigation.navigate("Plan")}
+                accessibilityLabel="Ver plan del mes"
+              >
+                <Text style={styles.pendingTitle}>Pagos fijos pendientes</Text>
+                <Text style={styles.pendingProgress}>
+                  {checklist.length - pendingPayments.length}/{checklist.length} pagados
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+              </Pressable>
+              <View style={styles.pendingBox}>
+                {pendingPayments.length === 0 ? (
+                  <View style={styles.allPaidRow}>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                    <Text style={styles.allPaidText}>Todo pagado este mes</Text>
+                  </View>
+                ) : (
+                  pendingPayments.map((item, i) => (
+                    <PaymentChecklistRow key={item.id ?? item.name + i} item={item} index={i} />
+                  ))
+                )}
+              </View>
             </>
+          ) : null}
+
+          <View style={styles.heroRow}>
+            <View style={styles.hero}>
+              <Text style={styles.heroLabel}>Gastado este mes</Text>
+              <MoneyText value={current_month.total_spent} size="lg" />
+              <Text style={styles.heroMeta}>
+                {current_month.transaction_count} transacciones
+              </Text>
+            </View>
+            <View style={[styles.hero, styles.heroDebt]}>
+              <Text style={styles.heroLabel}>Deuda total</Text>
+              {debts.debt_count === 0 ? (
+                <Text style={styles.noDebt}>Sin deudas</Text>
+              ) : (
+                <>
+                  <MoneyText value={debts.total_debt} size="lg" />
+                  <Text style={styles.heroMeta}>
+                    {debts.debt_count} · mín <MoneyText value={debts.total_minimum_payment} size="sm" style={{ color: colors.textSecondary, fontWeight: "600" }} />/mes
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+
+          <Text style={styles.sectionLabel}>Tendencia 6 meses</Text>
+          <TrendChart months={trendMonths} totals={trendTotals} />
+        </View>
+
+        <View style={isWide ? styles.column : undefined}>
+          {budgetStatus && budgetStatus.items.length > 0 ? (
+            <>
+              <Text style={styles.sectionLabel}>Presupuesto del mes</Text>
+              <BudgetOverview
+                items={budgetStatus.items}
+                onPress={() => tabNavigation.navigate("Budgets")}
+              />
+            </>
+          ) : null}
+
+          <Text style={styles.sectionLabel}>Por categoría</Text>
+          {sortedCategories.length === 0 ? (
+            <Text style={styles.emptyCat}>Sin gastos este mes</Text>
+          ) : (
+            sortedCategories.map((c, i) => {
+              const cat = getCategory(c.category);
+              const alert = c.category ? budgetAlertByCategory.get(c.category) : undefined;
+              return (
+                <Pressable
+                  key={`${c.category ?? "null"}-${i}`}
+                  style={({ pressed }) => [styles.catRow, pressed && styles.pressed]}
+                  onPress={() =>
+                    tabNavigation.navigate("Transactions", { category: c.category })
+                  }
+                  accessibilityLabel={`Ver movimientos de ${cat.label}`}
+                >
+                  <CategoryIcon categoryKey={c.category} />
+                  <View style={styles.catBody}>
+                    <View style={styles.catLabelRow}>
+                      <Text style={styles.catLabel}>{cat.label}</Text>
+                      {alert ? (
+                        <Ionicons
+                          name={alert === "exceeded" ? "alert-circle" : "warning"}
+                          size={14}
+                          color={alert === "exceeded" ? colors.danger : colors.warning}
+                        />
+                      ) : null}
+                    </View>
+                    <Text style={styles.catCount}>{c.count} {c.count === 1 ? "tx" : "txs"}</Text>
+                  </View>
+                  <MoneyText value={c.total} size="md" />
+                  <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+                </Pressable>
+              );
+            })
           )}
         </View>
       </View>
-
-      <Text style={styles.sectionLabel}>Tendencia 6 meses</Text>
-      <TrendChart months={trendMonths} totals={trendTotals} />
-
-      {budgetStatus && budgetStatus.items.length > 0 ? (
-        <>
-          <Text style={styles.sectionLabel}>Presupuesto del mes</Text>
-          <BudgetOverview
-            items={budgetStatus.items}
-            onPress={() => tabNavigation.navigate("Budgets")}
-          />
-        </>
-      ) : null}
-
-      <Text style={styles.sectionLabel}>Por categoría</Text>
-      {sortedCategories.length === 0 ? (
-        <Text style={styles.emptyCat}>Sin gastos este mes</Text>
-      ) : (
-        sortedCategories.map((c, i) => {
-          const cat = getCategory(c.category);
-          const alert = c.category ? budgetAlertByCategory.get(c.category) : undefined;
-          return (
-            <Pressable
-              key={`${c.category ?? "null"}-${i}`}
-              style={({ pressed }) => [styles.catRow, pressed && styles.pressed]}
-              onPress={() =>
-                tabNavigation.navigate("Transactions", { category: c.category })
-              }
-              accessibilityLabel={`Ver movimientos de ${cat.label}`}
-            >
-              <CategoryIcon categoryKey={c.category} />
-              <View style={styles.catBody}>
-                <View style={styles.catLabelRow}>
-                  <Text style={styles.catLabel}>{cat.label}</Text>
-                  {alert ? (
-                    <Ionicons
-                      name={alert === "exceeded" ? "alert-circle" : "warning"}
-                      size={14}
-                      color={alert === "exceeded" ? colors.danger : colors.warning}
-                    />
-                  ) : null}
-                </View>
-                <Text style={styles.catCount}>{c.count} {c.count === 1 ? "tx" : "txs"}</Text>
-              </View>
-              <MoneyText value={c.total} size="md" />
-              <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-            </Pressable>
-          );
-        })
-      )}
     </ScrollView>
   );
 }
@@ -310,6 +324,9 @@ function scoreColor(total: number): string {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 32 },
+  contentWide: { paddingHorizontal: 32 },
+  columns: { flexDirection: "row", gap: 24, alignItems: "flex-start" },
+  column: { flex: 1, minWidth: 0 },
   centered: {
     flex: 1,
     backgroundColor: colors.background,

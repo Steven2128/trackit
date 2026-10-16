@@ -14,6 +14,7 @@ import GoalFormSheet from "../components/GoalFormSheet";
 import MoneyText from "../components/MoneyText";
 import { useGoals, type SavingsGoalOut } from "../services/queries/goals";
 import { colors } from "../theme/colors";
+import { pageStyle, useIsWide } from "../theme/layout";
 
 function formatTargetDate(iso: string | null): string | null {
   if (!iso) return null;
@@ -25,6 +26,7 @@ export default function GoalsScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useGoals();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<SavingsGoalOut | undefined>(undefined);
+  const isWide = useIsWide();
 
   if (isLoading) {
     return (
@@ -55,7 +57,11 @@ export default function GoalsScreen() {
       <FlatList
         data={goals}
         keyExtractor={(g) => g.id}
-        contentContainerStyle={styles.list}
+        // Changing numColumns on the fly isn't supported — remount via key.
+        key={isWide ? "grid" : "list"}
+        numColumns={isWide ? 2 : 1}
+        columnWrapperStyle={isWide ? styles.gridRow : undefined}
+        contentContainerStyle={[styles.list, pageStyle]}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
         }
@@ -76,42 +82,44 @@ export default function GoalsScreen() {
         renderItem={({ item }) => {
           const dateLabel = formatTargetDate(item.target_date);
           return (
-            <Pressable
-              style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-              onPress={() => {
-                setEditing(item);
-                setSheetOpen(true);
-              }}
-            >
-              <View style={styles.cardTop}>
-                <Text style={styles.goalName} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={styles.pct}>{item.pct}%</Text>
-              </View>
-              <View style={styles.barTrack}>
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      width: `${Math.min(item.pct, 100)}%`,
-                      backgroundColor: item.pct >= 100 ? colors.success : colors.primary,
-                    },
-                  ]}
-                />
-              </View>
-              <View style={styles.cardBottom}>
-                <Text style={styles.amounts}>
-                  <MoneyText value={item.current_amount} size="sm" /> de{" "}
-                  <MoneyText
-                    value={item.target_amount}
-                    size="sm"
-                    style={{ color: colors.textSecondary }}
+            <View style={isWide ? styles.cell : undefined}>
+              <Pressable
+                style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+                onPress={() => {
+                  setEditing(item);
+                  setSheetOpen(true);
+                }}
+              >
+                <View style={styles.cardTop}>
+                  <Text style={styles.goalName} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.pct}>{item.pct}%</Text>
+                </View>
+                <View style={styles.barTrack}>
+                  <View
+                    style={[
+                      styles.barFill,
+                      {
+                        width: `${Math.min(item.pct, 100)}%`,
+                        backgroundColor: item.pct >= 100 ? colors.success : colors.primary,
+                      },
+                    ]}
                   />
-                </Text>
-                {dateLabel ? <Text style={styles.date}>{dateLabel}</Text> : null}
-              </View>
-            </Pressable>
+                </View>
+                <View style={styles.cardBottom}>
+                  <Text style={styles.amounts}>
+                    <MoneyText value={item.current_amount} size="sm" /> de{" "}
+                    <MoneyText
+                      value={item.target_amount}
+                      size="sm"
+                      style={{ color: colors.textSecondary }}
+                    />
+                  </Text>
+                  {dateLabel ? <Text style={styles.date}>{dateLabel}</Text> : null}
+                </View>
+              </Pressable>
+            </View>
           );
         }}
       />
@@ -161,6 +169,9 @@ const styles = StyleSheet.create({
   retryText: { color: "#fff", fontWeight: "600" },
   pressed: { opacity: 0.7 },
   list: { padding: 16, paddingBottom: 96 },
+  // Wide screens: two cards per row (cells carry the gutter).
+  gridRow: { marginHorizontal: -6 },
+  cell: { width: "50%", paddingHorizontal: 6 },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 12,

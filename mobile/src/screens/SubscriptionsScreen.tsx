@@ -2,8 +2,10 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 
 import CategoryIcon from "../components/CategoryIcon";
 import MoneyText from "../components/MoneyText";
+import ResponsiveGrid from "../components/ResponsiveGrid";
 import { useSubscriptions, type SubscriptionFrequency, type SubscriptionOut } from "../services/queries/subscriptions";
 import { colors } from "../theme/colors";
+import { pageStyle } from "../theme/layout";
 import { formatDayHeader } from "../utils/dates";
 
 const FREQUENCY_LABEL: Record<SubscriptionFrequency, string> = {
@@ -52,7 +54,7 @@ export default function SubscriptionsScreen() {
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, pageStyle]}
       refreshControl={
         <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
       }
@@ -72,27 +74,29 @@ export default function SubscriptionsScreen() {
           </Text>
         </View>
       ) : (
-        data.map((sub) => (
-          <View key={`${sub.merchant}-${sub.frequency}`} style={styles.row}>
-            <CategoryIcon categoryKey={sub.category} />
-            <View style={styles.rowBody}>
-              <View style={styles.rowTop}>
-                <Text style={styles.merchant} numberOfLines={1}>
-                  {sub.merchant}
-                </Text>
-                <MoneyText value={sub.average_amount} size="sm" />
-              </View>
-              <View style={styles.rowBottom}>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{FREQUENCY_LABEL[sub.frequency]}</Text>
+        <ResponsiveGrid>
+          {data.map((sub) => (
+            <View key={`${sub.merchant}-${sub.frequency}`} style={styles.row}>
+              <CategoryIcon categoryKey={sub.category} />
+              <View style={styles.rowBody}>
+                <View style={styles.rowTop}>
+                  <Text style={styles.merchant} numberOfLines={1}>
+                    {sub.merchant}
+                  </Text>
+                  <MoneyText value={sub.average_amount} size="sm" />
                 </View>
-                <Text style={styles.nextCharge}>
-                  Próximo: {formatDayHeader(sub.next_expected_at)}
-                </Text>
+                <View style={styles.rowBottom}>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{FREQUENCY_LABEL[sub.frequency]}</Text>
+                  </View>
+                  <Text style={styles.nextCharge}>
+                    Próximo: {formatDayHeader(sub.next_expected_at)}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
-        ))
+          ))}
+        </ResponsiveGrid>
       )}
     </ScrollView>
   );

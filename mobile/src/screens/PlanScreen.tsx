@@ -19,12 +19,15 @@ import {
   usePlannedPayments,
 } from "../services/queries/plan";
 import { colors } from "../theme/colors";
+import { pageStyle, useIsWide } from "../theme/layout";
 
 export default function PlanScreen() {
   const cashflow = useCashFlow();
   const incomes = useIncomeSources();
   const payments = usePlannedPayments();
   const [editing, setEditing] = useState<PlanItemEditing | null>(null);
+  // Wide screens: projection + checklist left, the editable lists right.
+  const isWide = useIsWide();
 
   const isLoading = cashflow.isLoading || incomes.isLoading || payments.isLoading;
   const isError = cashflow.isError || incomes.isError || payments.isError;
@@ -66,7 +69,7 @@ export default function PlanScreen() {
   return (
     <View style={styles.root}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, pageStyle]}
         refreshControl={
           <RefreshControl
             refreshing={cashflow.isRefetching}
@@ -75,125 +78,130 @@ export default function PlanScreen() {
           />
         }
       >
-        {hasSetup && flow ? (
-          <>
-            <View style={styles.hero}>
-              <Text style={styles.heroLabel}>Disponible mensual proyectado</Text>
-              <MoneyText
-                value={flow.available}
-                size="xl"
-                style={available < 0 ? { color: colors.danger } : undefined}
-              />
-              <Text style={styles.heroSub}>
-                Ingresos <MoneyText value={flow.monthly_income} size="sm" style={styles.heroSubStrong} />{" "}
-                − compromisos{" "}
-                <MoneyText value={flow.monthly_committed} size="sm" style={styles.heroSubStrong} />
-              </Text>
-            </View>
-
-            {flow.next_income_date ? (
-              <View style={styles.nextIncome}>
-                <Ionicons name="calendar-outline" size={18} color={colors.success} />
-                <Text style={styles.nextIncomeText}>
-                  Próximo ingreso: {flow.next_income_name} —{" "}
-                  {formatDeadline(flow.next_income_date)} (
-                  <MoneyText value={flow.next_income_amount} size="sm" style={{ color: colors.success }} />
-                  )
-                </Text>
-              </View>
-            ) : null}
-
-            {flow.checklist.length > 0 ? (
+        <View style={isWide ? styles.columns : undefined}>
+          <View style={isWide ? styles.column : undefined}>
+            {hasSetup && flow ? (
               <>
-                <View style={styles.checklistHeader}>
-                  <Text style={styles.sectionLabel}>Al cobrar, pagá en este orden</Text>
-                  <Text style={styles.checklistProgress}>
-                    {flow.checklist.filter((c) => c.is_paid).length}/
-                    {flow.checklist.length} pagados
+                <View style={styles.hero}>
+                  <Text style={styles.heroLabel}>Disponible mensual proyectado</Text>
+                  <MoneyText
+                    value={flow.available}
+                    size="xl"
+                    style={available < 0 ? { color: colors.danger } : undefined}
+                  />
+                  <Text style={styles.heroSub}>
+                    Ingresos <MoneyText value={flow.monthly_income} size="sm" style={styles.heroSubStrong} />{" "}
+                    − compromisos{" "}
+                    <MoneyText value={flow.monthly_committed} size="sm" style={styles.heroSubStrong} />
                   </Text>
                 </View>
-                <View style={styles.checklistBox}>
-                  {flow.checklist.map((item, i) => (
-                    <PaymentChecklistRow key={item.id ?? item.name + i} item={item} index={i} />
-                  ))}
-                </View>
-              </>
-            ) : null}
-          </>
-        ) : (
-          <View style={styles.emptyBox}>
-            <Ionicons name="map-outline" size={44} color={colors.textSecondary} />
-            <Text style={styles.emptyText}>
-              Registrá tus ingresos fijos (quincenas, bonificaciones) y tus pagos fijos
-              (arriendo, cuotas) para ver cuánto te queda libre cada mes y en qué orden pagar.
-            </Text>
-          </View>
-        )}
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>Ingresos fijos</Text>
-          <AddButton onPress={() => setEditing({ kind: "income" })} label="Agregar ingreso" />
-        </View>
-        {incomeList.length === 0 ? (
-          <Text style={styles.emptyRow}>Sin ingresos registrados</Text>
-        ) : (
-          incomeList.map((i) => (
-            <Pressable
-              key={i.id}
-              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-              onPress={() => setEditing({ kind: "income", item: i })}
-            >
-              <View style={[styles.dayBadge, { backgroundColor: colors.successSoft }]}>
-                <Text style={[styles.dayBadgeText, { color: colors.success }]}>{i.expected_day}</Text>
-              </View>
-              <Text style={styles.rowName} numberOfLines={1}>
-                {i.name}
-              </Text>
-              <MoneyText value={i.amount} size="sm" positive signed />
-            </Pressable>
-          ))
-        )}
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>Pagos fijos y apartados</Text>
-          <AddButton onPress={() => setEditing({ kind: "payment" })} label="Agregar pago" />
-        </View>
-        {paymentList.length === 0 ? (
-          <Text style={styles.emptyRow}>Sin pagos registrados</Text>
-        ) : (
-          paymentList.map((p) => (
-            <Pressable
-              key={p.id}
-              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-              onPress={() => setEditing({ kind: "payment", item: p })}
-            >
-              <View
-                style={[
-                  styles.dayBadge,
-                  { backgroundColor: p.is_debt_payment ? colors.dangerSoft : colors.primarySoft },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.dayBadgeText,
-                    { color: p.is_debt_payment ? colors.danger : colors.primary },
-                  ]}
-                >
-                  {p.due_day ?? "—"}
-                </Text>
-              </View>
-              <View style={styles.rowBody}>
-                <Text style={styles.rowName} numberOfLines={1}>
-                  {p.name}
-                </Text>
-                {p.grace_days > 0 ? (
-                  <Text style={styles.rowMeta}>+{p.grace_days} días de plazo</Text>
+                {flow.next_income_date ? (
+                  <View style={styles.nextIncome}>
+                    <Ionicons name="calendar-outline" size={18} color={colors.success} />
+                    <Text style={styles.nextIncomeText}>
+                      Próximo ingreso: {flow.next_income_name} —{" "}
+                      {formatDeadline(flow.next_income_date)} (
+                      <MoneyText value={flow.next_income_amount} size="sm" style={{ color: colors.success }} />
+                      )
+                    </Text>
+                  </View>
                 ) : null}
+
+                {flow.checklist.length > 0 ? (
+                  <>
+                    <View style={styles.checklistHeader}>
+                      <Text style={styles.sectionLabel}>Al cobrar, pagá en este orden</Text>
+                      <Text style={styles.checklistProgress}>
+                        {flow.checklist.filter((c) => c.is_paid).length}/
+                        {flow.checklist.length} pagados
+                      </Text>
+                    </View>
+                    <View style={styles.checklistBox}>
+                      {flow.checklist.map((item, i) => (
+                        <PaymentChecklistRow key={item.id ?? item.name + i} item={item} index={i} />
+                      ))}
+                    </View>
+                  </>
+                ) : null}
+              </>
+            ) : (
+              <View style={styles.emptyBox}>
+                <Ionicons name="map-outline" size={44} color={colors.textSecondary} />
+                <Text style={styles.emptyText}>
+                  Registrá tus ingresos fijos (quincenas, bonificaciones) y tus pagos fijos
+                  (arriendo, cuotas) para ver cuánto te queda libre cada mes y en qué orden pagar.
+                </Text>
               </View>
-              <MoneyText value={p.amount} size="sm" />
-            </Pressable>
-          ))
-        )}
+            )}
+          </View>
+          <View style={isWide ? styles.column : undefined}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>Ingresos fijos</Text>
+              <AddButton onPress={() => setEditing({ kind: "income" })} label="Agregar ingreso" />
+            </View>
+            {incomeList.length === 0 ? (
+              <Text style={styles.emptyRow}>Sin ingresos registrados</Text>
+            ) : (
+              incomeList.map((i) => (
+                <Pressable
+                  key={i.id}
+                  style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+                  onPress={() => setEditing({ kind: "income", item: i })}
+                >
+                  <View style={[styles.dayBadge, { backgroundColor: colors.successSoft }]}>
+                    <Text style={[styles.dayBadgeText, { color: colors.success }]}>{i.expected_day}</Text>
+                  </View>
+                  <Text style={styles.rowName} numberOfLines={1}>
+                    {i.name}
+                  </Text>
+                  <MoneyText value={i.amount} size="sm" positive signed />
+                </Pressable>
+              ))
+            )}
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>Pagos fijos y apartados</Text>
+              <AddButton onPress={() => setEditing({ kind: "payment" })} label="Agregar pago" />
+            </View>
+            {paymentList.length === 0 ? (
+              <Text style={styles.emptyRow}>Sin pagos registrados</Text>
+            ) : (
+              paymentList.map((p) => (
+                <Pressable
+                  key={p.id}
+                  style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+                  onPress={() => setEditing({ kind: "payment", item: p })}
+                >
+                  <View
+                    style={[
+                      styles.dayBadge,
+                      { backgroundColor: p.is_debt_payment ? colors.dangerSoft : colors.primarySoft },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.dayBadgeText,
+                        { color: p.is_debt_payment ? colors.danger : colors.primary },
+                      ]}
+                    >
+                      {p.due_day ?? "—"}
+                    </Text>
+                  </View>
+                  <View style={styles.rowBody}>
+                    <Text style={styles.rowName} numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                    {p.grace_days > 0 ? (
+                      <Text style={styles.rowMeta}>+{p.grace_days} días de plazo</Text>
+                    ) : null}
+                  </View>
+                  <MoneyText value={p.amount} size="sm" />
+                </Pressable>
+              ))
+            )}
+          </View>
+        </View>
       </ScrollView>
 
       <PlanItemSheet editing={editing} onClose={() => setEditing(null)} />
@@ -217,6 +225,8 @@ function AddButton({ onPress, label }: { onPress: () => void; label: string }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 48 },
+  columns: { flexDirection: "row", gap: 24, alignItems: "flex-start" },
+  column: { flex: 1, minWidth: 0 },
   centered: {
     flex: 1,
     backgroundColor: colors.background,

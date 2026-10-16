@@ -17,6 +17,7 @@ import {
 import { colors } from "../theme/colors";
 import { formatCOP, parseCOP } from "../utils/currency";
 import MoneyText from "./MoneyText";
+import { useWebSheet } from "./useWebSheet";
 
 type Props = {
   isVisible: boolean;
@@ -40,6 +41,7 @@ function formatMonths(months: number | null): string {
 
 export default function StrategySheet({ isVisible, onClose }: Props) {
   const sheetRef = useRef<BottomSheet>(null);
+  const sheet = useWebSheet(isVisible);
   const snapPoints = useMemo(() => ["85%"], []);
   const [extraInput, setExtraInput] = useState("");
   // The query only fires when the user taps "Calcular" — extra is frozen then.
@@ -59,6 +61,8 @@ export default function StrategySheet({ isVisible, onClose }: Props) {
 
   const data = query.data;
 
+  if (!sheet.mounted) return null;
+
   return (
     <BottomSheet
       ref={sheetRef}
@@ -68,6 +72,7 @@ export default function StrategySheet({ isVisible, onClose }: Props) {
       onClose={onClose}
       backgroundStyle={styles.bg}
       handleIndicatorStyle={styles.handle}
+      {...sheet.props}
     >
       <BottomSheetScrollView contentContainerStyle={styles.body}>
         <Text style={styles.title}>Estrategia de pago</Text>

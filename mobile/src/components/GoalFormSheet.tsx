@@ -18,6 +18,7 @@ import {
 import { colors } from "../theme/colors";
 import { parseCOP } from "../utils/currency";
 import { Alert } from "../utils/alert";
+import { useWebSheet } from "./useWebSheet";
 
 type Props = {
   isVisible: boolean;
@@ -46,6 +47,7 @@ function fromGoal(g?: SavingsGoalOut): FormState {
 
 export default function GoalFormSheet({ isVisible, goal, onClose }: Props) {
   const sheetRef = useRef<BottomSheet>(null);
+  const sheet = useWebSheet(isVisible);
   const snapPoints = useMemo(() => ["80%"], []);
   const [form, setForm] = useState<FormState>(fromGoal(goal));
   const isEdit = !!goal;
@@ -120,6 +122,8 @@ export default function GoalFormSheet({ isVisible, goal, onClose }: Props) {
     ]);
   }
 
+  if (!sheet.mounted) return null;
+
   return (
     <BottomSheet
       ref={sheetRef}
@@ -129,6 +133,7 @@ export default function GoalFormSheet({ isVisible, goal, onClose }: Props) {
       onClose={onClose}
       backgroundStyle={styles.bg}
       handleIndicatorStyle={styles.handle}
+      {...sheet.props}
     >
       <BottomSheetView style={styles.body}>
         <Text style={styles.title}>{isEdit ? "Editar meta" : "Nueva meta"}</Text>

@@ -22,6 +22,7 @@ import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories
 import { Alert } from "../utils/alert";
 import CategoryIcon from "./CategoryIcon";
 import MoneyText from "./MoneyText";
+import { useWebSheet } from "./useWebSheet";
 
 type Props = {
   isVisible: boolean;
@@ -31,6 +32,7 @@ type Props = {
 
 export default function CategoryPickerSheet({ isVisible, transaction, onClose }: Props) {
   const sheetRef = useRef<BottomSheet>(null);
+  const sheet = useWebSheet(isVisible);
   const snapPoints = useMemo(() => ["85%"], []);
   const mutation = useUpdateTransaction();
   const { data: budgetStatus } = useBudgetStatus();
@@ -82,6 +84,8 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
     );
   }
 
+  if (!sheet.mounted) return null;
+
   return (
     <BottomSheet
       ref={sheetRef}
@@ -91,6 +95,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       onClose={onClose}
       backgroundStyle={styles.bg}
       handleIndicatorStyle={styles.handle}
+      {...sheet.props}
     >
       <BottomSheetScrollView
         contentContainerStyle={styles.body}

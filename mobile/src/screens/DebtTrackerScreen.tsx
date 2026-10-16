@@ -16,12 +16,14 @@ import MoneyText from "../components/MoneyText";
 import StrategySheet from "../components/StrategySheet";
 import { useDebts, type DebtOut } from "../services/queries/debts";
 import { colors } from "../theme/colors";
+import { pageStyle, useIsWide } from "../theme/layout";
 
 export default function DebtTrackerScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useDebts();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [strategyOpen, setStrategyOpen] = useState(false);
   const [editing, setEditing] = useState<DebtOut | undefined>(undefined);
+  const isWide = useIsWide();
 
   const { totalDebt, totalMin, count } = useMemo(() => {
     const list = data ?? [];
@@ -68,7 +70,11 @@ export default function DebtTrackerScreen() {
       <FlatList
         data={debts}
         keyExtractor={(d) => d.id}
-        contentContainerStyle={styles.list}
+        // Changing numColumns on the fly isn't supported — remount via key.
+        key={isWide ? "grid" : "list"}
+        numColumns={isWide ? 2 : 1}
+        columnWrapperStyle={isWide ? styles.gridRow : undefined}
+        contentContainerStyle={[styles.list, pageStyle]}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -111,7 +117,11 @@ export default function DebtTrackerScreen() {
             </Pressable>
           </View>
         }
-        renderItem={({ item }) => <DebtCard debt={item} onPress={openEdit} />}
+        renderItem={({ item }) => (
+          <View style={isWide ? styles.cell : undefined}>
+            <DebtCard debt={item} onPress={openEdit} />
+          </View>
+        )}
       />
 
       {debts.length > 0 ? (
@@ -157,6 +167,9 @@ const styles = StyleSheet.create({
   },
   retryText: { color: "#fff", fontWeight: "600" },
   list: { padding: 16, paddingBottom: 96 },
+  // Wide screens: two cards per row (cells carry the gutter).
+  gridRow: { marginHorizontal: -6 },
+  cell: { width: "50%", paddingHorizontal: 6 },
   // Surface card with a red accent instead of a solid red block — the
   // number carries the weight; a full red panel reads as a permanent alarm.
   hero: {

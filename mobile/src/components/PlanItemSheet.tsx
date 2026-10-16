@@ -22,6 +22,7 @@ import {
 import { colors } from "../theme/colors";
 import { parseCOP } from "../utils/currency";
 import { Alert } from "../utils/alert";
+import { useWebSheet } from "./useWebSheet";
 
 export type PlanItemEditing =
   | { kind: "income"; item?: IncomeSourceOut }
@@ -64,6 +65,7 @@ function fromEditing(editing: PlanItemEditing | null): FormState {
 
 export default function PlanItemSheet({ editing, onClose }: Props) {
   const sheetRef = useRef<BottomSheet>(null);
+  const sheet = useWebSheet(editing !== null);
   const snapPoints = useMemo(() => ["80%"], []);
   const [form, setForm] = useState<FormState>(fromEditing(editing));
 
@@ -185,6 +187,8 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
     ]);
   }
 
+  if (!sheet.mounted) return null;
+
   return (
     <BottomSheet
       ref={sheetRef}
@@ -194,6 +198,7 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
       onClose={onClose}
       backgroundStyle={styles.bg}
       handleIndicatorStyle={styles.handle}
+      {...sheet.props}
     >
       <BottomSheetView style={styles.body}>
         <Text style={styles.title}>

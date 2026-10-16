@@ -1,4 +1,4 @@
-import { NavigationContainer } from "@react-navigation/native";
+import { DarkTheme, NavigationContainer, type Theme } from "@react-navigation/native";
 import { useEffect } from "react";
 
 import SplashScreen from "../screens/SplashScreen";
@@ -6,9 +6,24 @@ import { api } from "../services/api";
 import { registerForPushNotifications } from "../services/notifications";
 import { takeOAuthFragment } from "../services/webAuth";
 import { AuthUser, useAuthStore } from "../store/auth";
+import { colors } from "../theme/colors";
 import { Alert } from "../utils/alert";
 import AppStack from "./AppStack";
 import AuthStack from "./AuthStack";
+
+// Matches the app palette so any area a screen doesn't paint (e.g. the sides
+// of a centered page on desktop) stays dark instead of the default light grey.
+const navTheme: Theme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: colors.background,
+    card: colors.surface,
+    border: colors.border,
+    primary: colors.primary,
+    text: colors.textPrimary,
+  },
+};
 
 /**
  * Web only: finish an OAuth round-trip whose result the backend left in the
@@ -65,7 +80,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
       {accessToken ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
   );
