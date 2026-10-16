@@ -4,6 +4,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.money import MAX_INTEREST_RATE, MAX_NUMERIC_12_2, MAX_NUMERIC_14_2
+
 _EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 
 
@@ -15,9 +17,9 @@ def _normalize_sender(value: str | None) -> str | None:
 
 class DebtBase(BaseModel):
     bank_name: str = Field(..., min_length=1, max_length=128)
-    total_amount: Decimal
-    interest_rate: Decimal | None = None
-    minimum_payment: Decimal | None = None
+    total_amount: Decimal = Field(..., le=MAX_NUMERIC_14_2)
+    interest_rate: Decimal | None = Field(default=None, ge=0, le=MAX_INTEREST_RATE)
+    minimum_payment: Decimal | None = Field(default=None, ge=0, le=MAX_NUMERIC_12_2)
     # Credit-card email link: sender + one of GET /debts/card-formats.
     email_sender: str | None = Field(default=None, max_length=255, pattern=_EMAIL_PATTERN)
     email_format: str | None = Field(default=None, max_length=32)
@@ -32,9 +34,9 @@ class DebtCreate(DebtBase):
 
 class DebtUpdate(BaseModel):
     bank_name: str | None = None
-    total_amount: Decimal | None = None
-    interest_rate: Decimal | None = None
-    minimum_payment: Decimal | None = None
+    total_amount: Decimal | None = Field(default=None, le=MAX_NUMERIC_14_2)
+    interest_rate: Decimal | None = Field(default=None, ge=0, le=MAX_INTEREST_RATE)
+    minimum_payment: Decimal | None = Field(default=None, ge=0, le=MAX_NUMERIC_12_2)
     email_sender: str | None = Field(default=None, max_length=255, pattern=_EMAIL_PATTERN)
     email_format: str | None = Field(default=None, max_length=32)
     card_last_digits: str | None = Field(default=None, pattern=r"^\d{4}$")

@@ -45,6 +45,32 @@ class GmailConnectStartResponse(BaseModel):
     auth_url: str
 
 
+class GmailStatusResponse(BaseModel):
+    connected: bool
+    email: str | None = None
+    last_sync_at: datetime | None = None
+
+
+@router.get("/status", response_model=GmailStatusResponse)
+async def gmail_status(current_user: CurrentUser, db: DbSession) -> GmailStatusResponse:
+    """Whether the user has linked Gmail, so the client can say so instead of
+    always offering to connect."""
+    existing = await db.execute(
+        select(ProviderConnection).where(
+            ProviderConnection.user_id == current_user.id,
+            ProviderConnection.provider_type == ProviderType.gmail,
+        )
+    )
+    connection = existing.scalars().first()
+    if connection is None:
+        return GmailStatusResponse(connected=False)
+    return GmailStatusResponse(
+        connected=True,
+        email=connection.provider_email,
+        last_sync_at=connection.last_sync_at,
+    )
+
+
 @router.post("/connect", response_model=GmailConnectStartResponse)
 async def gmail_connect_start(
     payload: GmailConnectStartRequest,

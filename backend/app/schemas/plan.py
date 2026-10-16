@@ -4,13 +4,15 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.money import MAX_NUMERIC_14_2
+
 
 # --- Income sources ---
 
 
 class IncomeSourceBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=128)
-    amount: Decimal = Field(..., gt=0)
+    amount: Decimal = Field(..., gt=0, le=MAX_NUMERIC_14_2)
     expected_day: int = Field(..., ge=1, le=31)
 
 
@@ -20,7 +22,7 @@ class IncomeSourceCreate(IncomeSourceBase):
 
 class IncomeSourceUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128)
-    amount: Decimal | None = Field(default=None, gt=0)
+    amount: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_14_2)
     expected_day: int | None = Field(default=None, ge=1, le=31)
 
 
@@ -36,7 +38,7 @@ class IncomeSourceOut(IncomeSourceBase):
 
 class PlannedPaymentBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=128)
-    amount: Decimal = Field(..., gt=0)
+    amount: Decimal = Field(..., gt=0, le=MAX_NUMERIC_14_2)
     due_day: int | None = Field(default=None, ge=1, le=31)
     grace_days: int = Field(default=0, ge=0, le=60)
     is_debt_payment: bool = False
@@ -48,7 +50,7 @@ class PlannedPaymentCreate(PlannedPaymentBase):
 
 class PlannedPaymentUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128)
-    amount: Decimal | None = Field(default=None, gt=0)
+    amount: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_14_2)
     due_day: int | None = Field(default=None, ge=1, le=31)
     grace_days: int | None = Field(default=None, ge=0, le=60)
     is_debt_payment: bool | None = None

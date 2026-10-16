@@ -4,9 +4,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.money import MAX_NUMERIC_12_2
+
 
 class BudgetUpsert(BaseModel):
-    monthly_limit: Decimal = Field(gt=0)
+    monthly_limit: Decimal = Field(gt=0, le=MAX_NUMERIC_12_2)
 
 
 class BudgetRename(BaseModel):

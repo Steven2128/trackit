@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -167,8 +168,10 @@ export default function NetWorthScreen() {
 
         <Text style={styles.footnote}>
           Los bancos no mandan el saldo por email: la app parte del saldo que cargás y le suma o
-          resta cada movimiento. Conciliá cada tanto para ver si se escapó algo. Mantené presionada
-          una cuenta para reiniciar su saldo.
+          resta cada movimiento. Conciliá cada tanto para ver si se escapó algo.{" "}
+          {Platform.OS === "web"
+            ? "Mantené el clic sobre el nombre de una cuenta para reiniciar su saldo."
+            : "Mantené presionada una cuenta para reiniciar su saldo."}
         </Text>
       </ScrollView>
 

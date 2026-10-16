@@ -11,6 +11,7 @@ import {
 } from "react-native";
 
 import { api } from "../services/api";
+import { gmailStatusQueryKey, useGmailStatus } from "../services/queries/gmail";
 import { isWeb, redirectTo, webReturnUrl } from "../services/webAuth";
 import { colors } from "../theme/colors";
 import { Alert } from "../utils/alert";
@@ -33,7 +34,9 @@ type SyncResponse = {
 export default function GmailConnectCard() {
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [connected, setConnected] = useState<string | null>(null);
+  const [justConnected, setJustConnected] = useState<string | null>(null);
+  const { data: status } = useGmailStatus();
+  const connected = justConnected ?? (status?.connected ? status.email : null);
   const queryClient = useQueryClient();
 
   const handleConnect = async () => {
@@ -65,7 +68,8 @@ export default function GmailConnectCard() {
       const email = queryParams?.email;
 
       if (status === "ok" && typeof email === "string") {
-        setConnected(email);
+        setJustConnected(email);
+        queryClient.invalidateQueries({ queryKey: gmailStatusQueryKey });
       } else {
         Alert.alert("Gmail", "No se pudo confirmar la conexión con Gmail.");
       }
@@ -103,7 +107,14 @@ export default function GmailConnectCard() {
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Gmail</Text>
       {connected ? (
-        <Text style={styles.connected}>Conectado como {connected}</Text>
+        <Text style={styles.connected}>
+          Conectado como {connected}
+          {status?.last_sync_at ? (
+            <Text style={styles.lastSync}> · última sincronización {formatSync(status.last_sync_at)}</Text>
+          ) : null}
+        </Text>
+      ) : status && !status.connected ? (
+        <Text style={styles.notConnected}>Conectá Gmail para que la app lea los emails de tu banco.</Text>
       ) : null}
       <View style={styles.row}>
         <Pressable
@@ -125,9 +136,10 @@ export default function GmailConnectCard() {
         <Pressable
           style={({ pressed }) => [
             styles.buttonSecondary,
-            (pressed || syncing) && styles.buttonDim,
+            (pressed || syncing || !connected) && styles.buttonDim,
           ]}
-          disabled={syncing}
+          // Nothing to sync until Gmail is linked (the backend would 404).
+          disabled={syncing || !connected}
           onPress={handleSync}
         >
           {syncing ? (
@@ -160,6 +172,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 12,
   },
+  lastSync: { color: colors.textSecondary },
+  notConnected: { color: colors.textSecondary, fontSize: 13, marginBottom: 12 },
   row: { flexDirection: "row", gap: 8 },
   button: {
     backgroundColor: colors.primary,
@@ -184,3 +198,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+function formatSync(iso: string): string {
+  return new Date(iso).toLocaleString("es-CO", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

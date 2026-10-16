@@ -4,11 +4,13 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
+from app.schemas.money import MAX_NUMERIC_14_2
+
 
 class SavingsGoalBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=128)
-    target_amount: Decimal = Field(..., gt=0)
-    current_amount: Decimal = Field(default=Decimal("0"), ge=0)
+    target_amount: Decimal = Field(..., gt=0, le=MAX_NUMERIC_14_2)
+    current_amount: Decimal = Field(default=Decimal("0"), ge=0, le=MAX_NUMERIC_14_2)
     target_date: date | None = None
 
 
@@ -18,8 +20,8 @@ class SavingsGoalCreate(SavingsGoalBase):
 
 class SavingsGoalUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128)
-    target_amount: Decimal | None = Field(default=None, gt=0)
-    current_amount: Decimal | None = Field(default=None, ge=0)
+    target_amount: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_14_2)
+    current_amount: Decimal | None = Field(default=None, ge=0, le=MAX_NUMERIC_14_2)
     target_date: date | None = None
 
 
