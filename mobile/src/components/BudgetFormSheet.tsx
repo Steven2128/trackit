@@ -1,4 +1,4 @@
-import BottomSheet, { BottomSheetTextInput, BottomSheetView } from "@gorhom/bottom-sheet";
+import BottomSheet, { BottomSheetTextInput, BottomSheetView } from "./sheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Keyboard,

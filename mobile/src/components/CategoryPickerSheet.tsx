@@ -1,7 +1,7 @@
 import BottomSheet, {
   BottomSheetScrollView,
   BottomSheetTextInput,
-} from "@gorhom/bottom-sheet";
+} from "./sheet";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
