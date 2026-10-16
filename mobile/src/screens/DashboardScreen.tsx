@@ -136,14 +136,17 @@ function DashboardContent({
             Así van tus finanzas en {humanizeMonth(current_month.month)}
           </Text>
         </View>
-        <Pressable
-          onPress={() => navigation.navigate("Profile")}
-          hitSlop={8}
-          accessibilityLabel="Perfil"
-          style={({ pressed }) => pressed && styles.pressed}
-        >
-          <Ionicons name="person-circle-outline" size={32} color={colors.textPrimary} />
-        </Pressable>
+        {/* Wide screens reach Perfil from the sidebar. */}
+        {isWide ? null : (
+          <Pressable
+            onPress={() => navigation.navigate("Profile")}
+            hitSlop={8}
+            accessibilityLabel="Perfil"
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <Ionicons name="person-circle-outline" size={32} color={colors.textPrimary} />
+          </Pressable>
+        )}
       </View>
 
       <View style={isWide ? styles.columns : undefined}>
@@ -379,6 +382,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 12,
+    // Without a floor the three links shrink to the score card's height
+    // (~20px each) — too tight to read and to tap.
+    minHeight: 36,
     flex: 1,
   },
   quickText: { color: colors.textPrimary, fontSize: 13, fontWeight: "600", flex: 1 },

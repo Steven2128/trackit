@@ -84,9 +84,14 @@ export default function DebtTrackerScreen() {
         }
         ListHeaderComponent={
           <View>
-            <View style={styles.hero}>
+            <View style={[styles.hero, totalDebt === 0 && styles.heroZero]}>
               <Text style={styles.heroLabel}>Deuda total</Text>
-              <MoneyText value={totalDebt} size="xl" style={styles.heroMoney} />
+              <MoneyText
+                value={totalDebt}
+                size="xl"
+                // Red only when there is actually something owed.
+                style={[styles.heroMoney, totalDebt === 0 && styles.heroMoneyZero]}
+              />
               <Text style={styles.heroSub}>
                 {count} {count === 1 ? "deuda" : "deudas"} · pago mínimo {" "}
                 <MoneyText value={totalMin} size="sm" style={styles.heroSubMoney} />
@@ -189,6 +194,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   heroMoney: { color: colors.danger, marginTop: 4 },
+  heroMoneyZero: { color: colors.success },
+  heroZero: { borderLeftColor: colors.success },
   heroSub: { color: colors.textSecondary, fontSize: 12, marginTop: 6 },
   heroSubMoney: { color: colors.textPrimary, fontWeight: "600" },
   strategyBtn: {

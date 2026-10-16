@@ -4,11 +4,12 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import GmailConnectCard from "../components/GmailConnectCard";
 import { useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
-import { pageStyle } from "../theme/layout";
+import { pageStyle, useIsWide } from "../theme/layout";
 
 export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
+  const isWide = useIsWide();
 
   return (
     <View style={styles.container}>
@@ -30,7 +31,7 @@ export default function ProfileScreen() {
         <GmailConnectCard />
 
         <Pressable
-          style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.signOut, isWide && styles.signOutWide, pressed && styles.pressed]}
           onPress={() => clearSession()}
         >
           <Ionicons name="log-out-outline" size={18} color={colors.danger} />
@@ -81,6 +82,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: "auto",
   },
+  // On desktop there's no thumb to reach the bottom edge — keep it with the rest.
+  signOutWide: { marginTop: 24 },
   pressed: { opacity: 0.7 },
   signOutText: { color: colors.danger, fontSize: 14, fontWeight: "600" },
 });

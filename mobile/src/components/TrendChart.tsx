@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { BarChart } from "react-native-chart-kit";
 
 import { colors } from "../theme/colors";
@@ -16,6 +16,16 @@ const chartConfig = {
   color: (opacity = 1) => `rgba(91, 141, 239, ${opacity})`,
   labelColor: (opacity = 1) => `rgba(163, 168, 179, ${opacity})`,
   propsForBackgroundLines: { stroke: colors.border },
+  // Bars default to a 10%-opacity fill — nearly invisible on the dark card.
+  fillShadowGradientFrom: colors.primary,
+  fillShadowGradientFromOpacity: 0.95,
+  fillShadowGradientTo: colors.primary,
+  fillShadowGradientToOpacity: 0.55,
+  // SVG text ignores the app font; on web it falls back to a serif face.
+  propsForLabels:
+    Platform.OS === "web"
+      ? { fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", fontSize: 11 }
+      : {},
   barPercentage: 0.6,
   // BarChart only picks up formatYLabel from chartConfig (unlike LineChart's prop).
   formatYLabel: (raw: string) => compactCOP(raw),

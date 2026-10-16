@@ -7,9 +7,11 @@ import { registerForPushNotifications } from "../services/notifications";
 import { takeOAuthFragment } from "../services/webAuth";
 import { AuthUser, useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
+import { useIsWide } from "../theme/layout";
 import { Alert } from "../utils/alert";
 import AppStack from "./AppStack";
 import AuthStack from "./AuthStack";
+import { buildLinking } from "./linking";
 
 // Matches the app palette so any area a screen doesn't paint (e.g. the sides
 // of a centered page on desktop) stays dark instead of the default light grey.
@@ -35,14 +37,14 @@ async function completeWebOAuth(): Promise<string | null> {
 
   if (fragment.kind === "auth") {
     const { access_token: accessToken, refresh_token: refreshToken } = fragment;
-    if (!accessToken || !refreshToken) return "Login failed: backend did not return tokens.";
+    if (!accessToken || !refreshToken) return "No se pudo iniciar sesión: el servidor no devolvió la sesión.";
     try {
       const me = await api.get<AuthUser>("/auth/me", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       await useAuthStore.getState().setSession({ user: me.data, accessToken, refreshToken });
     } catch (err) {
-      return `Login failed: ${err instanceof Error ? err.message : "could not authenticate."}`;
+      return `No se pudo iniciar sesión: ${err instanceof Error ? err.message : "error desconocido."}`;
     }
     return null;
   }
@@ -59,6 +61,7 @@ export default function RootNavigator() {
   const hydrated = useAuthStore((s) => s.hydrated);
   const accessToken = useAuthStore((s) => s.accessToken);
   const hydrate = useAuthStore((s) => s.hydrate);
+  const isWide = useIsWide();
 
   useEffect(() => {
     if (hydrated) return;
@@ -80,7 +83,14 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navTheme}>
+    // Remount when the URL map changes (login/logout, crossing the wide
+    // breakpoint) — linking config is only read on mount.
+    <NavigationContainer
+      key={`${accessToken ? "app" : "auth"}-${isWide ? "wide" : "narrow"}`}
+      theme={navTheme}
+      linking={buildLinking(!!accessToken, isWide)}
+      documentTitle={{ formatter: (options) => (options?.title ? `${options.title} · TrackIt` : "TrackIt") }}
+    >
       {accessToken ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
   );

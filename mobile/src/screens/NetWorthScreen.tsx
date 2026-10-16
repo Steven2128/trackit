@@ -15,7 +15,7 @@ import MoneyText from "../components/MoneyText";
 import ResponsiveGrid from "../components/ResponsiveGrid";
 import { useNetWorth, type AccountKind, type AccountOut } from "../services/queries/accounts";
 import { colors } from "../theme/colors";
-import { pageStyle } from "../theme/layout";
+import { pageStyle, useIsWide } from "../theme/layout";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -37,6 +37,8 @@ function sinceLabel(iso: string | null): string {
 export default function NetWorthScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useNetWorth();
   const [editing, setEditing] = useState<AccountSheetMode | null>(null);
+  // Wide screens: accounts become equal-height cards in a 3-column grid.
+  const isWide = useIsWide();
 
   if (isLoading) {
     return (
@@ -102,11 +104,16 @@ export default function NetWorthScreen() {
               return (
                 <Pressable
                   key={kind}
-                  style={({ pressed }) => [styles.row, styles.rowEmpty, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.row,
+                    isWide && styles.rowWide,
+                    styles.rowEmpty,
+                    pressed && styles.pressed,
+                  ]}
                   onPress={() => setEditing({ mode: "setup", kind, name })}
                 >
                   <Ionicons name={icon} size={20} color={colors.textSecondary} />
-                  <View style={styles.rowBody}>
+                  <View style={[styles.rowBody, isWide && styles.rowBodyWide]}>
                     <Text style={styles.rowName}>{name}</Text>
                     <Text style={styles.rowMeta}>Tocá para cargar el saldo de hoy</Text>
                   </View>
@@ -115,10 +122,10 @@ export default function NetWorthScreen() {
               );
             }
             return (
-              <View key={kind} style={styles.row}>
+              <View key={kind} style={[styles.row, isWide && styles.rowWide]}>
                 <Ionicons name={icon} size={20} color={colors.primary} />
                 <Pressable
-                  style={styles.rowBody}
+                  style={[styles.rowBody, isWide && styles.rowBodyWide]}
                   onLongPress={() => setEditing({ mode: "setup", kind, name: account.name })}
                   accessibilityHint="Mantené presionado para reiniciar el saldo"
                 >
@@ -127,7 +134,7 @@ export default function NetWorthScreen() {
                     {hint} · {sinceLabel(account.last_reconciled_at)}
                   </Text>
                 </Pressable>
-                <View style={styles.rowRight}>
+                <View style={[styles.rowRight, isWide && styles.rowRightWide]}>
                   <MoneyText value={account.balance} size="md" />
                   <Pressable
                     hitSlop={8}
@@ -238,6 +245,15 @@ const styles = StyleSheet.create({
   rowName: { color: colors.textPrimary, fontSize: 15, fontWeight: "600" },
   rowMeta: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
   rowRight: { alignItems: "flex-end", gap: 4 },
+  rowWide: { flex: 1, flexDirection: "column", alignItems: "flex-start", gap: 10, padding: 16 },
+  rowBodyWide: { flex: 0, alignSelf: "stretch" },
+  rowRightWide: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: "auto",
+  },
   reconcile: { color: colors.primary, fontSize: 12, fontWeight: "600" },
   cashBtn: {
     flexDirection: "row",
@@ -249,5 +265,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   cashText: { color: colors.primary, fontSize: 14, fontWeight: "600" },
-  footnote: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 20 },
+  // Capped so the line stays readable on desktop.
+  footnote: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 20, maxWidth: 640 },
 });

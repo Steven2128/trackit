@@ -373,7 +373,9 @@ const styles = StyleSheet.create({
   },
   // flexGrow: 0 keeps the horizontal ScrollView at its content height —
   // without it the chips get squeezed/clipped by the SectionList below.
-  chipsScroll: { flexGrow: 0 },
+  // flexShrink 0: inside the flex page the browser would otherwise squash
+  // the horizontal chip row to a sliver.
+  chipsScroll: { flexGrow: 0, flexShrink: 0 },
   chipsRow: {
     paddingHorizontal: 16,
     paddingVertical: 2,

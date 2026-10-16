@@ -56,12 +56,12 @@ export default function ConnectGmailScreen() {
       if (status === "ok" && typeof email === "string") {
         setConnected(email);
       } else {
-        Alert.alert("Gmail connect", "Backend did not confirm the connection.");
+        Alert.alert("Gmail", "No se pudo confirmar la conexión con Gmail.");
       }
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not start Gmail OAuth.";
-      Alert.alert("Gmail connect failed", message);
+        err instanceof Error ? err.message : "No se pudo iniciar la conexión con Google.";
+      Alert.alert("No se pudo conectar Gmail", message);
     } finally {
       setBusy(false);
     }
@@ -69,14 +69,14 @@ export default function ConnectGmailScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Connect Gmail</Text>
+      <Text style={styles.title}>Conectar Gmail</Text>
       <Text style={styles.subtitle}>
-        Authorize TrackIt to read your bank notification emails. We only request
-        read-only access and store the OAuth tokens encrypted at rest.
+        Autorizá a TrackIt a leer los emails de notificación de tu banco. Solo
+        pedimos acceso de lectura y guardamos los tokens cifrados.
       </Text>
 
       {connected ? (
-        <Text style={styles.connected}>Connected as {connected}</Text>
+        <Text style={styles.connected}>Conectado como {connected}</Text>
       ) : null}
 
       <Pressable
@@ -91,7 +91,7 @@ export default function ConnectGmailScreen() {
           <ActivityIndicator color={colors.textPrimary} />
         ) : (
           <Text style={styles.buttonText}>
-            {connected ? "Reconnect Gmail" : "Connect Gmail"}
+            {connected ? "Reconectar Gmail" : "Conectar Gmail"}
           </Text>
         )}
       </Pressable>

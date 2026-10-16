@@ -45,6 +45,7 @@ export type AppTabParamList = {
   Plan: undefined;
   Goals: undefined;
   NetWorth: undefined;
+  Profile: undefined;
 };
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -58,6 +59,7 @@ const TAB_ICONS: Record<keyof AppTabParamList, { active: IconName; inactive: Ico
   Plan: { active: "map", inactive: "map-outline" },
   Goals: { active: "flag", inactive: "flag-outline" },
   NetWorth: { active: "wallet", inactive: "wallet-outline" },
+  Profile: { active: "person-circle", inactive: "person-circle-outline" },
 };
 
 const PLANNING_TABS = new Set<string>(["Plan", "Goals", "NetWorth"]);
@@ -103,20 +105,13 @@ function Sidebar({ state, descriptors, navigation }: BottomTabBarProps) {
   return (
     <View style={sidebar.root}>
       <Text style={sidebar.brand}>TrackIt</Text>
-      {indexes.filter((i) => !PLANNING_TABS.has(state.routes[i].name)).map(renderItem)}
+      {indexes
+        .filter((i) => !PLANNING_TABS.has(state.routes[i].name) && state.routes[i].name !== "Profile")
+        .map(renderItem)}
       <Text style={sidebar.section}>Planificación</Text>
       {indexes.filter((i) => PLANNING_TABS.has(state.routes[i].name)).map(renderItem)}
       <View style={{ flex: 1 }} />
-      <Pressable
-        onPress={() => navigation.navigate("Profile" as never)}
-        style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
-          sidebar.item,
-          (hovered || pressed) && sidebar.itemHover,
-        ]}
-      >
-        <Ionicons name="person-circle-outline" size={20} color={colors.textSecondary} />
-        <Text style={[sidebar.label, { color: colors.textSecondary }]}>Perfil</Text>
-      </Pressable>
+      {indexes.filter((i) => state.routes[i].name === "Profile").map(renderItem)}
     </View>
   );
 }
@@ -183,6 +178,9 @@ function Tabs() {
   const isWide = useIsWide();
   return (
     <Tab.Navigator
+      // Every tab switch is a history entry, so the browser back button
+      // returns to the previous section instead of skipping it.
+      backBehavior="history"
       tabBar={isWide ? (props) => <Sidebar {...props} /> : undefined}
       screenOptions={({ route }) => ({
         headerStyle: { backgroundColor: colors.background },
@@ -249,6 +247,7 @@ function Tabs() {
           <Tab.Screen name="Plan" component={PlanScreen} options={{ title: "Plan del mes" }} />
           <Tab.Screen name="Goals" component={GoalsScreen} options={{ title: "Metas de ahorro" }} />
           <Tab.Screen name="NetWorth" component={NetWorthScreen} options={{ title: "Patrimonio" }} />
+          <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Perfil" }} />
         </>
       ) : null}
     </Tab.Navigator>

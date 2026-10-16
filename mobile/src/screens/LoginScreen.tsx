@@ -53,7 +53,7 @@ export default function LoginScreen() {
         typeof accessToken !== "string" ||
         typeof refreshToken !== "string"
       ) {
-        Alert.alert("Login failed", "Backend did not return tokens.");
+        Alert.alert("No se pudo iniciar sesión", "El servidor no devolvió la sesión.");
         return;
       }
 
@@ -68,8 +68,8 @@ export default function LoginScreen() {
       });
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not authenticate.";
-      Alert.alert("Login failed", message);
+        err instanceof Error ? err.message : "No se pudo autenticar.";
+      Alert.alert("No se pudo iniciar sesión", message);
     } finally {
       setBusy(false);
     }
@@ -79,7 +79,7 @@ export default function LoginScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>TrackIt</Text>
       <Text style={styles.subtitle}>
-        Read bank emails. Track every expense.
+        Tus finanzas al día, leídas de los emails de tu banco.
       </Text>
 
       <Pressable
@@ -93,7 +93,7 @@ export default function LoginScreen() {
         {busy ? (
           <ActivityIndicator color={colors.textPrimary} />
         ) : (
-          <Text style={styles.buttonText}>Sign in with Google</Text>
+          <Text style={styles.buttonText}>Entrar con Google</Text>
         )}
       </Pressable>
     </View>

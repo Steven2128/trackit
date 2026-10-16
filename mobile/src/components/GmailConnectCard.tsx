@@ -67,12 +67,12 @@ export default function GmailConnectCard() {
       if (status === "ok" && typeof email === "string") {
         setConnected(email);
       } else {
-        Alert.alert("Gmail", "Backend did not confirm the connection.");
+        Alert.alert("Gmail", "No se pudo confirmar la conexión con Gmail.");
       }
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not start Gmail OAuth.";
-      Alert.alert("Gmail connect failed", message);
+        err instanceof Error ? err.message : "No se pudo iniciar la conexión con Google.";
+      Alert.alert("No se pudo conectar Gmail", message);
     } finally {
       setBusy(false);
     }
@@ -87,13 +87,13 @@ export default function GmailConnectCard() {
       });
       await queryClient.invalidateQueries();
       Alert.alert(
-        "Sync",
+        "Sincronización",
         `${data.created} nuevas · ${data.processed} procesadas · ${data.skipped_duplicate} duplicadas`,
       );
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Sync failed.";
-      Alert.alert("Sync failed", message);
+        err instanceof Error ? err.message : "La sincronización falló.";
+      Alert.alert("No se pudo sincronizar", message);
     } finally {
       setSyncing(false);
     }
@@ -103,7 +103,7 @@ export default function GmailConnectCard() {
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Gmail</Text>
       {connected ? (
-        <Text style={styles.connected}>Connected as {connected}</Text>
+        <Text style={styles.connected}>Conectado como {connected}</Text>
       ) : null}
       <View style={styles.row}>
         <Pressable
@@ -118,7 +118,7 @@ export default function GmailConnectCard() {
             <ActivityIndicator color={colors.textPrimary} />
           ) : (
             <Text style={styles.buttonText}>
-              {connected ? "Reconnect Gmail" : "Connect Gmail"}
+              {connected ? "Reconectar Gmail" : "Conectar Gmail"}
             </Text>
           )}
         </Pressable>
@@ -133,7 +133,7 @@ export default function GmailConnectCard() {
           {syncing ? (
             <ActivityIndicator color={colors.textPrimary} />
           ) : (
-            <Text style={styles.buttonText}>Sync now</Text>
+            <Text style={styles.buttonText}>Sincronizar ahora</Text>
           )}
         </Pressable>
       </View>
