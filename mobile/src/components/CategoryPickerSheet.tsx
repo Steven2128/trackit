@@ -97,17 +97,33 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       handleIndicatorStyle={styles.handle}
       {...sheet.props}
     >
+      {/* Pinned header: with a dozen category rows below, a Guardar at the
+          end of the list was off-screen until you scrolled to it. */}
+      <View style={styles.header}>
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Editar movimiento</Text>
+          {transaction ? (
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {transaction.merchant ?? "Sin nombre"} ·{" "}
+              <MoneyText value={transaction.amount} size="sm" />
+            </Text>
+          ) : null}
+        </View>
+        <Pressable
+          style={[styles.saveBtn, mutation.isPending && { opacity: 0.5 }]}
+          disabled={mutation.isPending}
+          onPress={handleSave}
+        >
+          <Text style={styles.saveText}>
+            {mutation.isPending ? "Guardando..." : "Guardar"}
+          </Text>
+        </Pressable>
+      </View>
+
       <BottomSheetScrollView
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>Editar movimiento</Text>
-        {transaction ? (
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {transaction.merchant ?? "Sin nombre"} ·{" "}
-            <MoneyText value={transaction.amount} size="sm" />
-          </Text>
-        ) : null}
 
         <Text style={styles.label}>Nombre</Text>
         <BottomSheetTextInput
@@ -155,16 +171,6 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
           selected={selected === null}
           onPress={() => setSelected(null)}
         />
-
-        <Pressable
-          style={[styles.saveBtn, mutation.isPending && { opacity: 0.5 }]}
-          disabled={mutation.isPending}
-          onPress={handleSave}
-        >
-          <Text style={styles.saveText}>
-            {mutation.isPending ? "Guardando..." : "Guardar"}
-          </Text>
-        </Pressable>
       </BottomSheetScrollView>
     </BottomSheet>
   );
@@ -206,9 +212,20 @@ function OptionRow({
 const styles = StyleSheet.create({
   bg: { backgroundColor: colors.surface },
   handle: { backgroundColor: colors.border },
-  body: { padding: 16, paddingBottom: 32, gap: 6 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerText: { flex: 1 },
+  body: { padding: 16, paddingTop: 4, paddingBottom: 32, gap: 6 },
   title: { color: colors.textPrimary, fontSize: 16, fontWeight: "600" },
-  subtitle: { color: colors.textSecondary, fontSize: 13, marginBottom: 6 },
+  subtitle: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
   label: {
     color: colors.textSecondary,
     fontSize: 10,
@@ -244,10 +261,10 @@ const styles = StyleSheet.create({
   checkPlaceholder: { width: 20 },
   saveBtn: {
     backgroundColor: colors.primary,
-    padding: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     borderRadius: 8,
     alignItems: "center",
-    marginTop: 12,
   },
   saveText: { color: "#fff", fontWeight: "600", fontSize: 14 },
 });
