@@ -135,10 +135,10 @@ Pushing to `master` deploys automatically once CI passes. Rationale in
    docker compose exec -T db pg_dump -U trackit -d trackit --no-owner --no-acl > dump.sql
    docker compose exec -T db psql "<neon connection string>" < dump.sql
    ```
-6. **Web**: the Blueprint also creates the `trackit-web` static site and
-   wires its host into the API's `WEB_APP_HOST`. Open its
-   `https://trackit-web….onrender.com` URL and sign in. If the Blueprint
-   predates the web service, *Blueprints → Sync* (or push) creates it.
+6. **Web**: the Blueprint also creates the `trackit-web` static site
+   (live at https://trackit-web-0uh9.onrender.com). Its origin must be in
+   the API's `WEB_RETURN_ORIGINS` (set in `render.yaml`) or login returns
+   400 "origin is not allowed".
 7. **Mobile**: set `mobile/app.json` → `extra.apiUrl` and `.env`'s
    `EXPO_PUBLIC_API_URL` to the Render URL, then `npx expo start --clear`.
 

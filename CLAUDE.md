@@ -63,7 +63,7 @@ After changing `extra.apiUrl`, run `npx expo start --clear` — Metro caches the
 - Container runs `alembic upgrade head` on boot — a new migration ships with the push, no manual step.
 - Render free sleeps when idle → `SYNC_SCHEDULER_ENABLED=false` there. Scheduled jobs come from `.github/workflows/cron.yml` hitting `POST /internal/cron/{gmail-sync,push-alerts,weekly-summary}` with `Bearer $CRON_SECRET`. If you add a scheduled job to `app/main.py`'s lifespan, also add it to `app/api/routes/cron.py::_JOBS` and the workflow.
 - `DATABASE_URL` from Neon is pasted raw (`postgresql://…?sslmode=require`); `Settings._normalize_database_url` converts it. Use Neon's direct endpoint, not `-pooler`.
-- Web client = Render static site `trackit-web` (`rootDir: mobile`, `expo export --platform web`). CI job `web` (tsc + export) gates it.
+- Web client = Render static site `trackit-web` → https://trackit-web-0uh9.onrender.com (`rootDir: mobile`, `expo export --platform web`). CI job `web` (tsc + export) gates it. Its origin is hardcoded in `render.yaml` → `WEB_RETURN_ORIGINS` (`fromService` host came back empty).
 - The Render URL replaces ngrok for the phone; the ngrok flow below is only for testing local backend changes on a device.
 
 ## Physical device testing — ngrok is required

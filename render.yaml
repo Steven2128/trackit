@@ -37,13 +37,11 @@ services:
         sync: false
       - key: MOBILE_RETURN_SCHEME
         value: trackit
-      # The web client's host; OAuth may only send tokens back to it (or to
-      # WEB_RETURN_ORIGINS, which defaults to the local Expo web ports).
-      - key: WEB_APP_HOST
-        fromService:
-          type: web
-          name: trackit-web
-          property: host
+      # The web client's origin; OAuth only sends tokens back to these.
+      # Explicit because `fromService: {property: host}` resolved empty for
+      # the static site. Keep the local Expo web port for dev against prod.
+      - key: WEB_RETURN_ORIGINS
+        value: "https://trackit-web-0uh9.onrender.com,http://localhost:8081"
       # Instance sleeps when idle — jobs come from .github/workflows/cron.yml.
       - key: SYNC_SCHEDULER_ENABLED
         value: "false"
