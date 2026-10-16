@@ -246,7 +246,7 @@ function DashboardContent({
                 {current_month.transaction_count} transacciones
               </Text>
             </View>
-            <View style={[styles.hero, styles.heroDebt]}>
+            <View style={[styles.hero, styles.heroDebt, debts.debt_count === 0 && styles.heroDebtNone]}>
               <Text style={styles.heroLabel}>Deuda total</Text>
               {debts.debt_count === 0 ? (
                 <Text style={styles.noDebt}>Sin deudas</Text>
@@ -430,6 +430,8 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   heroDebt: { borderLeftWidth: 3, borderLeftColor: colors.danger },
+  // Same accent as the "Sin deudas" text — red only when something is owed.
+  heroDebtNone: { borderLeftColor: colors.success },
   heroLabel: {
     color: colors.textSecondary,
     fontSize: 11,
