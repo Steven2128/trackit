@@ -1,6 +1,7 @@
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -35,8 +36,12 @@ export default function GmailConnectCard() {
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [justConnected, setJustConnected] = useState<string | null>(null);
-  const { data: status } = useGmailStatus();
+  const { data: status, isLoading: statusLoading, isError: statusError } = useGmailStatus();
   const connected = justConnected ?? (status?.connected ? status.email : null);
+  // Only a confirmed "not connected" blocks syncing; while the status loads
+  // (the free API can take a minute to wake up) or if it failed, let the user
+  // try — the backend answers with a clear error if there is no Gmail.
+  const knownDisconnected = !justConnected && status?.connected === false;
   const queryClient = useQueryClient();
 
   const handleConnect = async () => {
@@ -96,7 +101,11 @@ export default function GmailConnectCard() {
       );
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "La sincronización falló.";
+        isAxiosError(err) && err.response?.status === 404
+          ? "Todavía no hay una cuenta de Gmail conectada. Tocá \"Conectar Gmail\" primero."
+          : err instanceof Error
+            ? err.message
+            : "La sincronización falló.";
       Alert.alert("No se pudo sincronizar", message);
     } finally {
       setSyncing(false);
@@ -113,8 +122,12 @@ export default function GmailConnectCard() {
             <Text style={styles.lastSync}> · última sincronización {formatSync(status.last_sync_at)}</Text>
           ) : null}
         </Text>
-      ) : status && !status.connected ? (
+      ) : knownDisconnected ? (
         <Text style={styles.notConnected}>Conectá Gmail para que la app lea los emails de tu banco.</Text>
+      ) : statusLoading ? (
+        <Text style={styles.notConnected}>Revisando la conexión con Gmail…</Text>
+      ) : statusError ? (
+        <Text style={styles.notConnected}>No pudimos revisar la conexión con Gmail. Probá sincronizar igual.</Text>
       ) : null}
       <View style={styles.row}>
         <Pressable
@@ -136,10 +149,10 @@ export default function GmailConnectCard() {
         <Pressable
           style={({ pressed }) => [
             styles.buttonSecondary,
-            (pressed || syncing || !connected) && styles.buttonDim,
+            (pressed || syncing || knownDisconnected) && styles.buttonDim,
           ]}
           // Nothing to sync until Gmail is linked (the backend would 404).
-          disabled={syncing || !connected}
+          disabled={syncing || knownDisconnected}
           onPress={handleSync}
         >
           {syncing ? (
