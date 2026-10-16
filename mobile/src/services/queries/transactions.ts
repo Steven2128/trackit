@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../api";
+import { accountsQueryKey } from "./accounts";
 import { budgetsQueryKey } from "./budgets";
 import { dashboardQueryKey } from "./dashboard";
 
@@ -17,6 +18,8 @@ export type TransactionOut = {
   occurred_at: string;
   note: string | null;
   debt_id: string | null;
+  // Account the money moved in; "cash" = typed in by the user (editable amount).
+  source: string | null;
 };
 
 export type TransactionListResponse = {
@@ -60,7 +63,19 @@ export type TransactionPatch = {
   category?: string | null;
   merchant?: string | null;
   note?: string | null;
+  // Cash expenses only — the backend rejects it on bank rows.
+  amount?: number;
 };
+
+function invalidateTransactionViews(qc: ReturnType<typeof useQueryClient>) {
+  // Category and amount feed every derived view, and cash rows also move the
+  // Efectivo balance in Patrimonio.
+  qc.invalidateQueries({ queryKey: ["transactions"] });
+  qc.invalidateQueries({ queryKey: budgetsQueryKey });
+  qc.invalidateQueries({ queryKey: dashboardQueryKey });
+  qc.invalidateQueries({ queryKey: ["insights"] });
+  qc.invalidateQueries({ queryKey: accountsQueryKey });
+}
 
 export function useUpdateTransaction() {
   const qc = useQueryClient();
@@ -69,13 +84,17 @@ export function useUpdateTransaction() {
       const res = await api.patch<TransactionOut>(`/transactions/${id}`, fields);
       return res.data;
     },
-    onSuccess: () => {
-      // Recategorizing moves spending between categories — everything
-      // derived from transaction categories must refetch.
-      qc.invalidateQueries({ queryKey: ["transactions"] });
-      qc.invalidateQueries({ queryKey: budgetsQueryKey });
-      qc.invalidateQueries({ queryKey: dashboardQueryKey });
-      qc.invalidateQueries({ queryKey: ["insights"] });
+    onSuccess: () => invalidateTransactionViews(qc),
+  });
+}
+
+/** Deletes a typed-in cash expense (the backend refuses bank rows). */
+export function useDeleteCashTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/transactions/${id}`);
     },
+    onSuccess: () => invalidateTransactionViews(qc),
   });
 }

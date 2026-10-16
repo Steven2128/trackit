@@ -45,3 +45,13 @@ def test_interest_rate_bounds() -> None:
     DebtCreate(bank_name="x", total_amount=Decimal(1), interest_rate=Decimal("28.5"))
     with pytest.raises(ValidationError):
         DebtCreate(bank_name="x", total_amount=Decimal(1), interest_rate=Decimal("1000"))
+
+
+def test_transaction_update_amount_bounds() -> None:
+    from app.schemas.transaction import TransactionUpdate
+
+    assert TransactionUpdate(amount=Decimal("15700")).amount == Decimal("15700")
+    assert "amount" not in TransactionUpdate(category="food").model_fields_set
+    for bad in (Decimal("0"), Decimal("-1"), Decimal("120000120000")):
+        with pytest.raises(ValidationError):
+            TransactionUpdate(amount=bad)

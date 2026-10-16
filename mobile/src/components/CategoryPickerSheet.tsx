@@ -14,11 +14,13 @@ import {
 
 import { useBudgetStatus } from "../services/queries/budgets";
 import {
+  useDeleteCashTransaction,
   useUpdateTransaction,
   type TransactionOut,
 } from "../services/queries/transactions";
 import { colors } from "../theme/colors";
 import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
+import { parseCOP } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import CategoryIcon from "./CategoryIcon";
 import MoneyText from "./MoneyText";
@@ -35,17 +37,23 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   const sheet = useWebSheet(isVisible);
   const snapPoints = useMemo(() => ["85%"], []);
   const mutation = useUpdateTransaction();
+  const removal = useDeleteCashTransaction();
   const { data: budgetStatus } = useBudgetStatus();
 
   const [merchant, setMerchant] = useState("");
   const [note, setNote] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const [amount, setAmount] = useState("");
+  // Typed-in cash expenses: amount editable and deletable. Bank rows mirror
+  // their notification email, so their amount stays read-only.
+  const isCash = transaction?.source === "cash";
 
   useEffect(() => {
     if (transaction) {
       setMerchant(transaction.merchant ?? "");
       setNote(transaction.note ?? "");
       setSelected(transaction.category);
+      setAmount(String(Math.round(Number(transaction.amount))));
     }
   }, [transaction]);
 
@@ -68,6 +76,11 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   function handleSave() {
     if (!transaction || mutation.isPending) return;
     const name = merchant.trim();
+    const newAmount = parseCOP(amount);
+    if (isCash && newAmount <= 0) {
+      Alert.alert("Monto inválido", "Escribí un monto en pesos mayor a 0.");
+      return;
+    }
     Keyboard.dismiss();
     mutation.mutate(
       {
@@ -75,12 +88,36 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
         category: selected,
         merchant: name || null,
         note: note.trim() || null,
+        ...(isCash && newAmount !== Math.round(Number(transaction.amount))
+          ? { amount: newAmount }
+          : {}),
       },
       {
         onSuccess: onClose,
         onError: (e) =>
           Alert.alert("Error", e instanceof Error ? e.message : "Error al guardar."),
       },
+    );
+  }
+
+  function handleDelete() {
+    if (!transaction || removal.isPending) return;
+    Alert.alert(
+      "Eliminar gasto",
+      `¿Eliminar "${transaction.merchant ?? "este gasto"}"? Vuelve a sumar al efectivo.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: () =>
+            removal.mutate(transaction.id, {
+              onSuccess: onClose,
+              onError: (e) =>
+                Alert.alert("Error", e instanceof Error ? e.message : "Error al eliminar."),
+            }),
+        },
+      ],
     );
   }
 
@@ -109,6 +146,19 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
             </Text>
           ) : null}
         </View>
+        {/* In the header, not after the category list, so it's findable. */}
+        {isCash ? (
+          <Pressable
+            style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressed]}
+            disabled={removal.isPending}
+            onPress={handleDelete}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Eliminar gasto"
+          >
+            <Ionicons name="trash-outline" size={20} color={colors.danger} />
+          </Pressable>
+        ) : null}
         <Pressable
           style={[styles.saveBtn, mutation.isPending && { opacity: 0.5 }]}
           disabled={mutation.isPending}
@@ -124,6 +174,20 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
       >
+        {isCash ? (
+          <>
+            <Text style={styles.label}>Monto (COP)</Text>
+            <BottomSheetTextInput
+              style={styles.input}
+              placeholder="0"
+              placeholderTextColor={colors.textSecondary}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="number-pad"
+              inputMode="numeric"
+            />
+          </>
+        ) : null}
 
         <Text style={styles.label}>Nombre</Text>
         <BottomSheetTextInput
@@ -267,4 +331,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  deleteBtn: {
+    padding: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.danger,
+  },
 });

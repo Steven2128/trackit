@@ -146,8 +146,9 @@ async def update_transaction(
     current_user: CurrentUser,
     db: DbSession,
 ) -> TransactionOut:
-    """Manual edit (category and/or merchant name) — feeds budget bars,
-    summaries and dashboard. Partial: only fields present in the body change."""
+    """Manual edit (category, merchant name, note; amount for cash expenses)
+    — feeds budget bars, summaries, dashboard and the cash balance. Partial:
+    only fields present in the body change."""
     provided = payload.model_fields_set
     if not provided:
         raise HTTPException(
@@ -197,6 +198,18 @@ async def update_transaction(
         tx.merchant = merchant
     if "note" in provided:
         tx.note = note
+    if "amount" in provided:
+        if payload.amount is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid_amount"
+            )
+        # Bank rows mirror their notification email; editing the amount would
+        # just diverge from the bank (and from the statement reconciler).
+        if tx.source != "cash":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="amount_not_editable"
+            )
+        tx.amount = payload.amount
     await db.commit()
     await db.refresh(tx)
     return TransactionOut.model_validate(tx)

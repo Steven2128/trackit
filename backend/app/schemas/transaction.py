@@ -2,9 +2,10 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.transaction import TransactionType
+from app.schemas.money import MAX_NUMERIC_12_2
 
 
 class TransactionOut(BaseModel):
@@ -31,6 +32,9 @@ class TransactionUpdate(BaseModel):
     category: str | None = None
     merchant: str | None = None
     note: str | None = None
+    # Only for typed-in cash expenses (source="cash"); bank rows keep the
+    # amount from their email, the route rejects it there.
+    amount: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_12_2)
 
 
 class TransactionListResponse(BaseModel):
