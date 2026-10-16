@@ -1,9 +1,9 @@
 import type { LinkingOptions } from "@react-navigation/native";
+import { Platform } from "react-native";
 
 // Signed-in and signed-out trees differ, so params are left untyped here.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyLinking = LinkingOptions<any>;
-import { Platform } from "react-native";
 
 /**
  * Browser URLs for each screen (web only): makes the back button, reloads and
