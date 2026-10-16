@@ -296,3 +296,34 @@ semanal, alertas push) que hoy corren dentro del proceso con APScheduler.
 - **Vercel**: serverless — sin proceso vivo para APScheduler, cron free máximo 1 vez/día, límite de duración por request (riesgoso para un sync de 200 emails) y hay que adaptar el pool de conexiones.
 - **Fly.io / Railway**: ya no tienen plan gratis permanente.
 - **Postgres de Render**: expira a los 30 días en free.
+
+## ADR-009: Cliente web — la misma app Expo exportada al navegador
+
+**Fecha:** 2026-10-15
+**Estado:** Aceptado
+
+### Contexto
+
+Al usuario le robaron el celular: todo lo que hace la app mobile tiene que
+poder usarse desde un navegador, sin depender de tener el teléfono.
+
+### Decisión
+
+- **Un solo código**: `mobile/` se exporta también para web (`npx expo export --platform web`, react-native-web). No hay un frontend web aparte que mantener en paralelo.
+- **Hosting**: static site `trackit-web` en Render (`render.yaml`), deploy en cada push a `master` cuando pasa CI (nuevo job `web`: `tsc` + export).
+- **OAuth en web**: redirect de página completa en vez de `WebBrowser.openAuthSessionAsync`. El cliente manda `return_url` (login: query de `/auth/google/start`; Gmail: body de `POST /gmail/connect`); el backend lo valida contra una allowlist (`WEB_RETURN_ORIGINS` + `https://$WEB_APP_HOST`), lo guarda en el state JWT y al final redirige a `<return_url>#kind=auth&access_token=…`. Los tokens van en el **fragment** para que nunca lleguen a logs de servidor; el cliente los lee una vez (`services/webAuth.ts`) y limpia la barra de direcciones. Los clientes nativos siguen igual con `return_scheme`.
+- **Shims de plataforma**: `utils/storage.ts` (SecureStore → `localStorage` en web), `utils/alert.ts` (`Alert.alert` de react-native-web es un no-op → `window.alert`/`window.confirm`), push deshabilitado en web, `webPolyfills.ts` para `@gorhom/bottom-sheet`. En pantallas anchas la app se ve como una columna centrada de 560px (`theme/layout.ts`).
+
+### Consecuencias
+
+**Ganamos:** acceso desde cualquier navegador con el mismo código y las mismas pantallas; nada que configurar en Google Cloud (los redirect URIs siguen siendo los del backend).
+
+**Pagamos:**
+- Los tokens viven en `localStorage` (no hay keychain en el navegador). Mitigación: access token de 30 min, `X-Frame-Options: DENY` en el static site, sin scripts de terceros.
+- Sin push notifications en web — quedan el resumen semanal por email y las alertas in-app.
+- La UI es mobile-first; en desktop se ve como columna, no como layout de escritorio.
+
+### Alternativas descartadas
+
+- **Frontend web separado (Next.js/Vite)**: duplicar todas las pantallas y queries; mantener dos clientes para un usuario.
+- **Servir el bundle desde FastAPI**: obliga a meter Node en la imagen del backend y a que cada cambio de UI redeploye la API.

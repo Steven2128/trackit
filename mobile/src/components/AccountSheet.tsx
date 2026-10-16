@@ -1,6 +1,12 @@
 import BottomSheet, { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import {
   useCreateCashExpense,
@@ -11,6 +17,7 @@ import {
 import { colors } from "../theme/colors";
 import { CATEGORIES } from "../utils/categories";
 import { formatCOP, parseCOP } from "../utils/currency";
+import { Alert } from "../utils/alert";
 
 export type AccountSheetMode =
   // First balance, or start over from today's real balance.

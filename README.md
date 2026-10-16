@@ -91,6 +91,20 @@ simulator. Make sure `EXPO_PUBLIC_API_URL` in `.env` points to a host
 that the device can reach (for physical devices on the same Wi-Fi, use
 your machine's LAN IP instead of `localhost`).
 
+### Web
+
+The same app runs in the browser (ADR-009):
+
+```bash
+cd mobile
+npx expo start --web          # dev server on http://localhost:8081
+npx expo export --platform web   # static build in mobile/dist
+```
+
+The backend only sends OAuth tokens back to allowlisted web origins:
+`WEB_RETURN_ORIGINS` (default `http://localhost:8081,http://localhost:19006`)
+plus `https://$WEB_APP_HOST`.
+
 ## Deploy (Render + Neon, free)
 
 Pushing to `master` deploys automatically once CI passes. Rationale in
@@ -121,7 +135,11 @@ Pushing to `master` deploys automatically once CI passes. Rationale in
    docker compose exec -T db pg_dump -U trackit -d trackit --no-owner --no-acl > dump.sql
    docker compose exec -T db psql "<neon connection string>" < dump.sql
    ```
-6. **Mobile**: set `mobile/app.json` → `extra.apiUrl` and `.env`'s
+6. **Web**: the Blueprint also creates the `trackit-web` static site and
+   wires its host into the API's `WEB_APP_HOST`. Open its
+   `https://trackit-web….onrender.com` URL and sign in. If the Blueprint
+   predates the web service, *Blueprints → Sync* (or push) creates it.
+7. **Mobile**: set `mobile/app.json` → `extra.apiUrl` and `.env`'s
    `EXPO_PUBLIC_API_URL` to the Render URL, then `npx expo start --clear`.
 
 Free-tier caveat: the API sleeps after ~15 min idle, so the first request

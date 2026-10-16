@@ -1,6 +1,12 @@
 import BottomSheet, { BottomSheetTextInput, BottomSheetView } from "@gorhom/bottom-sheet";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import {
   useCreateGoal,
@@ -11,6 +17,7 @@ import {
 } from "../services/queries/goals";
 import { colors } from "../theme/colors";
 import { parseCOP } from "../utils/currency";
+import { Alert } from "../utils/alert";
 
 type Props = {
   isVisible: boolean;

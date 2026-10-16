@@ -1,7 +1,8 @@
-import { Dimensions } from "react-native";
+import { useWindowDimensions } from "react-native";
 import { BarChart } from "react-native-chart-kit";
 
 import { colors } from "../theme/colors";
+import { MAX_CONTENT_WIDTH } from "../theme/layout";
 
 type Props = {
   months: string[];
@@ -43,7 +44,8 @@ function compactCOP(raw: string): string {
 }
 
 export default function TrendChart({ months, totals }: Props) {
-  const width = Dimensions.get("window").width - 32;
+  const { width: windowWidth } = useWindowDimensions();
+  const width = Math.min(windowWidth, MAX_CONTENT_WIDTH) - 32;
   return (
     <BarChart
       data={{

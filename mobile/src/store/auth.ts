@@ -1,5 +1,6 @@
-import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
+
+import { storage } from "../utils/storage";
 
 export type AuthUser = {
   id: string;
@@ -35,9 +36,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   hydrate: async () => {
     const [userRaw, accessToken, refreshToken] = await Promise.all([
-      SecureStore.getItemAsync(KEY_USER),
-      SecureStore.getItemAsync(KEY_ACCESS),
-      SecureStore.getItemAsync(KEY_REFRESH),
+      storage.getItem(KEY_USER),
+      storage.getItem(KEY_ACCESS),
+      storage.getItem(KEY_REFRESH),
     ]);
 
     set({
@@ -50,23 +51,23 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setSession: async ({ user, accessToken, refreshToken }) => {
     await Promise.all([
-      SecureStore.setItemAsync(KEY_USER, JSON.stringify(user)),
-      SecureStore.setItemAsync(KEY_ACCESS, accessToken),
-      SecureStore.setItemAsync(KEY_REFRESH, refreshToken),
+      storage.setItem(KEY_USER, JSON.stringify(user)),
+      storage.setItem(KEY_ACCESS, accessToken),
+      storage.setItem(KEY_REFRESH, refreshToken),
     ]);
     set({ user, accessToken, refreshToken });
   },
 
   setAccessToken: async (token) => {
-    await SecureStore.setItemAsync(KEY_ACCESS, token);
+    await storage.setItem(KEY_ACCESS, token);
     set({ accessToken: token });
   },
 
   clearSession: async () => {
     await Promise.all([
-      SecureStore.deleteItemAsync(KEY_USER),
-      SecureStore.deleteItemAsync(KEY_ACCESS),
-      SecureStore.deleteItemAsync(KEY_REFRESH),
+      storage.deleteItem(KEY_USER),
+      storage.deleteItem(KEY_ACCESS),
+      storage.deleteItem(KEY_REFRESH),
     ]);
     set({ user: null, accessToken: null, refreshToken: null });
   },

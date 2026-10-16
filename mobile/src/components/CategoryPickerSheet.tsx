@@ -4,7 +4,13 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { useBudgetStatus } from "../services/queries/budgets";
 import {
@@ -13,6 +19,7 @@ import {
 } from "../services/queries/transactions";
 import { colors } from "../theme/colors";
 import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
+import { Alert } from "../utils/alert";
 import CategoryIcon from "./CategoryIcon";
 import MoneyText from "./MoneyText";
 

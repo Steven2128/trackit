@@ -1,4 +1,4 @@
-# Render Blueprint — backend API on the free plan.
+# Render Blueprint — backend API + web client, both on the free plan.
 # Database lives on Neon (Render's free Postgres is deleted after 30 days).
 # Deploys automatically on every push to master once CI passes.
 # Values marked `sync: false` are entered once in the Render dashboard.
@@ -37,6 +37,13 @@ services:
         sync: false
       - key: MOBILE_RETURN_SCHEME
         value: trackit
+      # The web client's host; OAuth may only send tokens back to it (or to
+      # WEB_RETURN_ORIGINS, which defaults to the local Expo web ports).
+      - key: WEB_APP_HOST
+        fromService:
+          type: web
+          name: trackit-web
+          property: host
       # Instance sleeps when idle — jobs come from .github/workflows/cron.yml.
       - key: SYNC_SCHEDULER_ENABLED
         value: "false"
@@ -44,3 +51,29 @@ services:
         value: "*"
       - key: LOG_LEVEL
         value: INFO
+
+  # Web client (ADR-009): the Expo app exported for the browser. It talks to
+  # trackit-api through mobile/app.json → extra.apiUrl.
+  - type: web
+    name: trackit-web
+    runtime: static
+    branch: master
+    rootDir: mobile
+    buildCommand: npm ci && npx expo export --platform web
+    staticPublishPath: dist
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+    # Single-page app: every path serves index.html.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer

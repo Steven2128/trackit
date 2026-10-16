@@ -1,7 +1,6 @@
 import BottomSheet, { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Keyboard,
   Pressable,
   StyleSheet,
@@ -19,6 +18,7 @@ import {
 import { useTransactions } from "../services/queries/transactions";
 import { colors } from "../theme/colors";
 import { parseCOP } from "../utils/currency";
+import { Alert } from "../utils/alert";
 import MoneyText from "./MoneyText";
 
 type Props = {

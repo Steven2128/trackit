@@ -25,6 +25,12 @@ class Settings(BaseSettings):
 
     api_base_url: str = Field(default="http://localhost:8000")
     mobile_return_scheme: str = Field(default="trackit")
+    # Browser origins the web client may be sent back to after OAuth
+    # (comma-separated, e.g. "http://localhost:8081"). `web_app_host` is the
+    # bare host of the deployed web app (Render injects it via `fromService`)
+    # and is allowed as `https://<host>`.
+    web_return_origins: str = Field(default="http://localhost:8081,http://localhost:19006")
+    web_app_host: str = Field(default="")
 
     google_client_id: str = Field(default="")
     google_client_secret: str = Field(default="")
@@ -74,6 +80,13 @@ class Settings(BaseSettings):
         if "?" not in value and "&" in value:
             value = value.replace("&", "?", 1)
         return value
+
+    @property
+    def web_return_origin_list(self) -> list[str]:
+        origins = [o.strip().rstrip("/") for o in self.web_return_origins.split(",") if o.strip()]
+        if self.web_app_host.strip():
+            origins.append(f"https://{self.web_app_host.strip().rstrip('/')}")
+        return origins
 
     @property
     def cors_origin_list(self) -> list[str]:

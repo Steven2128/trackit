@@ -37,6 +37,8 @@ docker-compose.yml   Postgres 16 + backend service
 5. Backend 307 → `trackit://auth?access_token=...&refresh_token=...`
 6. Mobile parses the URL with `expo-linking`, calls `/auth/me` for the user object, persists session to SecureStore + Zustand.
 
+**Web client** (ADR-009): same flow but a full-page redirect. Mobile code sends `return_url` (instead of `return_scheme`) to `/auth/google/start` / `POST /gmail/connect`; the backend checks it against `WEB_RETURN_ORIGINS` + `https://$WEB_APP_HOST` (`app/core/oauth_return.py`) and returns to `<return_url>#kind=auth&access_token=...` (fragment, never query). `mobile/src/services/webAuth.ts` + `RootNavigator` consume it. On web, never import `Alert` from `react-native` (no-op there) — use `src/utils/alert.ts`; never call `expo-secure-store` directly — use `src/utils/storage.ts`.
+
 **Gmail connect** uses the same shape but auth-gated: `POST /gmail/connect` (with Bearer token) returns `{auth_url}` containing a state JWT bound to `user_id`. Mobile opens it; backend `/gmail/callback` stores the encrypted tokens in `provider_connections`.
 
 State CSRF: short-lived (10 min) JWT with `purpose`, `nonce`, `exp` — see `create_state_token` / `decode_state_token` in `app/core/security.py`. Reuse those, don't roll your own.
@@ -61,6 +63,7 @@ After changing `extra.apiUrl`, run `npx expo start --clear` — Metro caches the
 - Container runs `alembic upgrade head` on boot — a new migration ships with the push, no manual step.
 - Render free sleeps when idle → `SYNC_SCHEDULER_ENABLED=false` there. Scheduled jobs come from `.github/workflows/cron.yml` hitting `POST /internal/cron/{gmail-sync,push-alerts,weekly-summary}` with `Bearer $CRON_SECRET`. If you add a scheduled job to `app/main.py`'s lifespan, also add it to `app/api/routes/cron.py::_JOBS` and the workflow.
 - `DATABASE_URL` from Neon is pasted raw (`postgresql://…?sslmode=require`); `Settings._normalize_database_url` converts it. Use Neon's direct endpoint, not `-pooler`.
+- Web client = Render static site `trackit-web` (`rootDir: mobile`, `expo export --platform web`). CI job `web` (tsc + export) gates it.
 - The Render URL replaces ngrok for the phone; the ngrok flow below is only for testing local backend changes on a device.
 
 ## Physical device testing — ngrok is required

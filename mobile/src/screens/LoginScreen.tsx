@@ -1,26 +1,21 @@
-import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 
-import { api } from "../services/api";
+import { API_URL, api } from "../services/api";
+import { isWeb, redirectTo, webReturnUrl } from "../services/webAuth";
 import { AuthUser, useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
+import { Alert } from "../utils/alert";
 
 WebBrowser.maybeCompleteAuthSession();
-
-const API_URL =
-  (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
-  process.env.EXPO_PUBLIC_API_URL ??
-  "http://localhost:8000";
 
 const RETURN_SCHEME = "trackit";
 const RETURN_PATH = "auth";
@@ -30,6 +25,15 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
 
   const handleLogin = async () => {
+    if (isWeb) {
+      // Full-page redirect; RootNavigator picks the tokens up on return.
+      setBusy(true);
+      redirectTo(
+        `${API_URL}/auth/google/start?return_url=${encodeURIComponent(webReturnUrl())}`,
+      );
+      return;
+    }
+
     setBusy(true);
     try {
       const returnUrl = `${RETURN_SCHEME}://${RETURN_PATH}`;

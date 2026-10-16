@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -23,6 +22,7 @@ import {
 import { colors } from "../theme/colors";
 import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
 import { humanizeMonth } from "../utils/dates";
+import { Alert } from "../utils/alert";
 
 // Budgets make sense for spending categories only — internal movements
 // (transfer, cash_withdrawal) are excluded from spending everywhere else.

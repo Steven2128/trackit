@@ -4,7 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -12,7 +11,9 @@ import {
 } from "react-native";
 
 import { api } from "../services/api";
+import { isWeb, redirectTo, webReturnUrl } from "../services/webAuth";
 import { colors } from "../theme/colors";
+import { Alert } from "../utils/alert";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -38,9 +39,16 @@ export default function GmailConnectCard() {
   const handleConnect = async () => {
     setBusy(true);
     try {
-      const { data } = await api.post<ConnectResponse>("/gmail/connect", {
-        return_scheme: RETURN_SCHEME,
-      });
+      const { data } = await api.post<ConnectResponse>(
+        "/gmail/connect",
+        isWeb ? { return_url: webReturnUrl() } : { return_scheme: RETURN_SCHEME },
+      );
+
+      if (isWeb) {
+        // RootNavigator reports the result when Google sends us back.
+        redirectTo(data.auth_url);
+        return;
+      }
 
       const returnUrl = `${RETURN_SCHEME}://${RETURN_PATH}`;
       const result = await WebBrowser.openAuthSessionAsync(

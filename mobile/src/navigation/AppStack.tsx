@@ -5,7 +5,7 @@ import {
   createNativeStackNavigator,
   type NativeStackNavigationProp,
 } from "@react-navigation/native-stack";
-import { Pressable } from "react-native";
+import { Platform, Pressable } from "react-native";
 
 import BudgetsScreen from "../screens/BudgetsScreen";
 import DashboardScreen from "../screens/DashboardScreen";
@@ -76,11 +76,17 @@ function Tabs() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           paddingTop: 6,
+          // Native gets its height from the bottom safe-area inset; the
+          // browser has none, which clips the labels under the icons.
+          ...(Platform.OS === "web" ? { height: 72, paddingBottom: 10 } : null),
         },
         // 10px + no per-item padding so long Spanish labels
         // ("Suscripciones") fit in a 5-tab bar without truncating.
         tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
         tabBarItemStyle: { paddingHorizontal: 0 },
+        // React Navigation switches to "beside-icon" on wide (browser)
+        // windows, which hides the labels in our narrow centered column.
+        tabBarLabelPosition: "below-icon",
         tabBarAllowFontScaling: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,

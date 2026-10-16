@@ -1,5 +1,4 @@
 import logging
-from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import RedirectResponse
@@ -7,6 +6,7 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
+from app.core.oauth_return import build_return_redirect, validate_web_return_url
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -35,9 +35,19 @@ def _auth_redirect_uri() -> str:
 
 
 @router.get("/google/start")
-async def google_login_start(return_scheme: str | None = None) -> RedirectResponse:
-    scheme = return_scheme or settings.mobile_return_scheme
-    state = create_state_token({"purpose": "auth", "return_scheme": scheme})
+async def google_login_start(
+    return_scheme: str | None = None,
+    return_url: str | None = None,
+) -> RedirectResponse:
+    claims: dict[str, str] = {"purpose": "auth"}
+    if return_url:
+        try:
+            claims["return_url"] = validate_web_return_url(return_url)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    else:
+        claims["return_scheme"] = return_scheme or settings.mobile_return_scheme
+    state = create_state_token(claims)
     try:
         url = build_authorization_url(
             scopes=SIGNIN_SCOPES,
@@ -123,9 +133,13 @@ async def google_login_callback(
     access = create_access_token(subject)
     refresh = create_refresh_token(subject)
 
-    scheme = claims.get("return_scheme") or settings.mobile_return_scheme
-    deep_link = f"{scheme}://auth?{urlencode({'access_token': access, 'refresh_token': refresh})}"
-    return RedirectResponse(deep_link, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    try:
+        target = build_return_redirect(
+            claims, "auth", {"access_token": access, "refresh_token": refresh}
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return RedirectResponse(target, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 @router.get("/me", response_model=UserOut)

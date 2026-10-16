@@ -6,14 +6,16 @@ import { api } from "./api";
 
 // Foreground behavior: show the banner even with the app open — a budget
 // alert that lands while the user is browsing should still be visible.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 /**
  * Ask permission, fetch the Expo push token and register it with the
@@ -24,6 +26,9 @@ Notifications.setNotificationHandler({
  * or production app registers normally.
  */
 export async function registerForPushNotifications(): Promise<void> {
+  // Expo push tokens are native-only; the web client relies on the weekly
+  // email summary instead.
+  if (Platform.OS === "web") return;
   try {
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {

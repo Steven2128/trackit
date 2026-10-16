@@ -71,6 +71,7 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 ## Fase 4 — Inteligencia (futuro)
 
 - [x] Push notifications — tabla `push_tokens` (registro vía `POST /notifications/token` post-login en mobile con `expo-notifications`) + job diario 8am (`send_push_alerts_job`): presupuestos al 80/100%, vencimientos ≤3 días y gasto inusual, con dedupe por periodo en `notification_logs` (una alerta suena una vez por mes/vencimiento, no todos los días). Envío vía Expo Push API (`app/services/push_sender.py`); tokens muertos (`DeviceNotRegistered`) se purgan solos. Nota: en Expo Go (SDK 53+) push remoto no funciona — requiere development build; el registro falla silencioso en dev.
+- [x] Cliente web — la app Expo exportada al navegador (static site `trackit-web` en Render), login y conexión de Gmail por redirect con `return_url` en allowlist; storage/alertas con shims web, sin push en web (ADR-009)
 - [ ] Análisis de patrones con IA (Claude API)
 - [x] Parser Davivienda (cuenta de nómina desde 2026-09): compras, PSE, abonos, transferencias a llave → Nequi pareadas (ver PARSERS.md)
 - [x] Tarjetas de crédito conectadas por email, con remitente configurable desde la app (RappiCard primero): compras = gasto + suben la deuda, pagos bajan la deuda y su débito bancario pasa a `debt_payment`, el extracto actualiza mínimo y fecha límite (ver PARSERS.md)
