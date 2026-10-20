@@ -2,10 +2,11 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.account import AccountKind
 from app.schemas.money import MAX_NUMERIC_12_2, MAX_NUMERIC_14_2
+from app.schemas.transaction import check_expense_date
 
 
 class AccountUpsert(BaseModel):
@@ -52,4 +53,7 @@ class CashExpenseIn(BaseModel):
     amount: Decimal = Field(..., gt=0, le=MAX_NUMERIC_12_2)
     merchant: str = Field(..., min_length=1, max_length=255)
     category: str | None = Field(default=None, max_length=64)
+    # Lets the user log yesterday's spending on yesterday; None = now.
     occurred_at: datetime | None = None
+
+    _occurred_at = field_validator("occurred_at")(check_expense_date)

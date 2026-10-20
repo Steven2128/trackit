@@ -35,6 +35,8 @@ export type CashExpensePayload = {
   amount: string;
   merchant: string;
   category: string | null;
+  // ISO instant; omitted = now.
+  occurred_at?: string;
 };
 
 export const accountsQueryKey = ["accounts"] as const;

@@ -1,11 +1,26 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.transaction import TransactionType
 from app.schemas.money import MAX_NUMERIC_12_2
+
+# Tolerates a phone clock a few minutes ahead of the server's.
+_CLOCK_SKEW = timedelta(minutes=5)
+
+
+def check_expense_date(value: datetime | None) -> datetime | None:
+    """A typed-in expense happened at a known instant, never in the future.
+    Naive datetimes are rejected: their local day would be ambiguous."""
+    if value is None:
+        return value
+    if value.tzinfo is None:
+        raise ValueError("occurred_at needs a timezone")
+    if value > datetime.now(timezone.utc) + _CLOCK_SKEW:
+        raise ValueError("occurred_at is in the future")
+    return value
 
 
 class TransactionOut(BaseModel):
@@ -35,6 +50,10 @@ class TransactionUpdate(BaseModel):
     # Only for typed-in cash expenses (source="cash"); bank rows keep the
     # amount from their email, the route rejects it there.
     amount: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_12_2)
+    # Also cash-only: the day the user actually spent it.
+    occurred_at: datetime | None = None
+
+    _occurred_at = field_validator("occurred_at")(check_expense_date)
 
 
 class TransactionListResponse(BaseModel):

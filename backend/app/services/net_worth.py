@@ -88,6 +88,64 @@ def computed_balance(
     return total
 
 
+# (amount, occurred_at) of a typed-in cash expense; None when it doesn't exist
+# (before creation / after deletion).
+CashExpense = tuple[Decimal, datetime] | None
+
+
+def reconciled_delta(
+    opening_at: datetime,
+    reconciled_at: datetime,
+    before: CashExpense,
+    after: CashExpense,
+) -> Decimal:
+    """What to add to the latest reconciliation adjustment when a cash expense
+    is created, edited or deleted, so the cash the user counted stays put.
+
+    An expense dated before the last count was already inside that count:
+    typing it (or fixing its amount) afterwards must not lower the balance a
+    second time — the "unexplained" adjustment absorbs it instead. Expenses
+    after the count (or before opening_at, which never move the balance) need
+    nothing.
+    """
+
+    def counted(expense: CashExpense) -> Decimal:
+        if expense is None:
+            return Decimal("0")
+        amount, occurred_at = expense
+        return amount if opening_at <= occurred_at < reconciled_at else Decimal("0")
+
+    return counted(after) - counted(before)
+
+
+async def keep_cash_reconciled(
+    db: AsyncSession, user_id: uuid.UUID, before: CashExpense, after: CashExpense
+) -> None:
+    """Apply ``reconciled_delta`` to the cash account's latest adjustment.
+    Only the latest one matters: the current balance has to match the last
+    count. The caller commits."""
+    account = (
+        await db.execute(
+            select(Account).where(Account.user_id == user_id, Account.kind == AccountKind.cash)
+        )
+    ).scalar_one_or_none()
+    if account is None:
+        return
+    latest = (
+        await db.execute(
+            select(AccountAdjustment)
+            .where(AccountAdjustment.account_id == account.id)
+            .order_by(AccountAdjustment.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if latest is None:
+        return
+    delta = reconciled_delta(account.opening_at, latest.created_at, before, after)
+    if delta:
+        latest.amount += delta
+
+
 @dataclass
 class AccountSnapshot:
     account: Account

@@ -9,7 +9,12 @@ import pytest
 from app.models.account import AccountKind
 from app.models.transaction import TransactionType
 from app.parsers.davivienda import DaviviendaParser
-from app.services.net_worth import Movement, account_delta, computed_balance
+from app.services.net_worth import (
+    Movement,
+    account_delta,
+    computed_balance,
+    reconciled_delta,
+)
 from tests._helpers import load_eml_fixture
 
 OPENING = datetime(2026, 10, 1, tzinfo=timezone.utc)
@@ -88,3 +93,79 @@ def test_davivienda_retiro_is_cash_withdrawal() -> None:
     assert tx is not None
     assert tx.transaction_type == TransactionType.debit
     assert tx.category == "cash_withdrawal"
+
+
+class TestReconciledDelta:
+    """The cash the user counted at RECONCILED must survive typing, editing or
+    deleting an expense afterwards: balance change + delta == 0 for expenses
+    already inside the count."""
+
+    RECONCILED = OPENING + timedelta(days=15)
+    BEFORE = OPENING + timedelta(days=14)  # inside the count
+    AFTER = OPENING + timedelta(days=17)  # after the count
+
+    def _delta(self, before, after) -> Decimal:
+        return reconciled_delta(OPENING, self.RECONCILED, before, after)
+
+    def test_new_expense_before_the_count_is_absorbed(self) -> None:
+        assert self._delta(None, (Decimal("15700"), self.BEFORE)) == Decimal("15700")
+
+    def test_new_expense_after_the_count_moves_the_balance(self) -> None:
+        assert self._delta(None, (Decimal("15700"), self.AFTER)) == Decimal("0")
+
+    def test_expense_before_opening_never_moves_anything(self) -> None:
+        early = OPENING - timedelta(days=1)
+        assert self._delta(None, (Decimal("15700"), early)) == Decimal("0")
+
+    def test_fixing_a_typo_amount_inside_the_count(self) -> None:
+        # The real case: a $1 typo fixed after counting the cash.
+        delta = self._delta((Decimal("1"), self.BEFORE), (Decimal("15700"), self.BEFORE))
+        assert delta == Decimal("15699")
+
+    def test_deleting_an_expense_inside_the_count(self) -> None:
+        assert self._delta((Decimal("15700"), self.BEFORE), None) == Decimal("-15700")
+
+    def test_moving_an_expense_after_the_count(self) -> None:
+        # It happened after counting, so the count still held that money.
+        delta = self._delta((Decimal("15700"), self.BEFORE), (Decimal("15700"), self.AFTER))
+        assert delta == Decimal("-15700")
+
+    @pytest.mark.parametrize(
+        ("before", "after"),
+        [
+            (None, (Decimal("20000"), BEFORE)),
+            ((Decimal("1"), BEFORE), (Decimal("15700"), BEFORE)),
+            ((Decimal("15700"), BEFORE), None),
+            ((Decimal("9000"), AFTER), (Decimal("9000"), BEFORE)),
+        ],
+    )
+    def test_cash_balance_stays_at_the_counted_amount(self, before, after) -> None:
+        """End-to-end invariant through computed_balance: the balance after
+        the change equals the balance before it whenever both versions of the
+        expense fall inside the count."""
+
+        def balance(expense, adjustments: Decimal) -> Decimal:
+            movements = []
+            if expense is not None:
+                amount, at = expense
+                movements.append(
+                    Movement(source="cash", transaction_type=D, category="food",
+                             amount=amount, occurred_at=at)
+                )
+            return computed_balance(AccountKind.cash, Decimal("1200000"), OPENING,
+                                    movements, adjustments)
+
+        def inside(e):
+            return e is not None and OPENING <= e[1] < self.RECONCILED
+
+        adj = Decimal("-50000")
+        old = balance(before, adj)
+        new = balance(after, adj + self._delta(before, after))
+        moved_out = inside(before) and after is not None and not inside(after)
+        moved_in = before is not None and not inside(before) and inside(after)
+        if moved_out:
+            assert new == old - after[0]
+        elif moved_in:
+            assert new == old + before[0]
+        else:
+            assert new == old

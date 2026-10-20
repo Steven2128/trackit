@@ -63,8 +63,9 @@ export type TransactionPatch = {
   category?: string | null;
   merchant?: string | null;
   note?: string | null;
-  // Cash expenses only — the backend rejects it on bank rows.
+  // Cash expenses only — the backend rejects them on bank rows.
   amount?: number;
+  occurred_at?: string;
 };
 
 function invalidateTransactionViews(qc: ReturnType<typeof useQueryClient>) {

@@ -32,6 +32,7 @@ from app.schemas.transaction import (
     TransactionUpdate,
 )
 from app.services.categorizer import RULES
+from app.services.net_worth import keep_cash_reconciled
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -109,6 +110,7 @@ async def create_cash_expense(
         source="cash",
     )
     db.add(tx)
+    await keep_cash_reconciled(db, current_user.id, None, (tx.amount, tx.occurred_at))
     await db.commit()
     await db.refresh(tx)
     return TransactionOut.model_validate(tx)
@@ -131,6 +133,7 @@ async def delete_cash_expense(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="transaction_not_found")
     if tx.source != "cash":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="not_a_manual_transaction")
+    await keep_cash_reconciled(db, current_user.id, (tx.amount, tx.occurred_at), None)
     await db.delete(tx)
     await db.commit()
 
@@ -146,7 +149,7 @@ async def update_transaction(
     current_user: CurrentUser,
     db: DbSession,
 ) -> TransactionOut:
-    """Manual edit (category, merchant name, note; amount for cash expenses)
+    """Manual edit (category, merchant name, note; amount and date for cash expenses)
     — feeds budget bars, summaries, dashboard and the cash balance. Partial:
     only fields present in the body change."""
     provided = payload.model_fields_set
@@ -198,6 +201,7 @@ async def update_transaction(
         tx.merchant = merchant
     if "note" in provided:
         tx.note = note
+    before = (tx.amount, tx.occurred_at)
     if "amount" in provided:
         if payload.amount is None:
             raise HTTPException(
@@ -210,6 +214,19 @@ async def update_transaction(
                 status_code=status.HTTP_409_CONFLICT, detail="amount_not_editable"
             )
         tx.amount = payload.amount
+    if "occurred_at" in provided:
+        if payload.occurred_at is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid_date"
+            )
+        # Same reason: a bank row's date is the one in its email.
+        if tx.source != "cash":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="date_not_editable"
+            )
+        tx.occurred_at = payload.occurred_at
+    if tx.source == "cash" and provided & {"amount", "occurred_at"}:
+        await keep_cash_reconciled(db, current_user.id, before, (tx.amount, tx.occurred_at))
     await db.commit()
     await db.refresh(tx)
     return TransactionOut.model_validate(tx)

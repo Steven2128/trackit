@@ -22,7 +22,9 @@ import { colors } from "../theme/colors";
 import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
 import { parseCOP } from "../utils/currency";
 import { Alert } from "../utils/alert";
+import { daysAgo as daysAgoOf, expenseInstant } from "../utils/dates";
 import CategoryIcon from "./CategoryIcon";
+import ExpenseDayPicker from "./ExpenseDayPicker";
 import MoneyText from "./MoneyText";
 import { useWebSheet } from "./useWebSheet";
 
@@ -44,7 +46,8 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   const [note, setNote] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
-  // Typed-in cash expenses: amount editable and deletable. Bank rows mirror
+  const [daysAgo, setDaysAgo] = useState(0);
+  // Typed-in cash expenses: amount and day editable, and deletable. Bank rows mirror
   // their notification email, so their amount stays read-only.
   const isCash = transaction?.source === "cash";
 
@@ -54,6 +57,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       setNote(transaction.note ?? "");
       setSelected(transaction.category);
       setAmount(String(Math.round(Number(transaction.amount))));
+      setDaysAgo(daysAgoOf(transaction.occurred_at));
     }
   }, [transaction]);
 
@@ -90,6 +94,10 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
         note: note.trim() || null,
         ...(isCash && newAmount !== Math.round(Number(transaction.amount))
           ? { amount: newAmount }
+          : {}),
+        // Only when the day changed: keeps the original time otherwise.
+        ...(isCash && daysAgo !== daysAgoOf(transaction.occurred_at)
+          ? { occurred_at: expenseInstant(daysAgo) }
           : {}),
       },
       {
@@ -186,6 +194,8 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
               keyboardType="number-pad"
               inputMode="numeric"
             />
+            <Text style={styles.label}>Día</Text>
+            <ExpenseDayPicker daysAgo={daysAgo} onChange={setDaysAgo} />
           </>
         ) : null}
 

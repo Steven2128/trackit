@@ -18,6 +18,8 @@ import { colors } from "../theme/colors";
 import { CATEGORIES } from "../utils/categories";
 import { formatCOP, parseCOP } from "../utils/currency";
 import { Alert } from "../utils/alert";
+import { expenseInstant } from "../utils/dates";
+import ExpenseDayPicker from "./ExpenseDayPicker";
 import { useWebSheet } from "./useWebSheet";
 
 export type AccountSheetMode =
@@ -44,11 +46,13 @@ export default function AccountSheet({ editing, onClose }: Props) {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string | null>(null);
+  const [daysAgo, setDaysAgo] = useState(0);
 
   useEffect(() => {
     setAmount("");
     setDescription("");
     setCategory(null);
+    setDaysAgo(0);
     if (editing !== null) sheetRef.current?.expand();
     else sheetRef.current?.close();
   }, [editing]);
@@ -100,7 +104,13 @@ export default function AccountSheet({ editing, onClose }: Props) {
       return;
     }
     cash.mutate(
-      { amount: value.toString(), merchant: description.trim(), category },
+      {
+        amount: value.toString(),
+        merchant: description.trim(),
+        category,
+        // Today goes without a date so the server stamps "now".
+        ...(daysAgo > 0 ? { occurred_at: expenseInstant(daysAgo) } : {}),
+      },
       { onSuccess: onClose, onError },
     );
   }
@@ -116,7 +126,7 @@ export default function AccountSheet({ editing, onClose }: Props) {
       ? "Escribí el saldo que ves hoy en el banco (o el efectivo que tenés). Desde ahora la app lo actualiza con cada movimiento."
       : editing?.mode === "reconcile"
         ? `La app calcula ${formatCOP(editing.computed)}. Escribí el saldo real; si no coincide, la diferencia queda registrada.`
-        : "Resta del efectivo y cuenta como gasto del mes.";
+        : "Resta del efectivo y cuenta como gasto del día que elijas.";
 
   if (!sheet.mounted) return null;
 
@@ -157,6 +167,8 @@ export default function AccountSheet({ editing, onClose }: Props) {
               value={description}
               onChangeText={setDescription}
             />
+            <Text style={styles.label}>¿Cuándo?</Text>
+            <ExpenseDayPicker daysAgo={daysAgo} onChange={setDaysAgo} />
             <Text style={styles.label}>Categoría</Text>
             <View style={styles.chips}>
               {SPENDABLE.map((c) => (
