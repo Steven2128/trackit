@@ -72,3 +72,18 @@ export function formatShortDay(iso: string): string {
   const d = new Date(iso);
   return `${DIAS[d.getDay()]} ${d.getDate()} ${MESES[d.getMonth()]}`;
 }
+
+// The due date is typed as DD/MM/AAAA and sent as YYYY-MM-DD.
+export function isoToDmy(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+export function dmyToIso(text: string): string | null {
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text.trim());
+  if (!match) return null;
+  const [, d, m, y] = match.map(Number);
+  const date = new Date(y, m - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}

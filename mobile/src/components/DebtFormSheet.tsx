@@ -19,6 +19,7 @@ import { useTransactions } from "../services/queries/transactions";
 import { colors } from "../theme/colors";
 import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
+import { dmyToIso, isoToDmy } from "../utils/dates";
 import MoneyText from "./MoneyText";
 import { useWebSheet } from "./useWebSheet";
 
@@ -34,6 +35,7 @@ type FormState = {
   rate: string;
   min: string;
   due: string; // DD/MM/AAAA, "" = none
+  planned: string; // what the user pays each due date, "" = the minimum
   // Credit-card email link; format null = not linked.
   format: string | null;
   sender: string;
@@ -46,27 +48,13 @@ const EMPTY: FormState = {
   rate: "",
   min: "",
   due: "",
+  planned: "",
   format: null,
   sender: "",
   digits: "",
 };
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-// The due date is typed as DD/MM/AAAA and sent as YYYY-MM-DD.
-function isoToDmy(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-function dmyToIso(text: string): string | null {
-  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text.trim());
-  if (!match) return null;
-  const [, d, m, y] = match.map(Number);
-  const date = new Date(y, m - 1, d);
-  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
-  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-}
 
 function fromDebt(d?: DebtOut): FormState {
   if (!d) return EMPTY;
@@ -76,6 +64,7 @@ function fromDebt(d?: DebtOut): FormState {
     rate: d.interest_rate ? Number(d.interest_rate).toString() : "",
     min: Number(d.minimum_payment) ? toCOPInput(d.minimum_payment) : "",
     due: d.payment_due_date ? isoToDmy(d.payment_due_date) : "",
+    planned: Number(d.planned_payment) ? toCOPInput(d.planned_payment) : "",
     format: d.email_sender ? d.email_format : null,
     sender: d.email_sender ?? "",
     digits: d.card_last_digits ?? "",
@@ -140,6 +129,7 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
       interest_rate: rate !== null && !Number.isNaN(rate) ? rate.toString() : null,
       minimum_payment: min !== null ? min.toString() : null,
       payment_due_date: due,
+      planned_payment: form.planned.trim() === "" ? null : parseCOP(form.planned).toString(),
       email_sender: form.format ? sender : null,
       email_format: form.format,
       card_last_digits: form.format && digits !== "" ? digits : null,
@@ -241,6 +231,17 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
             placeholderTextColor={colors.textSecondary}
             value={form.min}
             onChangeText={(v) => setForm((f) => ({ ...f, min: formatCOPInput(v) }))}
+            keyboardType="numeric"
+          />
+        </Field>
+
+        <Field label="Cuánto pensás pagar cada vez (opcional)">
+          <BottomSheetTextInput
+            style={styles.input}
+            placeholder="Si es más que el mínimo, p.ej. 700.000"
+            placeholderTextColor={colors.textSecondary}
+            value={form.planned}
+            onChangeText={(v) => setForm((f) => ({ ...f, planned: formatCOPInput(v) }))}
             keyboardType="numeric"
           />
         </Field>

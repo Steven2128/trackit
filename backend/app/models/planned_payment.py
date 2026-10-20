@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,6 +43,9 @@ class PlannedPayment(Base):
     # monthly plan. Comparing against the current month makes the check
     # reset itself when a new month starts — no cron needed.
     paid_month: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    # One-off obligation (money owed to a friend): due once on this date,
+    # due_day is then ignored. NULL = recurring every month on due_day.
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

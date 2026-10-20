@@ -23,6 +23,8 @@ class DebtBase(BaseModel):
     # Due date of the next payment. Typed by the user for cards without a
     # statement email (Banco de Bogotá); statement emails refresh it.
     payment_due_date: date | None = None
+    # Planned payment per due date when above the minimum ("700.000 cada 5").
+    planned_payment: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_12_2)
     # Credit-card email link: sender + one of GET /debts/card-formats.
     email_sender: str | None = Field(default=None, max_length=255, pattern=_EMAIL_PATTERN)
     email_format: str | None = Field(default=None, max_length=32)
@@ -41,6 +43,7 @@ class DebtUpdate(BaseModel):
     interest_rate: Decimal | None = Field(default=None, ge=0, le=MAX_INTEREST_RATE)
     minimum_payment: Decimal | None = Field(default=None, ge=0, le=MAX_NUMERIC_12_2)
     payment_due_date: date | None = None
+    planned_payment: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_12_2)
     email_sender: str | None = Field(default=None, max_length=255, pattern=_EMAIL_PATTERN)
     email_format: str | None = Field(default=None, max_length=32)
     card_last_digits: str | None = Field(default=None, pattern=r"^\d{4}$")

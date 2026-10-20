@@ -91,3 +91,40 @@ export function useCreateCashExpense() {
     onSuccess: () => invalidateMoney(qc),
   });
 }
+
+/** Money in your accounts that isn't yours to spend (GET /fund-holds). */
+export type FundHoldOut = { id: string; name: string; amount: string; created_at: string };
+
+export const fundHoldsQueryKey = ["fund-holds"] as const;
+
+function invalidateHolds(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: fundHoldsQueryKey });
+  qc.invalidateQueries({ queryKey: ["cash-position"] });
+}
+
+export function useFundHolds() {
+  return useQuery({
+    queryKey: fundHoldsQueryKey,
+    queryFn: async () => (await api.get<FundHoldOut[]>("/fund-holds")).data,
+  });
+}
+
+export function useCreateFundHold() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { name: string; amount: string }) => {
+      await api.post("/fund-holds", payload);
+    },
+    onSuccess: () => invalidateHolds(qc),
+  });
+}
+
+export function useDeleteFundHold() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/fund-holds/${id}`);
+    },
+    onSuccess: () => invalidateHolds(qc),
+  });
+}

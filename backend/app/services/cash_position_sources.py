@@ -1,20 +1,18 @@
-"""Turn what the app already stores into cash_position inputs (stage 2).
+"""Turn what the app stores into cash_position inputs.
 
 Pure: the route (``GET /cashflow/position``) loads rows and passes them in.
-No new tables yet, so this reads only what exists:
 
-- balance: the computed account balances (services/net_worth.py);
+- balance: the computed account balances (services/net_worth.py), minus
+  ``fund_holds`` (money kept for someone else);
 - expected income: each ``income_sources`` row on its day of each month,
   weekend paydays on the Friday before, skipped once a matching deposit
   shows up in the movements;
-- obligations: each ``planned_payments`` row on its ``due_day`` (the
-  monthly check-off marks the current month's one as paid) and the latest
-  statement of each debt (minimum + due date), minus the card payments
-  already linked to that debt.
-
-Not there yet (needs schema, stage 3): money held for others, one-off
-obligations and partial payments of a planned payment. ``NOTES`` says so in
-the response instead of pretending.
+- obligations: each ``planned_payments`` row — monthly on ``due_day``, or
+  once on ``due_date`` (money owed to a friend) — and each debt's next due
+  date for the larger of its minimum and what the user plans to pay.
+  What's already paid toward a due date = ``obligation_payments`` for it
+  (partial or ahead); the old monthly check-off still counts as paid in
+  full, and card payments read from email count when nothing was recorded.
 """
 
 from __future__ import annotations
@@ -26,7 +24,9 @@ from decimal import Decimal
 from typing import Protocol, Sequence
 
 from app.services.cash_position import (
+    AmountStatus,
     ExpectedIncome,
+    Hold,
     Obligation,
     PositionInputs,
     fortnight_bounds,
@@ -44,10 +44,6 @@ LATE_LOOKBACK_DAYS = 5
 # Card payments this long before a due date count against that statement.
 STATEMENT_WINDOW_DAYS = 35
 
-NOTES = [
-    "Todavía no se descuenta la plata de terceros (por ejemplo, la de tu hermano).",
-    "Todavía no entran las deudas de una sola vez (amigos, familia) ni los pagos parciales.",
-]
 
 
 class IncomeSourceLike(Protocol):
@@ -57,9 +53,11 @@ class IncomeSourceLike(Protocol):
 
 
 class PlannedPaymentLike(Protocol):
+    id: object
     name: str
     amount: Decimal
     due_day: int | None
+    due_date: date | None
     paid_month: str | None
 
 
@@ -67,7 +65,14 @@ class DebtLike(Protocol):
     id: object
     bank_name: str
     minimum_payment: Decimal | None
+    planned_payment: Decimal | None
     payment_due_date: date | None
+    email_format: str | None
+
+
+class FundHoldLike(Protocol):
+    name: str
+    amount: Decimal
 
 
 @dataclass(frozen=True)
@@ -80,9 +85,36 @@ class Credit:
 
 @dataclass(frozen=True)
 class DebtPayment:
+    """A card payment read from email (debt_payment movement)."""
+
     debt_id: object
     on: date
     amount: Decimal
+
+
+@dataclass(frozen=True)
+class PaymentRecord:
+    """An obligation_payments row: money put toward one due date."""
+
+    due_date: date
+    amount: Decimal
+    planned_payment_id: object = None
+    debt_id: object = None
+
+
+def _recorded(records: Sequence[PaymentRecord], due: date, *, planned=None, debt=None) -> Decimal:
+    return sum(
+        (
+            r.amount
+            for r in records
+            if r.due_date == due
+            and (
+                (planned is not None and r.planned_payment_id == planned)
+                or (debt is not None and r.debt_id == debt)
+            )
+        ),
+        ZERO,
+    )
 
 
 def default_horizon(today: date) -> date:
@@ -144,44 +176,117 @@ def expected_incomes(
 
 
 def planned_obligations(
-    payments: Sequence[PlannedPaymentLike], today: date, horizon_end: date
+    payments: Sequence[PlannedPaymentLike],
+    today: date,
+    horizon_end: date,
+    records: Sequence[PaymentRecord] = (),
 ) -> list[Obligation]:
     out = []
     current = f"{today.year:04d}-{today.month:02d}"
     for p in payments:
+        if p.due_date is not None:
+            # One-off: the check-off (any month) or recorded payments settle it.
+            due = p.due_date
+            if due > horizon_end:
+                continue
+            paid = p.amount if p.paid_month else _recorded(records, due, planned=p.id)
+            if paid >= p.amount:
+                continue
+            out.append(
+                Obligation(p.name, due, p.amount, paid=paid, ref=f"planned:{p.id}:{due}")
+            )
+            continue
         if p.due_day is None:
             paid = p.amount if p.paid_month == current else ZERO
-            out.append(Obligation(p.name, None, p.amount, paid=paid))
+            out.append(Obligation(p.name, None, p.amount, paid=paid, ref=f"planned:{p.id}:"))
             continue
         for y, m in _months(today, horizon_end):
             due = date(y, m, min(p.due_day, calendar.monthrange(y, m)[1]))
-            month = f"{y:04d}-{m:02d}"
             if due > horizon_end:
                 continue
-            paid = p.amount if p.paid_month == month else ZERO
-            # Past due this month and not checked off: still owed (overdue).
-            if due < today and paid == p.amount:
+            checked = p.amount if p.paid_month == f"{y:04d}-{m:02d}" else ZERO
+            paid = max(checked, _recorded(records, due, planned=p.id))
+            # Past due this month and not fully paid: still owed (overdue).
+            if due < today and paid >= p.amount:
                 continue
-            out.append(Obligation(f"{p.name} ({due.day}/{due.month})", due, p.amount, paid=paid))
+            out.append(
+                Obligation(
+                    f"{p.name} ({due.day}/{due.month})",
+                    due,
+                    p.amount,
+                    paid=paid,
+                    ref=f"planned:{p.id}:{due}",
+                )
+            )
     return out
+
+
+def _add_month(d: date) -> date:
+    y, m = (d.year + 1, 1) if d.month == 12 else (d.year, d.month + 1)
+    return date(y, m, min(d.day, calendar.monthrange(y, m)[1]))
 
 
 def debt_obligations(
-    debts: Sequence[DebtLike], payments: Sequence[DebtPayment], today: date
+    debts: Sequence[DebtLike],
+    payments: Sequence[DebtPayment],
+    today: date,
+    horizon_end: date | None = None,
+    records: Sequence[PaymentRecord] = (),
 ) -> list[Obligation]:
+    """Each debt's due dates in the horizon, for max(minimum, planned).
+
+    Cards read by email: only the latest statement's date (an old one means
+    the next statement hasn't arrived). Debts typed by hand (no email): the
+    date repeats monthly — rolled past dates are flagged as estimated, the
+    user should confirm them against the statement.
+    """
+    horizon_end = horizon_end or today
     out = []
     for d in debts:
-        if not d.minimum_payment:
+        amount = max(d.minimum_payment or ZERO, d.planned_payment or ZERO)
+        if amount == 0:
             continue
+        planned = d.planned_payment is not None and d.planned_payment > (d.minimum_payment or 0)
+        name = f"{'Abono' if planned else 'Mínimo'} {d.bank_name}"
         due = d.payment_due_date
-        if due is not None and due < today:
+        if due is None:
+            out.append(Obligation(name, None, amount, ref=f"debt:{d.id}:"))
+            continue
+        dues = [due]
+        rolled = False
+        if d.email_format is None:
+            while dues[-1] < today:
+                dues[-1] = _add_month(dues[-1])
+                rolled = True
+            while _add_month(dues[-1]) <= horizon_end:
+                dues.append(_add_month(dues[-1]))
+        elif due < today:
             continue  # an old statement: the next one hasn't arrived yet
-        since = (due or today) - timedelta(days=STATEMENT_WINDOW_DAYS)
-        paid = sum(
-            (p.amount for p in payments if p.debt_id == d.id and p.on >= since), ZERO
-        )
-        out.append(Obligation(f"Mínimo {d.bank_name}", due, d.minimum_payment, paid=paid))
+        for i, when in enumerate(dues):
+            recorded = _recorded(records, when, debt=d.id)
+            if recorded:
+                paid = recorded
+            else:
+                since = when - timedelta(days=STATEMENT_WINDOW_DAYS)
+                paid = sum(
+                    (p.amount for p in payments if p.debt_id == d.id and since <= p.on <= when),
+                    ZERO,
+                )
+            out.append(
+                Obligation(
+                    name,
+                    when,
+                    amount,
+                    status=AmountStatus.estimated if rolled or i else AmountStatus.confirmed,
+                    paid=paid,
+                    ref=f"debt:{d.id}:{when}",
+                )
+            )
     return out
+
+
+def holds(rows: Sequence[FundHoldLike]) -> tuple[Hold, ...]:
+    return tuple(Hold(r.name, r.amount) for r in rows)
 
 
 def build_inputs(
@@ -195,15 +300,18 @@ def build_inputs(
     debts: Sequence[DebtLike],
     debt_payments: Sequence[DebtPayment],
     pay_due_on_payday: bool,
+    fund_holds: Sequence[FundHoldLike] = (),
+    records: Sequence[PaymentRecord] = (),
 ) -> PositionInputs:
     return PositionInputs(
         today=today,
         horizon_end=horizon_end,
         balance=balance,
+        holds=holds(fund_holds),
         incomes=tuple(expected_incomes(income_sources, credits, today, horizon_end)),
         obligations=(
-            *planned_obligations(planned_payments, today, horizon_end),
-            *debt_obligations(debts, debt_payments, today),
+            *planned_obligations(planned_payments, today, horizon_end, records),
+            *debt_obligations(debts, debt_payments, today, horizon_end, records),
         ),
         pay_due_on_payday=pay_due_on_payday,
     )

@@ -34,6 +34,9 @@ class Debt(Base):
     # Purchases on other cards from the same sender are ignored when set.
     card_last_digits: Mapped[str | None] = mapped_column(String(4), nullable=True)
     payment_due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # What the user plans to pay each due date when it's more than the
+    # minimum ("700.000 cada 5"). The cash position uses the larger one.
+    planned_payment: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     # Only movements after this instant touch total_amount: the user enters the
     # current balance when linking, and older emails would double-count it.
     email_linked_at: Mapped[datetime | None] = mapped_column(

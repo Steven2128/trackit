@@ -128,6 +128,8 @@ class Obligation:
     status: AmountStatus = AmountStatus.confirmed
     upper_bound: Decimal | None = None
     paid: Decimal = ZERO
+    # Opaque id the caller uses to act on it ("planned:<uuid>", "debt:<uuid>").
+    ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -177,8 +179,11 @@ class PositionStatus(str, enum.Enum):
 @dataclass
 class WindowLine:
     name: str
-    amount: Decimal
+    amount: Decimal  # still owed
     estimated: bool = False
+    due: date | None = None
+    total: Decimal = ZERO  # what the due date asks for; paid = total − amount
+    ref: str | None = None
 
 
 @dataclass
@@ -306,7 +311,9 @@ def compute_position(inp: PositionInputs) -> Position:
         elif ob.due < inp.today:
             overdue.append(ob.name)
         windows[window_for_due(ob.due)].obligations.append(
-            WindowLine(ob.name, remaining, estimated=is_estimate)
+            WindowLine(
+                ob.name, remaining, estimated=is_estimate, due=ob.due, total=owed, ref=ob.ref
+            )
         )
 
     future_starts = fortnight_starts(inp.today, inp.horizon_end)

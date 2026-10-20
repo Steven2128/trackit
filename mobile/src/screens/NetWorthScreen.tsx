@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import AccountSheet, { type AccountSheetMode } from "../components/AccountSheet";
+import FundHoldsSection from "../components/FundHoldsSection";
 import MoneyText from "../components/MoneyText";
 import ResponsiveGrid from "../components/ResponsiveGrid";
 import { useNetWorth, type AccountKind, type AccountOut } from "../services/queries/accounts";
@@ -165,6 +166,8 @@ export default function NetWorthScreen() {
             <Text style={styles.cashText}>Registrar gasto en efectivo</Text>
           </Pressable>
         ) : null}
+
+        <FundHoldsSection />
 
         <Text style={styles.footnote}>
           Los bancos no mandan el saldo por email: la app parte del saldo que cargás y le suma o

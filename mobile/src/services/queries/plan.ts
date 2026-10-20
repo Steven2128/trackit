@@ -24,6 +24,7 @@ export type PlannedPaymentOut = {
   grace_days: number;
   is_debt_payment: boolean;
   paid_month: string | null;
+  due_date: string | null; // one-off: YYYY-MM-DD
   created_at: string;
 };
 
@@ -33,6 +34,7 @@ export type PlannedPaymentPayload = {
   due_day?: number | null;
   grace_days?: number;
   is_debt_payment?: boolean;
+  due_date?: string | null;
 };
 
 export type UpcomingPaymentOut = {

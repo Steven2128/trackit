@@ -14,16 +14,24 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.time_utils import current_month_local, user_tz
+from app.models.account import AccountKind
 from app.models.debt import Debt
+from app.models.fund_hold import FundHold
 from app.models.income_source import IncomeSource
+from app.models.obligation_payment import ObligationPayment
 from app.models.planned_payment import PlannedPayment
 from app.models.transaction import Transaction, TransactionType
 from app.schemas.plan import (
     CashFlowResponse,
     CashPositionResponse,
+    FundHoldIn,
+    FundHoldOut,
+    FundHoldUpdate,
     IncomeSourceCreate,
     IncomeSourceOut,
     IncomeSourceUpdate,
+    ObligationPaymentIn,
+    ObligationPaymentOut,
     PlannedPaymentCreate,
     PlannedPaymentOut,
     PlannedPaymentUpdate,
@@ -35,14 +43,14 @@ from app.schemas.plan import (
 from app.services.cash_flow import IncomeLike, PaymentLike, compute_cash_flow
 from app.services.cash_position import compute_position
 from app.services.cash_position_sources import (
-    NOTES,
     STATEMENT_WINDOW_DAYS,
     Credit,
     DebtPayment,
+    PaymentRecord,
     build_inputs,
     default_horizon,
 )
-from app.services.net_worth import net_worth
+from app.services.net_worth import keep_cash_reconciled, net_worth
 
 router = APIRouter(tags=["plan"])
 
@@ -174,7 +182,7 @@ async def cash_flow(current_user: CurrentUser, db: DbSession) -> CashFlowRespons
         PaymentLike(
             name=p.name,
             amount=p.amount,
-            due_day=p.due_day,
+            due_day=_monthly_due_day(p, this_month),
             grace_days=p.grace_days,
             is_debt_payment=p.is_debt_payment,
             id=p.id,
@@ -182,6 +190,8 @@ async def cash_flow(current_user: CurrentUser, db: DbSession) -> CashFlowRespons
             is_paid=p.paid_month == this_month,
         )
         for p in payments_result.scalars().all()
+        # A one-off belongs to this month's plan only in (or past) its month.
+        if p.due_date is None or f"{p.due_date:%Y-%m}" <= this_month
     ]
 
     today = datetime.now(user_tz()).date()
@@ -238,6 +248,24 @@ async def cash_position(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="past_until")
 
     snap = await net_worth(db, current_user.id)
+    fund_holds = (
+        (await db.execute(select(FundHold).where(FundHold.user_id == current_user.id)))
+        .scalars()
+        .all()
+    )
+    records = [
+        PaymentRecord(r.due_date, r.amount, r.planned_payment_id, r.debt_id)
+        for r in (
+            await db.execute(
+                select(ObligationPayment).where(
+                    ObligationPayment.user_id == current_user.id,
+                    ObligationPayment.due_date >= today - timedelta(days=STATEMENT_WINDOW_DAYS),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    ]
     sources = (
         (await db.execute(select(IncomeSource).where(IncomeSource.user_id == current_user.id)))
         .scalars()
@@ -296,9 +324,11 @@ async def cash_position(
         debts=debts,
         debt_payments=debt_payments,
         pay_due_on_payday=pay_due_on_payday,
+        fund_holds=fund_holds,
+        records=records,
     )
     pos = compute_position(inputs)
-    notes = list(NOTES)
+    notes: list[str] = []
     if not snap.accounts:
         notes.insert(0, "No hay cuentas cargadas en Patrimonio: el saldo es 0.")
 
@@ -322,7 +352,14 @@ async def cash_position(
                 income=w.income,
                 income_names=w.income_names,
                 obligations=[
-                    PositionLineOut(name=o.name, amount=o.amount, estimated=o.estimated)
+                    PositionLineOut(
+                        name=o.name,
+                        amount=o.amount,
+                        estimated=o.estimated,
+                        due=o.due,
+                        total=o.total,
+                        ref=o.ref,
+                    )
                     for o in w.obligations
                 ],
                 essentials=w.essentials,
@@ -346,6 +383,164 @@ async def cash_position(
         no_plan=pos.no_plan,
         notes=notes,
     )
+
+
+def _monthly_due_day(p: PlannedPayment, this_month: str) -> int | None:
+    if p.due_date is None:
+        return p.due_day
+    # One-off: its day in its own month; overdue ones show without a date.
+    return p.due_date.day if f"{p.due_date:%Y-%m}" == this_month else None
+
+
+# --- Money held for others ---
+
+
+@router.get("/fund-holds", response_model=list[FundHoldOut])
+async def list_fund_holds(current_user: CurrentUser, db: DbSession) -> list[FundHoldOut]:
+    rows = await db.execute(
+        select(FundHold).where(FundHold.user_id == current_user.id).order_by(FundHold.created_at)
+    )
+    return [FundHoldOut.model_validate(h) for h in rows.scalars().all()]
+
+
+@router.post("/fund-holds", response_model=FundHoldOut, status_code=status.HTTP_201_CREATED)
+async def create_fund_hold(
+    payload: FundHoldIn, current_user: CurrentUser, db: DbSession
+) -> FundHoldOut:
+    hold = FundHold(user_id=current_user.id, **payload.model_dump())
+    db.add(hold)
+    await db.commit()
+    await db.refresh(hold)
+    return FundHoldOut.model_validate(hold)
+
+
+@router.patch("/fund-holds/{hold_id}", response_model=FundHoldOut)
+async def update_fund_hold(
+    hold_id: uuid.UUID, payload: FundHoldUpdate, current_user: CurrentUser, db: DbSession
+) -> FundHoldOut:
+    hold = await _get_own(FundHold, hold_id, current_user.id, db)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        if value is not None:
+            setattr(hold, field, value)
+    await db.commit()
+    await db.refresh(hold)
+    return FundHoldOut.model_validate(hold)
+
+
+@router.delete("/fund-holds/{hold_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_fund_hold(hold_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> None:
+    """When that money was handed over or used for what it was for."""
+    hold = await _get_own(FundHold, hold_id, current_user.id, db)
+    await db.delete(hold)
+    await db.commit()
+
+
+# --- Payments toward a due date ---
+
+
+@router.get("/obligation-payments", response_model=list[ObligationPaymentOut])
+async def list_obligation_payments(
+    current_user: CurrentUser,
+    db: DbSession,
+    since: date | None = Query(default=None),
+) -> list[ObligationPaymentOut]:
+    query = select(ObligationPayment).where(ObligationPayment.user_id == current_user.id)
+    if since is not None:
+        query = query.where(ObligationPayment.due_date >= since)
+    rows = await db.execute(query.order_by(ObligationPayment.due_date))
+    return [ObligationPaymentOut.model_validate(r) for r in rows.scalars().all()]
+
+
+@router.post(
+    "/obligation-payments",
+    response_model=ObligationPaymentOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_obligation_payment(
+    payload: ObligationPaymentIn, current_user: CurrentUser, db: DbSession
+) -> ObligationPaymentOut:
+    """Record money put toward one due date (all of it, part, or ahead).
+
+    ``from_cash`` also logs the cash expense: the cash position subtracts
+    what's paid from what's owed, so the balance has to drop by the same
+    amount or the payment would show up as free money.
+    """
+    if (payload.planned_payment_id is None) == (payload.debt_id is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="one_parent_required"
+        )
+    if payload.planned_payment_id is not None:
+        parent = await _get_own(PlannedPayment, payload.planned_payment_id, current_user.id, db)
+        merchant, category = parent.name, None
+    else:
+        parent = await _get_own(Debt, payload.debt_id, current_user.id, db)
+        # Paying a card isn't spending: its purchases already were.
+        merchant, category = f"Pago {parent.bank_name}", "debt_payment"
+
+    tz = user_tz()
+    today = datetime.now(tz).date()
+    paid_on = payload.paid_on or today
+    if paid_on > today:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="future_paid_on")
+
+    tx_id = None
+    if payload.from_cash:
+        occurred_at = (
+            datetime.now(tz)
+            if paid_on == today
+            else datetime.combine(paid_on, datetime.min.time(), tz).replace(hour=12)
+        )
+        tx = Transaction(
+            user_id=current_user.id,
+            provider_connection_id=None,
+            amount=payload.amount,
+            merchant=merchant,
+            category=category,
+            transaction_type=TransactionType.debit,
+            currency="COP",
+            occurred_at=occurred_at,
+            source=AccountKind.cash.value,
+        )
+        db.add(tx)
+        await db.flush()
+        await keep_cash_reconciled(db, current_user.id, None, (tx.amount, tx.occurred_at))
+        tx_id = tx.id
+
+    record = ObligationPayment(
+        user_id=current_user.id,
+        planned_payment_id=payload.planned_payment_id,
+        debt_id=payload.debt_id,
+        due_date=payload.due_date,
+        amount=payload.amount,
+        paid_on=paid_on,
+        transaction_id=tx_id,
+    )
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+    return ObligationPaymentOut.model_validate(record)
+
+
+@router.delete("/obligation-payments/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_obligation_payment(
+    payment_id: uuid.UUID, current_user: CurrentUser, db: DbSession
+) -> None:
+    """Undo a recorded payment; the cash expense it created goes with it."""
+    record = await _get_own(ObligationPayment, payment_id, current_user.id, db)
+    if record.transaction_id is not None:
+        tx = (
+            await db.execute(
+                select(Transaction).where(
+                    Transaction.id == record.transaction_id,
+                    Transaction.user_id == current_user.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if tx is not None:
+            await keep_cash_reconciled(db, current_user.id, (tx.amount, tx.occurred_at), None)
+            await db.delete(tx)
+    await db.delete(record)
+    await db.commit()
 
 
 async def _get_own(model, obj_id: uuid.UUID, user_id: uuid.UUID, db: DbSession):

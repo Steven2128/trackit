@@ -14,6 +14,7 @@ export type DebtOut = {
   email_format: string | null;
   card_last_digits: string | null;
   payment_due_date: string | null;
+  planned_payment: string | null;
   email_linked_at: string | null;
   created_at: string;
 };
@@ -24,6 +25,7 @@ export type DebtPayload = {
   interest_rate?: string | null;
   minimum_payment?: string | null;
   payment_due_date?: string | null; // YYYY-MM-DD
+  planned_payment?: string | null;
   email_sender?: string | null;
   email_format?: string | null;
   card_last_digits?: string | null;

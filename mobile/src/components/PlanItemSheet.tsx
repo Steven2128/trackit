@@ -22,6 +22,7 @@ import {
 import { colors } from "../theme/colors";
 import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
+import { dmyToIso, isoToDmy } from "../utils/dates";
 import { useWebSheet } from "./useWebSheet";
 
 export type PlanItemEditing =
@@ -39,10 +40,13 @@ type FormState = {
   day: string;
   grace: string;
   isDebt: boolean;
+  oneOff: boolean; // due once on `date` (a debt with a friend)
+  date: string; // DD/MM/AAAA
 };
 
 function fromEditing(editing: PlanItemEditing | null): FormState {
-  if (!editing?.item) return { name: "", amount: "", day: "", grace: "0", isDebt: false };
+  if (!editing?.item)
+    return { name: "", amount: "", day: "", grace: "0", isDebt: false, oneOff: false, date: "" };
   if (editing.kind === "income") {
     const i = editing.item;
     return {
@@ -51,6 +55,8 @@ function fromEditing(editing: PlanItemEditing | null): FormState {
       day: String(i.expected_day),
       grace: "0",
       isDebt: false,
+      oneOff: false,
+      date: "",
     };
   }
   const p = editing.item;
@@ -60,6 +66,8 @@ function fromEditing(editing: PlanItemEditing | null): FormState {
     day: p.due_day !== null ? String(p.due_day) : "",
     grace: String(p.grace_days),
     isDebt: p.is_debt_payment,
+    oneOff: p.due_date !== null,
+    date: p.due_date ? isoToDmy(p.due_date) : "",
   };
 }
 
@@ -99,7 +107,13 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
   const isIncome = editing?.kind === "income";
   const isEdit = !!editing?.item;
 
-  function validate(): { name: string; amount: number; day: number | null; grace: number } | null {
+  function validate(): {
+    name: string;
+    amount: number;
+    day: number | null;
+    grace: number;
+    date: string | null;
+  } | null {
     const name = form.name.trim();
     const amount = parseCOP(form.amount);
     if (name.length === 0) {
@@ -109,6 +123,14 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
     if (amount <= 0) {
       Alert.alert("Monto inválido", "El monto debe ser mayor a 0.");
       return null;
+    }
+    if (!isIncome && form.oneOff) {
+      const date = dmyToIso(form.date);
+      if (date === null) {
+        Alert.alert("Fecha inválida", "Escribí la fecha como DD/MM/AAAA, por ejemplo 25/10/2026.");
+        return null;
+      }
+      return { name, amount, day: null, grace: 0, date };
     }
     const dayRaw = form.day.trim();
     let day: number | null = null;
@@ -128,7 +150,7 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
       Alert.alert("Plazo inválido", "Los días de plazo deben estar entre 0 y 60.");
       return null;
     }
-    return { name, amount, day, grace };
+    return { name, amount, day, grace, date: null };
   }
 
   function handleSave() {
@@ -157,6 +179,7 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
         due_day: values.day,
         grace_days: values.grace,
         is_debt_payment: form.isDebt,
+        due_date: values.date,
       };
       if (editing.item) {
         updatePayment.mutate({ id: editing.item.id, payload }, { onSuccess: onClose, onError });
@@ -233,6 +256,31 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
           />
         </Field>
 
+        {!isIncome ? (
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Una sola vez (no se repite cada mes)</Text>
+            <Switch
+              value={form.oneOff}
+              onValueChange={(v) => setForm((f) => ({ ...f, oneOff: v }))}
+              trackColor={{ false: colors.surfaceMuted, true: colors.primaryDim }}
+              thumbColor={form.oneOff ? colors.primary : colors.textSecondary}
+            />
+          </View>
+        ) : null}
+
+        {!isIncome && form.oneOff ? (
+          <Field label="Fecha en que lo pagás (DD/MM/AAAA)">
+            <BottomSheetTextInput
+              style={styles.input}
+              placeholder="25/10/2026"
+              placeholderTextColor={colors.textSecondary}
+              value={form.date}
+              onChangeText={(v) => setForm((f) => ({ ...f, date: v }))}
+              keyboardType="numbers-and-punctuation"
+              maxLength={10}
+            />
+          </Field>
+        ) : (
         <Field label={isIncome ? "Día del mes en que cae" : "Día de corte (opcional)"}>
           <BottomSheetTextInput
             style={styles.input}
@@ -243,8 +291,9 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
             keyboardType="numeric"
           />
         </Field>
+        )}
 
-        {!isIncome ? (
+        {!isIncome && !form.oneOff ? (
           <>
             <Field label="Días de plazo después del corte">
               <BottomSheetTextInput
