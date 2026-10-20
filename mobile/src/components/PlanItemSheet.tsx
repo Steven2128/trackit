@@ -20,7 +20,7 @@ import {
   type PlannedPaymentOut,
 } from "../services/queries/plan";
 import { colors } from "../theme/colors";
-import { parseCOP } from "../utils/currency";
+import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import { useWebSheet } from "./useWebSheet";
 
@@ -47,7 +47,7 @@ function fromEditing(editing: PlanItemEditing | null): FormState {
     const i = editing.item;
     return {
       name: i.name,
-      amount: Number(i.amount).toString(),
+      amount: toCOPInput(i.amount),
       day: String(i.expected_day),
       grace: "0",
       isDebt: false,
@@ -56,7 +56,7 @@ function fromEditing(editing: PlanItemEditing | null): FormState {
   const p = editing.item;
   return {
     name: p.name,
-    amount: Number(p.amount).toString(),
+    amount: toCOPInput(p.amount),
     day: p.due_day !== null ? String(p.due_day) : "",
     grace: String(p.grace_days),
     isDebt: p.is_debt_payment,
@@ -228,7 +228,7 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
             placeholder="0"
             placeholderTextColor={colors.textSecondary}
             value={form.amount}
-            onChangeText={(v) => setForm((f) => ({ ...f, amount: v }))}
+            onChangeText={(v) => setForm((f) => ({ ...f, amount: formatCOPInput(v) }))}
             keyboardType="numeric"
           />
         </Field>

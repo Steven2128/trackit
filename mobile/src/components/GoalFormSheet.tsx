@@ -16,7 +16,7 @@ import {
   type SavingsGoalPayload,
 } from "../services/queries/goals";
 import { colors } from "../theme/colors";
-import { parseCOP } from "../utils/currency";
+import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import { useWebSheet } from "./useWebSheet";
 
@@ -39,8 +39,8 @@ function fromGoal(g?: SavingsGoalOut): FormState {
   if (!g) return EMPTY;
   return {
     name: g.name,
-    target: g.target_amount ? Number(g.target_amount).toString() : "",
-    current: g.current_amount ? Number(g.current_amount).toString() : "",
+    target: toCOPInput(g.target_amount),
+    current: Number(g.current_amount) ? toCOPInput(g.current_amount) : "",
     date: g.target_date ?? "",
   };
 }
@@ -155,7 +155,7 @@ export default function GoalFormSheet({ isVisible, goal, onClose }: Props) {
             placeholder="0"
             placeholderTextColor={colors.textSecondary}
             value={form.target}
-            onChangeText={(v) => setForm((f) => ({ ...f, target: v }))}
+            onChangeText={(v) => setForm((f) => ({ ...f, target: formatCOPInput(v) }))}
             keyboardType="numeric"
           />
         </Field>
@@ -166,7 +166,7 @@ export default function GoalFormSheet({ isVisible, goal, onClose }: Props) {
             placeholder="0"
             placeholderTextColor={colors.textSecondary}
             value={form.current}
-            onChangeText={(v) => setForm((f) => ({ ...f, current: v }))}
+            onChangeText={(v) => setForm((f) => ({ ...f, current: formatCOPInput(v) }))}
             keyboardType="numeric"
           />
         </Field>

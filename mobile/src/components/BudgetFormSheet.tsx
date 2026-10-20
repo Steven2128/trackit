@@ -11,7 +11,7 @@ import {
 import { useDeleteBudget, useRenameBudget, useUpsertBudget } from "../services/queries/budgets";
 import { colors } from "../theme/colors";
 import { getCategory, slugifyCategory, CATEGORIES } from "../utils/categories";
-import { parseCOP } from "../utils/currency";
+import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import { useWebSheet } from "./useWebSheet";
 
@@ -44,7 +44,7 @@ export default function BudgetFormSheet({
   const snapPoints = useMemo(() => [showNameField ? "60%" : "45%"], [showNameField]);
 
   useEffect(() => {
-    setLimit(currentLimit ? Number(currentLimit).toString() : "");
+    setLimit(toCOPInput(currentLimit));
     setCustomName(
       !createCustom && category && isCustomCategory ? getCategory(category).label : "",
     );
@@ -174,7 +174,7 @@ export default function BudgetFormSheet({
             placeholder="0"
             placeholderTextColor={colors.textSecondary}
             value={limit}
-            onChangeText={setLimit}
+            onChangeText={(v) => setLimit(formatCOPInput(v))}
             keyboardType="numeric"
             autoFocus={!showNameField}
           />

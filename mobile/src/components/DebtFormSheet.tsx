@@ -17,7 +17,7 @@ import {
 } from "../services/queries/debts";
 import { useTransactions } from "../services/queries/transactions";
 import { colors } from "../theme/colors";
-import { parseCOP } from "../utils/currency";
+import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import MoneyText from "./MoneyText";
 import { useWebSheet } from "./useWebSheet";
@@ -72,9 +72,9 @@ function fromDebt(d?: DebtOut): FormState {
   if (!d) return EMPTY;
   return {
     bank: d.bank_name,
-    amount: d.total_amount ? Number(d.total_amount).toString() : "",
+    amount: toCOPInput(d.total_amount),
     rate: d.interest_rate ? Number(d.interest_rate).toString() : "",
-    min: d.minimum_payment ? Number(d.minimum_payment).toString() : "",
+    min: Number(d.minimum_payment) ? toCOPInput(d.minimum_payment) : "",
     due: d.payment_due_date ? isoToDmy(d.payment_due_date) : "",
     format: d.email_sender ? d.email_format : null,
     sender: d.email_sender ?? "",
@@ -218,7 +218,7 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
             placeholder="0"
             placeholderTextColor={colors.textSecondary}
             value={form.amount}
-            onChangeText={(v) => setForm((f) => ({ ...f, amount: v }))}
+            onChangeText={(v) => setForm((f) => ({ ...f, amount: formatCOPInput(v) }))}
             keyboardType="numeric"
           />
         </Field>
@@ -240,7 +240,7 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
             placeholder="0"
             placeholderTextColor={colors.textSecondary}
             value={form.min}
-            onChangeText={(v) => setForm((f) => ({ ...f, min: v }))}
+            onChangeText={(v) => setForm((f) => ({ ...f, min: formatCOPInput(v) }))}
             keyboardType="numeric"
           />
         </Field>

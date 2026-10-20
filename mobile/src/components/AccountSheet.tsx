@@ -16,7 +16,7 @@ import {
 } from "../services/queries/accounts";
 import { colors } from "../theme/colors";
 import { CATEGORIES } from "../utils/categories";
-import { formatCOP, parseCOP } from "../utils/currency";
+import { formatCOP, formatCOPInput, parseCOP } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import { expenseInstant } from "../utils/dates";
 import ExpenseDayPicker from "./ExpenseDayPicker";
@@ -153,7 +153,7 @@ export default function AccountSheet({ editing, onClose }: Props) {
           placeholder="0"
           placeholderTextColor={colors.textSecondary}
           value={amount}
-          onChangeText={setAmount}
+          onChangeText={(v) => setAmount(formatCOPInput(v))}
           keyboardType="numeric"
         />
 

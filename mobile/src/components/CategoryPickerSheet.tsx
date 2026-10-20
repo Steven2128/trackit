@@ -21,7 +21,7 @@ import {
 } from "../services/queries/transactions";
 import { colors } from "../theme/colors";
 import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
-import { parseCOP } from "../utils/currency";
+import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import { daysAgo as daysAgoOf, expenseInstant } from "../utils/dates";
 import CategoryIcon from "./CategoryIcon";
@@ -70,7 +70,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       setMerchant(transaction.merchant ?? "");
       setNote(transaction.note ?? "");
       setSelected(transaction.category);
-      setAmount(String(Math.round(Number(transaction.amount))));
+      setAmount(toCOPInput(transaction.amount));
       setDaysAgo(daysAgoOf(transaction.occurred_at));
       setScope("one");
     }
@@ -272,7 +272,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
               placeholder="0"
               placeholderTextColor={colors.textSecondary}
               value={amount}
-              onChangeText={setAmount}
+              onChangeText={(v) => setAmount(formatCOPInput(v))}
               keyboardType="number-pad"
               inputMode="numeric"
             />

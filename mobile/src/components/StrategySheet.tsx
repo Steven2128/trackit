@@ -15,7 +15,7 @@ import {
   type StrategyResultOut,
 } from "../services/queries/debts";
 import { colors } from "../theme/colors";
-import { formatCOP, parseCOP } from "../utils/currency";
+import { formatCOP, formatCOPInput, parseCOP } from "../utils/currency";
 import MoneyText from "./MoneyText";
 import { useWebSheet } from "./useWebSheet";
 
@@ -86,7 +86,7 @@ export default function StrategySheet({ isVisible, onClose }: Props) {
             placeholder="0"
             placeholderTextColor={colors.textSecondary}
             value={extraInput}
-            onChangeText={setExtraInput}
+            onChangeText={(v) => setExtraInput(formatCOPInput(v))}
             keyboardType="numeric"
           />
           <Pressable
