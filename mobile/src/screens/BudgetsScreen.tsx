@@ -20,6 +20,7 @@ import {
   type BudgetAlertStatus,
   type BudgetStatusItem,
 } from "../services/queries/budgets";
+import { useCategoryRules, useDeleteCategoryRule } from "../services/queries/categoryRules";
 import { colors } from "../theme/colors";
 import { pageStyle } from "../theme/layout";
 import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
@@ -43,6 +44,27 @@ export default function BudgetsScreen() {
   const [editing, setEditing] = useState<{ category: string; limit: string | null } | null>(null);
   const [creatingCustom, setCreatingCustom] = useState(false);
   const deleteMut = useDeleteBudget();
+  const rules = useCategoryRules();
+  const deleteRule = useDeleteCategoryRule();
+
+  function confirmDeleteRule(id: string, pattern: string) {
+    Alert.alert(
+      "Quitar regla",
+      `¿Dejar de mandar "${pattern}" a una categoría fija? Los movimientos que ya están no cambian.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Quitar",
+          style: "destructive",
+          onPress: () =>
+            deleteRule.mutate(id, {
+              onError: (e) =>
+                Alert.alert("Error", e instanceof Error ? e.message : "Error al quitar."),
+            }),
+        },
+      ],
+    );
+  }
 
   function confirmDelete(category: string) {
     const isCustom = !CATEGORIES.some((c) => c.key === category);
@@ -235,6 +257,34 @@ export default function BudgetsScreen() {
         <Text style={styles.hint}>
           Tocá una categoría para fijar, editar o quitar su límite.
         </Text>
+
+        <Text style={styles.sectionTitle}>Reglas por comercio</Text>
+        {(rules.data ?? []).length === 0 ? (
+          <Text style={styles.rulesEmpty}>
+            Todavía no tenés reglas. Al cambiarle la categoría a un movimiento, elegí
+            "Este y los próximos" para que ese comercio vaya siempre ahí.
+          </Text>
+        ) : (
+          <View style={styles.rulesBox}>
+            {(rules.data ?? []).map((r) => (
+              <View key={r.id} style={styles.ruleRow}>
+                <CategoryIcon categoryKey={r.category} />
+                <Text style={styles.ruleText}>
+                  Contiene "<Text style={styles.rulePattern}>{r.pattern}</Text>" →{" "}
+                  {getCategory(r.category).label}
+                </Text>
+                <Pressable
+                  onPress={() => confirmDeleteRule(r.id, r.pattern)}
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.trashBtn, pressed && styles.rowPressed]}
+                  accessibilityLabel={`Quitar regla ${r.pattern}`}
+                >
+                  <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       <BudgetFormSheet
@@ -345,4 +395,17 @@ const styles = StyleSheet.create({
   },
   addText: { color: colors.primary, fontSize: 14, fontWeight: "600" },
   trashBtn: { padding: 4 },
+  sectionTitle: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  rulesEmpty: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
+  rulesBox: { backgroundColor: colors.surface, borderRadius: 12, paddingVertical: 4 },
+  ruleRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 10 },
+  ruleText: { color: colors.textPrimary, fontSize: 14, flex: 1 },
+  rulePattern: { fontWeight: "700" },
 });

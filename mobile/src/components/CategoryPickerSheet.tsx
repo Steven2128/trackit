@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { useBudgetStatus } from "../services/queries/budgets";
+import { useRuleSuggestion, useSaveCategoryRule } from "../services/queries/categoryRules";
 import {
   useDeleteCashTransaction,
   useUpdateTransaction,
@@ -28,6 +29,17 @@ import ExpenseDayPicker from "./ExpenseDayPicker";
 import MoneyText from "./MoneyText";
 import { useWebSheet } from "./useWebSheet";
 
+// What else a category change applies to — "one" is just this movement.
+type RuleScope = "one" | "future" | "all";
+
+const SCOPES: { key: RuleScope; label: string }[] = [
+  { key: "one", label: "Solo este" },
+  { key: "future", label: "Este y los próximos" },
+  { key: "all", label: "Todos (también los anteriores)" },
+];
+
+const NO_RULE_CATEGORIES = ["transfer", "cash_withdrawal", "debt_payment"];
+
 type Props = {
   isVisible: boolean;
   transaction: TransactionOut | null;
@@ -40,6 +52,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   const snapPoints = useMemo(() => ["85%"], []);
   const mutation = useUpdateTransaction();
   const removal = useDeleteCashTransaction();
+  const saveRule = useSaveCategoryRule();
   const { data: budgetStatus } = useBudgetStatus();
 
   const [merchant, setMerchant] = useState("");
@@ -47,6 +60,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   const [selected, setSelected] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [daysAgo, setDaysAgo] = useState(0);
+  const [scope, setScope] = useState<RuleScope>("one");
   // Typed-in cash expenses: amount and day editable, and deletable. Bank rows mirror
   // their notification email, so their amount stays read-only.
   const isCash = transaction?.source === "cash";
@@ -58,8 +72,21 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       setSelected(transaction.category);
       setAmount(String(Math.round(Number(transaction.amount))));
       setDaysAgo(daysAgoOf(transaction.occurred_at));
+      setScope("one");
     }
   }, [transaction]);
+
+  const suggestion = useRuleSuggestion(transaction?.merchant);
+  const pattern = suggestion.data ?? null;
+  // Offer a merchant rule only for a real category change on a named
+  // movement. Not for "Otros" (null), nor for the internal-movement
+  // categories, which come from what the email says (the API refuses them).
+  const offerRule =
+    !!transaction &&
+    pattern !== null &&
+    selected !== null &&
+    !NO_RULE_CATEGORIES.includes(selected) &&
+    selected !== transaction.category;
 
   useEffect(() => {
     if (isVisible) sheetRef.current?.expand();
@@ -101,7 +128,34 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
           : {}),
       },
       {
-        onSuccess: onClose,
+        onSuccess: () => {
+          if (offerRule && scope !== "one" && pattern && selected) {
+            saveRule.mutate(
+              { pattern, category: selected, apply_to_past: scope === "all" },
+              {
+                onSuccess: ({ updated }) => {
+                  const label = getCategory(selected).label;
+                  Alert.alert(
+                    "Regla guardada",
+                    `Los próximos de "${pattern}" van a ${label}.` +
+                      (scope === "all"
+                        ? ` Además, ${updated} movimiento${updated === 1 ? "" : "s"} anterior${updated === 1 ? "" : "es"} pasaron a ${label}.`
+                        : ""),
+                  );
+                  onClose();
+                },
+                onError: (e) =>
+                  Alert.alert(
+                    "Error",
+                    "Se guardó el cambio de este movimiento, pero no la regla. " +
+                      (e instanceof Error ? e.message : ""),
+                  ),
+              },
+            );
+            return;
+          }
+          onClose();
+        },
         onError: (e) =>
           Alert.alert("Error", e instanceof Error ? e.message : "Error al guardar."),
       },
@@ -168,15 +222,43 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
           </Pressable>
         ) : null}
         <Pressable
-          style={[styles.saveBtn, mutation.isPending && { opacity: 0.5 }]}
-          disabled={mutation.isPending}
+          style={[styles.saveBtn, (mutation.isPending || saveRule.isPending) && { opacity: 0.5 }]}
+          disabled={mutation.isPending || saveRule.isPending}
           onPress={handleSave}
         >
           <Text style={styles.saveText}>
-            {mutation.isPending ? "Guardando..." : "Guardar"}
+            {mutation.isPending || saveRule.isPending ? "Guardando..." : "Guardar"}
           </Text>
         </Pressable>
       </View>
+
+      {/* Pinned too: it appears right when a category is tapped, which is
+          usually far down the list. */}
+      {offerRule ? (
+        <View style={styles.scopeBox}>
+          <Text style={styles.scopeTitle}>
+            ¿Y los otros de "{pattern}"? → {getCategory(selected).label}
+          </Text>
+          <View style={styles.scopeChips}>
+            {SCOPES.map((s) => (
+              <Pressable
+                key={s.key}
+                onPress={() => setScope(s.key)}
+                style={[styles.scopeChip, scope === s.key && styles.scopeChipActive]}
+              >
+                <Text style={[styles.scopeText, scope === s.key && styles.scopeTextActive]}>
+                  {s.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {scope === "all" ? (
+            <Text style={styles.scopeHint}>
+              Los que ya cambiaste a mano no se tocan.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       <BottomSheetScrollView
         contentContainerStyle={styles.body}
@@ -341,6 +423,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  scopeBox: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.primarySoft,
+    gap: 8,
+  },
+  scopeTitle: { color: colors.textPrimary, fontSize: 13, fontWeight: "600" },
+  scopeChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  scopeChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.surface,
+  },
+  scopeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  scopeText: { color: colors.textSecondary, fontSize: 12, fontWeight: "600" },
+  scopeTextActive: { color: "#fff" },
+  scopeHint: { color: colors.textSecondary, fontSize: 11 },
   deleteBtn: {
     padding: 9,
     borderRadius: 8,

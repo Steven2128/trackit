@@ -40,11 +40,12 @@ from app.integrations.gmail import (
     gmail_message_to_envelope,
 )
 from app.models.debt import Debt
+from app.models.merchant_category_rule import MerchantCategoryRule
 from app.models.provider_connection import ProviderConnection
 from app.models.transaction import Transaction, TransactionType
 from app.parsers import REGISTERED_PARSERS
 from app.parsers.cards import CARD_FORMATS, CardEvent, CardEventKind
-from app.services.categorizer import categorize
+from app.services.categorizer import UserRule, categorize
 from app.services.transfer_matcher import match_debt_payments, match_transfers
 from app.parsers.base import EmailEnvelope, EmailParser, ParsedTransaction
 
@@ -98,6 +99,7 @@ async def sync_provider_connection(
 ) -> SyncResult:
     client = build_gmail_client(connection)
     card_debts = await load_card_debts(db, connection.user_id)
+    user_rules = await load_user_rules(db, connection.user_id)
 
     query = build_query(
         REGISTERED_PARSERS,
@@ -113,7 +115,9 @@ async def sync_provider_connection(
     for message_id in message_ids:
         result.processed += 1
         try:
-            await _process_message(db, client, connection, message_id, result, card_debts)
+            await _process_message(
+                db, client, connection, message_id, result, card_debts, user_rules
+            )
         except Exception:  # noqa: BLE001 — never abort the batch on one bad email
             log.exception("gmail_sync parser_error message_id=%s", message_id)
             result.errors += 1
@@ -143,6 +147,16 @@ async def load_card_debts(db: AsyncSession, user_id) -> list[Debt]:
     return [d for d in rows.scalars().all() if d.email_format in CARD_FORMATS]
 
 
+async def load_user_rules(db: AsyncSession, user_id) -> list[UserRule]:
+    """The user's own merchant → category rules (run before the system ones)."""
+    rows = await db.execute(
+        select(MerchantCategoryRule.pattern, MerchantCategoryRule.category).where(
+            MerchantCategoryRule.user_id == user_id
+        )
+    )
+    return [UserRule(pattern=p, category=c) for p, c in rows.all()]
+
+
 async def _process_message(
     db: AsyncSession,
     client: GmailClient,
@@ -150,6 +164,7 @@ async def _process_message(
     message_id: str,
     result: SyncResult,
     card_debts: Sequence[Debt] = (),
+    user_rules: Sequence[UserRule] = (),
 ) -> None:
     existing = await db.execute(
         select(Transaction.id)
@@ -169,7 +184,9 @@ async def _process_message(
     sender = envelope.sender.lower()
     linked = [d for d in card_debts if d.email_sender and d.email_sender.lower() in sender]
     if linked:
-        await _process_card_email(db, connection, envelope, message_id, linked, result)
+        await _process_card_email(
+            db, connection, envelope, message_id, linked, result, user_rules
+        )
         return
 
     parser = _pick_parser(envelope)
@@ -195,7 +212,11 @@ async def _process_message(
         async with db.begin_nested():
             db.add(
                 _to_transaction(
-                    parsed, connection, fallback_message_id=message_id, source=parser.name
+                    parsed,
+                    connection,
+                    fallback_message_id=message_id,
+                    source=parser.name,
+                    user_rules=user_rules,
                 )
             )
             await db.flush()
@@ -212,6 +233,7 @@ async def _process_card_email(
     message_id: str,
     linked: list[Debt],
     result: SyncResult,
+    user_rules: Sequence[UserRule] = (),
 ) -> None:
     event = CARD_FORMATS[linked[0].email_format].parse(envelope)
     if event is None:
@@ -232,7 +254,7 @@ async def _process_card_email(
         result.card_statements += 1
         return
 
-    tx = card_event_to_transaction(event, debt, connection, message_id)
+    tx = card_event_to_transaction(event, debt, connection, message_id, user_rules)
     try:
         async with db.begin_nested():
             db.add(tx)
@@ -260,6 +282,7 @@ def card_event_to_transaction(
     debt: Debt,
     connection: ProviderConnection,
     message_id: str,
+    user_rules: Sequence[UserRule] = (),
 ) -> Transaction:
     if event.kind is CardEventKind.purchase:
         # Real spending, counted the day it happens; categorized like any purchase.
@@ -268,7 +291,7 @@ def card_event_to_transaction(
             provider_connection_id=connection.id,
             amount=event.amount,
             merchant=event.merchant,
-            category=categorize(event.merchant),
+            category=categorize(event.merchant, user_rules),
             transaction_type=TransactionType.debit,
             currency="COP",
             card_last_digits=event.card_last_digits,
@@ -320,8 +343,14 @@ def _to_transaction(
     *,
     fallback_message_id: str,
     source: str | None = None,
+    user_rules: Sequence[UserRule] = (),
 ) -> Transaction:
-    category = parsed.category if parsed.category is not None else categorize(parsed.merchant)
+    # Parser decisions (transfer, cash_withdrawal…) win over any rule.
+    category = (
+        parsed.category
+        if parsed.category is not None
+        else categorize(parsed.merchant, user_rules)
+    )
     return Transaction(
         user_id=connection.user_id,
         provider_connection_id=connection.id,

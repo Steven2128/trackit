@@ -13,12 +13,17 @@ Categories reserved for other layers (do NOT add rules for them here):
 
 Callers must skip categorization when `parsed.category` is already set,
 so the parser/matcher decisions are not overwritten.
+
+Users can add their own rules ("merchant contains D1 → mercado", table
+`merchant_category_rules`). They run before the system rules — the user
+knows that their D1 is groceries, the system only knows it's food.
 """
 
 from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 
@@ -97,7 +102,37 @@ def _normalize(text: str) -> str:
     return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
-def categorize(merchant: str | None) -> str | None:
+@dataclass(frozen=True)
+class UserRule:
+    pattern: str  # normalized with `normalize_pattern`, e.g. "d1"
+    category: str
+
+
+_NON_WORD = re.compile(r"[^a-z0-9]+")
+# Bank prefixes/suffixes around the merchant name ("COMPRA … A As").
+_NOISE = {"compra", "a", "as", "pago", "pse"}
+
+
+def normalize_pattern(text: str) -> str:
+    """Lowercase, accent-free words separated by single spaces — the form
+    both user patterns and merchants are compared in."""
+    return _NON_WORD.sub(" ", _normalize(text).lower()).strip()
+
+
+def match_user_rule(merchant: str | None, rules: Sequence[UserRule]) -> str | None:
+    """Category of the most specific (longest) user pattern found as whole
+    words in the merchant, or None."""
+    if not merchant or not rules:
+        return None
+    text = f" {normalize_pattern(merchant)} "
+    for rule in sorted(rules, key=lambda r: len(r.pattern), reverse=True):
+        if rule.pattern and f" {rule.pattern} " in text:
+            return rule.category
+    return None
+
+
+def system_category(merchant: str | None) -> str | None:
+    """The built-in rules only (what an untouched transaction would have)."""
     if not merchant:
         return None
     text = _normalize(merchant)
@@ -105,3 +140,42 @@ def categorize(merchant: str | None) -> str | None:
         if rule.pattern.search(text):
             return rule.category
     return None
+
+
+def categorize(merchant: str | None, user_rules: Sequence[UserRule] = ()) -> str | None:
+    return match_user_rule(merchant, user_rules) or system_category(merchant)
+
+
+def suggest_pattern(merchant: str | None) -> str | None:
+    """What a new user rule should match for this merchant: the system
+    keyword when one hits ("TIENDA D1 LA FLORIDA" → "d1", so every D1 branch
+    matches), otherwise the first words of the name without bank noise or
+    branch numbers ("EMPANADAS DEL TOLIMA LA 90" → "empanadas del tolima")."""
+    if not merchant:
+        return None
+    text = _normalize(merchant)
+    for rule in RULES:
+        hit = rule.pattern.search(text)
+        if hit:
+            return normalize_pattern(hit.group(1))
+    words = [
+        w for w in normalize_pattern(merchant).split()
+        if w not in _NOISE and not w.isdigit()
+    ]
+    return " ".join(words[:3]) or None
+
+
+def follows_new_rule(
+    merchant: str | None,
+    current: str | None,
+    target: str,
+    rules: Sequence[UserRule],
+    previous: str | None = None,
+) -> bool:
+    """Should an existing transaction move to ``target`` now that the rule
+    exists ("apply to past")? Only when the rules route it there and nobody
+    chose its category by hand: it still has what the system rules gave it,
+    or what the same rule gave it before being changed (``previous``)."""
+    if current == target or categorize(merchant, rules) != target:
+        return False
+    return current == system_category(merchant) or (previous is not None and current == previous)

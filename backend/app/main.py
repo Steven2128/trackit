@@ -17,6 +17,7 @@ from app.api.routes import (
     gmail,
     goals,
     insights,
+    merchant_category_rules,
     notifications,
     plan,
     public_pages,
@@ -115,6 +116,7 @@ def create_app() -> FastAPI:
     app.include_router(accounts.router)
     app.include_router(dashboard.router)
     app.include_router(budgets.router)
+    app.include_router(merchant_category_rules.router)
     app.include_router(subscriptions.router)
     app.include_router(goals.router)
     app.include_router(plan.router)

@@ -11,12 +11,13 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 
 from app.api.deps import CurrentUser, DbSession
 from app.api.routes.transactions import ALLOWED_CATEGORIES
 from app.core.time_utils import current_month_local, month_filter
 from app.models.budget import Budget
+from app.models.merchant_category_rule import MerchantCategoryRule
 from app.models.transaction import Transaction, TransactionType
 from app.schemas.budget import (
     BudgetOut,
@@ -114,6 +115,15 @@ async def rename_budget_category(
             )
             .values(category=payload.new_category)
         )
+        # Merchant rules follow the category, or they'd recreate the old one.
+        await db.execute(
+            update(MerchantCategoryRule)
+            .where(
+                MerchantCategoryRule.user_id == current_user.id,
+                MerchantCategoryRule.category == category,
+            )
+            .values(category=payload.new_category)
+        )
     await db.commit()
     await db.refresh(budget)
     return BudgetOut.model_validate(budget)
@@ -137,7 +147,7 @@ async def delete_budget(
 
     # A custom category only exists through the rows that reference it —
     # deleting its budget deletes the category, so linked transactions fall
-    # back to uncategorized ("Otros"). System categories keep their
+    # back to uncategorized ("Otros") and its merchant rules go too. System categories keep their
     # transactions: removing the budget just removes the limit.
     if category not in ALLOWED_CATEGORIES:
         await db.execute(
@@ -147,6 +157,13 @@ async def delete_budget(
                 Transaction.category == category,
             )
             .values(category=None)
+        )
+        # Its merchant rules would keep filing new emails under it.
+        await db.execute(
+            delete(MerchantCategoryRule).where(
+                MerchantCategoryRule.user_id == current_user.id,
+                MerchantCategoryRule.category == category,
+            )
         )
     await db.commit()
 
