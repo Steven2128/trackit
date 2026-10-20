@@ -418,3 +418,12 @@ def test_obligations_after_the_horizon_are_ignored() -> None:
     far_bill = Obligation("Lejano", date(2027, 1, 15), k(5000))
     pos = compute_position(replace(S0, obligations=(*S0.obligations, far_bill)))
     assert pos.free == k(210)
+
+
+def test_paying_what_is_due_on_payday_with_that_payday() -> None:
+    """The user's rule: the card due on the 20th is paid with the 20th."""
+    pos = compute_position(replace(S0, pay_due_on_payday=True))
+    assert pos.due_before_next_income == 0
+    assert "Tarjeta X (extracto)" in [o.name for o in pos.windows[1].obligations]
+    # Same money overall, just one window later: X0 610+300, X1 unchanged.
+    assert [w.balance_after for w in pos.windows] == [k(910), k(210), k(860)]

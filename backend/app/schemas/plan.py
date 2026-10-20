@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.money import MAX_NUMERIC_14_2
 
-
 # --- Income sources ---
 
 
@@ -88,3 +87,57 @@ class CashFlowResponse(BaseModel):
     next_income_amount: Decimal | None
     upcoming: list[UpcomingPaymentOut]
     checklist: list[UpcomingPaymentOut]
+
+
+# --- Cash position by fortnight (GET /cashflow/position) ---
+
+
+class PositionLineOut(BaseModel):
+    name: str
+    amount: Decimal
+    estimated: bool
+
+
+class PositionWindowOut(BaseModel):
+    start: date
+    end: date | None  # exclusive; None = open until the horizon
+    income: Decimal
+    income_names: list[str]
+    obligations: list[PositionLineOut]
+    essentials: Decimal
+    balance_after: Decimal
+
+
+class PositionDeficitOut(BaseModel):
+    window_start: date
+    amount: Decimal
+    obligations: list[str]
+
+
+class CashPositionResponse(BaseModel):
+    """How much of today's money is really free (services/cash_position.py).
+
+    ``status``: confirmed | provisional (uses estimates) | indeterminate
+    (something that matters is unknown — see ``missing``).
+    """
+
+    status: str
+    today: date
+    horizon_end: date
+    pay_due_on_payday: bool
+    balance: Decimal
+    held_for_others: Decimal
+    own: Decimal
+    due_before_next_income: Decimal
+    essentials_until_next_income: Decimal
+    reserve_for_later: Decimal
+    free: Decimal
+    spendable_now: Decimal
+    windows: list[PositionWindowOut]
+    deficit: PositionDeficitOut | None
+    missing: list[str]
+    estimated: list[str]
+    late_incomes: list[str]
+    overdue: list[str]
+    no_plan: list[str]
+    notes: list[str]

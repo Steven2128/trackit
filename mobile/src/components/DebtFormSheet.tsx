@@ -33,6 +33,7 @@ type FormState = {
   amount: string;
   rate: string;
   min: string;
+  due: string; // DD/MM/AAAA, "" = none
   // Credit-card email link; format null = not linked.
   format: string | null;
   sender: string;
@@ -44,12 +45,28 @@ const EMPTY: FormState = {
   amount: "",
   rate: "",
   min: "",
+  due: "",
   format: null,
   sender: "",
   digits: "",
 };
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+// The due date is typed as DD/MM/AAAA and sent as YYYY-MM-DD.
+function isoToDmy(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function dmyToIso(text: string): string | null {
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text.trim());
+  if (!match) return null;
+  const [, d, m, y] = match.map(Number);
+  const date = new Date(y, m - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
 
 function fromDebt(d?: DebtOut): FormState {
   if (!d) return EMPTY;
@@ -58,6 +75,7 @@ function fromDebt(d?: DebtOut): FormState {
     amount: d.total_amount ? Number(d.total_amount).toString() : "",
     rate: d.interest_rate ? Number(d.interest_rate).toString() : "",
     min: d.minimum_payment ? Number(d.minimum_payment).toString() : "",
+    due: d.payment_due_date ? isoToDmy(d.payment_due_date) : "",
     format: d.email_sender ? d.email_format : null,
     sender: d.email_sender ?? "",
     digits: d.card_last_digits ?? "",
@@ -99,6 +117,11 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
     }
     const rate = form.rate.trim() === "" ? null : Number(form.rate.replace(",", "."));
     const min = form.min.trim() === "" ? null : parseCOP(form.min);
+    const due = form.due.trim() === "" ? null : dmyToIso(form.due);
+    if (form.due.trim() !== "" && due === null) {
+      Alert.alert("Fecha inválida", "Escribí la fecha límite como DD/MM/AAAA, por ejemplo 05/11/2026.");
+      return null;
+    }
     const sender = form.sender.trim().toLowerCase();
     const digits = form.digits.trim();
     if (form.format) {
@@ -116,6 +139,7 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
       total_amount: amount.toString(),
       interest_rate: rate !== null && !Number.isNaN(rate) ? rate.toString() : null,
       minimum_payment: min !== null ? min.toString() : null,
+      payment_due_date: due,
       email_sender: form.format ? sender : null,
       email_format: form.format,
       card_last_digits: form.format && digits !== "" ? digits : null,
@@ -218,6 +242,18 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
             value={form.min}
             onChangeText={(v) => setForm((f) => ({ ...f, min: v }))}
             keyboardType="numeric"
+          />
+        </Field>
+
+        <Field label="Fecha límite del próximo pago (DD/MM/AAAA)">
+          <BottomSheetTextInput
+            style={styles.input}
+            placeholder="05/11/2026"
+            placeholderTextColor={colors.textSecondary}
+            value={form.due}
+            onChangeText={(v) => setForm((f) => ({ ...f, due: v }))}
+            keyboardType="numbers-and-punctuation"
+            maxLength={10}
           />
         </Field>
 

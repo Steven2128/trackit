@@ -20,6 +20,9 @@ class DebtBase(BaseModel):
     total_amount: Decimal = Field(..., le=MAX_NUMERIC_14_2)
     interest_rate: Decimal | None = Field(default=None, ge=0, le=MAX_INTEREST_RATE)
     minimum_payment: Decimal | None = Field(default=None, ge=0, le=MAX_NUMERIC_12_2)
+    # Due date of the next payment. Typed by the user for cards without a
+    # statement email (Banco de Bogotá); statement emails refresh it.
+    payment_due_date: date | None = None
     # Credit-card email link: sender + one of GET /debts/card-formats.
     email_sender: str | None = Field(default=None, max_length=255, pattern=_EMAIL_PATTERN)
     email_format: str | None = Field(default=None, max_length=32)
@@ -37,6 +40,7 @@ class DebtUpdate(BaseModel):
     total_amount: Decimal | None = Field(default=None, le=MAX_NUMERIC_14_2)
     interest_rate: Decimal | None = Field(default=None, ge=0, le=MAX_INTEREST_RATE)
     minimum_payment: Decimal | None = Field(default=None, ge=0, le=MAX_NUMERIC_12_2)
+    payment_due_date: date | None = None
     email_sender: str | None = Field(default=None, max_length=255, pattern=_EMAIL_PATTERN)
     email_format: str | None = Field(default=None, max_length=32)
     card_last_digits: str | None = Field(default=None, pattern=r"^\d{4}$")
@@ -48,7 +52,6 @@ class DebtOut(DebtBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    payment_due_date: date | None = None
     email_linked_at: datetime | None = None
     created_at: datetime
 

@@ -20,7 +20,9 @@ Rules that keep it honest:
 - Expected income is never money today: I_0 = 0, and since free ≤ X_0 a
   future payday can only spare a reserve, never add free money.
 - An obligation due the same day as an income counts in the window before
-  it: the deposit may land late in the day, or late.
+  it (the deposit may land late in the day, or late) — unless the user
+  pays those with that payday (``pay_due_on_payday``: "lo del 5 se paga
+  con la del 5").
 - An expected income whose day passed without arriving counts as arriving
   tomorrow and is flagged late.
 - Paying an obligation lowers the balance and what's owed by the same
@@ -159,6 +161,8 @@ class PositionInputs:
     obligations: tuple[Obligation, ...] = ()
     essentials: tuple[Essential, ...] = ()
     budgets: tuple[DiscretionaryBudget, ...] = ()
+    # True: what's due on a payday is paid with that payday's money.
+    pay_due_on_payday: bool = False
 
 
 # --- Result ---
@@ -269,6 +273,8 @@ def compute_position(inp: PositionInputs) -> Position:
         # Strictly-before count: due on an income day → the window before.
         if due is None or due <= inp.today:
             return 0
+        if inp.pay_due_on_payday:
+            return sum(1 for b in boundaries if b <= due)
         return sum(1 for b in boundaries if b < due)
 
     def window_for_start(day: date) -> int:

@@ -7,26 +7,42 @@ Cash flow is computed on the fly like /dashboard — no persisted state.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.time_utils import current_month_local, user_tz
+from app.models.debt import Debt
 from app.models.income_source import IncomeSource
 from app.models.planned_payment import PlannedPayment
+from app.models.transaction import Transaction, TransactionType
 from app.schemas.plan import (
     CashFlowResponse,
+    CashPositionResponse,
     IncomeSourceCreate,
     IncomeSourceOut,
     IncomeSourceUpdate,
     PlannedPaymentCreate,
     PlannedPaymentOut,
     PlannedPaymentUpdate,
+    PositionDeficitOut,
+    PositionLineOut,
+    PositionWindowOut,
     UpcomingPaymentOut,
 )
 from app.services.cash_flow import IncomeLike, PaymentLike, compute_cash_flow
+from app.services.cash_position import compute_position
+from app.services.cash_position_sources import (
+    NOTES,
+    STATEMENT_WINDOW_DAYS,
+    Credit,
+    DebtPayment,
+    build_inputs,
+    default_horizon,
+)
+from app.services.net_worth import net_worth
 
 router = APIRouter(tags=["plan"])
 
@@ -194,6 +210,141 @@ async def cash_flow(current_user: CurrentUser, db: DbSession) -> CashFlowRespons
         next_income_amount=result.next_income_amount,
         upcoming=_out(result.upcoming),
         checklist=_out(result.checklist),
+    )
+
+
+# Deposits that are the user's own money moving, never income.
+_NOT_INCOME = ("transfer", "debt_payment")
+
+
+@router.get("/cashflow/position", response_model=CashPositionResponse)
+async def cash_position(
+    current_user: CurrentUser,
+    db: DbSession,
+    until: date | None = Query(default=None),
+    pay_due_on_payday: bool = Query(default=True),
+) -> CashPositionResponse:
+    """Fortnight cash position: balance → what's due before the next
+    payday → what later paydays can't cover → free. Read-only, computed on
+    the fly from accounts, income sources, planned payments and debts.
+
+    ``pay_due_on_payday`` (default on — the user's rule) pays what is due on
+    a payday with that payday's money; off = conservative, pay it before.
+    """
+    tz = user_tz()
+    today = datetime.now(tz).date()
+    horizon_end = until or default_horizon(today)
+    if horizon_end < today:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="past_until")
+
+    snap = await net_worth(db, current_user.id)
+    sources = (
+        (await db.execute(select(IncomeSource).where(IncomeSource.user_id == current_user.id)))
+        .scalars()
+        .all()
+    )
+    payments = (
+        (
+            await db.execute(
+                select(PlannedPayment).where(PlannedPayment.user_id == current_user.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    debts = (
+        (await db.execute(select(Debt).where(Debt.user_id == current_user.id))).scalars().all()
+    )
+
+    # Enough history to spot late deposits and card payments made against a
+    # statement that is due up to a month ahead.
+    since = datetime.now(tz) - timedelta(days=STATEMENT_WINDOW_DAYS + 10)
+    rows = (
+        await db.execute(
+            select(
+                Transaction.occurred_at,
+                Transaction.amount,
+                Transaction.category,
+                Transaction.debt_id,
+                Transaction.source,
+            ).where(
+                Transaction.user_id == current_user.id,
+                Transaction.transaction_type == TransactionType.credit,
+                Transaction.occurred_at >= since,
+            )
+        )
+    ).all()
+    credits = [
+        Credit(r.occurred_at.astimezone(tz).date(), r.amount)
+        for r in rows
+        # Card receipts (source "card") and own transfers aren't income.
+        if r.source != "card" and (r.category is None or r.category not in _NOT_INCOME)
+    ]
+    debt_payments = [
+        DebtPayment(r.debt_id, r.occurred_at.astimezone(tz).date(), r.amount)
+        for r in rows
+        if r.debt_id is not None and r.category == "debt_payment"
+    ]
+
+    inputs = build_inputs(
+        today=today,
+        horizon_end=horizon_end,
+        balance=snap.total_assets,
+        income_sources=sources,
+        credits=credits,
+        planned_payments=payments,
+        debts=debts,
+        debt_payments=debt_payments,
+        pay_due_on_payday=pay_due_on_payday,
+    )
+    pos = compute_position(inputs)
+    notes = list(NOTES)
+    if not snap.accounts:
+        notes.insert(0, "No hay cuentas cargadas en Patrimonio: el saldo es 0.")
+
+    return CashPositionResponse(
+        status=pos.status.value,
+        today=today,
+        horizon_end=horizon_end,
+        pay_due_on_payday=pay_due_on_payday,
+        balance=pos.balance,
+        held_for_others=pos.held_for_others,
+        own=pos.own,
+        due_before_next_income=pos.due_before_next_income,
+        essentials_until_next_income=pos.essentials_until_next_income,
+        reserve_for_later=pos.reserve_for_later,
+        free=pos.free,
+        spendable_now=pos.spendable_now,
+        windows=[
+            PositionWindowOut(
+                start=w.start,
+                end=w.end,
+                income=w.income,
+                income_names=w.income_names,
+                obligations=[
+                    PositionLineOut(name=o.name, amount=o.amount, estimated=o.estimated)
+                    for o in w.obligations
+                ],
+                essentials=w.essentials,
+                balance_after=w.balance_after,
+            )
+            for w in pos.windows
+        ],
+        deficit=(
+            PositionDeficitOut(
+                window_start=pos.deficit.window_start,
+                amount=pos.deficit.amount,
+                obligations=pos.deficit.obligations,
+            )
+            if pos.deficit
+            else None
+        ),
+        missing=pos.missing,
+        estimated=pos.estimated,
+        late_incomes=pos.late_incomes,
+        overdue=pos.overdue,
+        no_plan=pos.no_plan,
+        notes=notes,
     )
 
 

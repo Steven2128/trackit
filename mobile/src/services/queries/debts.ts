@@ -23,6 +23,7 @@ export type DebtPayload = {
   total_amount: string;
   interest_rate?: string | null;
   minimum_payment?: string | null;
+  payment_due_date?: string | null; // YYYY-MM-DD
   email_sender?: string | null;
   email_format?: string | null;
   card_last_digits?: string | null;
