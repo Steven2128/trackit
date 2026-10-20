@@ -87,3 +87,16 @@ export function dmyToIso(text: string): string | null {
   if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
+
+/** "20 oct" for a plain YYYY-MM-DD date (read at local noon, so the day
+ *  never slips to the one before in negative-offset timezones). */
+export function formatIsoDay(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  return `${d.getDate()} ${MESES[d.getMonth()]}`;
+}
+
+/** Local YYYY-MM-DD of `ago` days back (0 = today). */
+export function localIsoDate(ago = 0): string {
+  const now = new Date();
+  return ymdLocal(new Date(now.getFullYear(), now.getMonth(), now.getDate() - ago));
+}

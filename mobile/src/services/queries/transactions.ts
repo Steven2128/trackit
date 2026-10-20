@@ -72,6 +72,8 @@ function invalidateTransactionViews(qc: ReturnType<typeof useQueryClient>) {
   // Category and amount feed every derived view, and cash rows also move the
   // Efectivo balance in Patrimonio.
   qc.invalidateQueries({ queryKey: ["transactions"] });
+  // The fortnight position reads all of these.
+  qc.invalidateQueries({ queryKey: ["cash-position"] });
   qc.invalidateQueries({ queryKey: budgetsQueryKey });
   qc.invalidateQueries({ queryKey: dashboardQueryKey });
   qc.invalidateQueries({ queryKey: ["insights"] });

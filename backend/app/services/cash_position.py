@@ -299,7 +299,12 @@ def compute_position(inp: PositionInputs) -> Position:
             continue
         remaining = max(owed - ob.paid, ZERO)
         if remaining == 0:
-            continue  # paid: never reserved again
+            # Paid: never reserved again, but still listed (amount 0) so the
+            # plan shows it done.
+            windows[window_for_due(ob.due)].obligations.append(
+                WindowLine(ob.name, ZERO, due=ob.due, total=owed, ref=ob.ref)
+            )
+            continue
         if is_estimate:
             estimated.append(
                 f"{ob.name} (cota máxima)" if ob.amount is None else f"{ob.name} (estimado)"
@@ -340,7 +345,7 @@ def compute_position(inp: PositionInputs) -> Position:
         deficit = Deficit(
             window_start=first.start,
             amount=-first.balance_after,
-            obligations=[o.name for o in first.obligations],
+            obligations=[o.name for o in first.obligations if o.amount],
         )
 
     budget_remaining = (

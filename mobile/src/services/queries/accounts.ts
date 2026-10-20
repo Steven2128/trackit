@@ -43,6 +43,8 @@ export const accountsQueryKey = ["accounts"] as const;
 
 function invalidateMoney(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: accountsQueryKey });
+  // The fortnight position reads all of these.
+  qc.invalidateQueries({ queryKey: ["cash-position"] });
   qc.invalidateQueries({ queryKey: ["transactions"] });
   qc.invalidateQueries({ queryKey: budgetsQueryKey });
   qc.invalidateQueries({ queryKey: dashboardQueryKey });
@@ -65,7 +67,10 @@ export function useUpsertAccount() {
     mutationFn: async ({ kind, openingBalance }: { kind: AccountKind; openingBalance: number }) => {
       await api.put(`/accounts/${kind}`, { opening_balance: openingBalance.toString() });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: accountsQueryKey }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: accountsQueryKey });
+      qc.invalidateQueries({ queryKey: ["cash-position"] });
+    },
   });
 }
 
@@ -78,7 +83,10 @@ export function useReconcileAccount() {
       });
       return res.data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: accountsQueryKey }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: accountsQueryKey });
+      qc.invalidateQueries({ queryKey: ["cash-position"] });
+    },
   });
 }
 

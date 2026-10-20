@@ -82,7 +82,8 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
   - [x] Etapa 1: núcleo puro `app/services/cash_position.py` (posición, estados confirmado/provisional/indeterminado, "¿Puedo comprar esto?").
   - [x] Etapa 2: `GET /cashflow/position` de solo lectura, armado con cuentas, `income_sources`, `planned_payments` y el último extracto de cada deuda (`app/services/cash_position_sources.py`). Las deudas aceptan la fecha límite cargada a mano (tarjetas sin email de extracto).
   - [x] Etapa 3: tablas `fund_holds` (plata de terceros, sección en Patrimonio) y `obligation_payments` (pagos parciales o adelantados por fecha de vencimiento; `from_cash` registra también el gasto en efectivo), `planned_payments.due_date` (pagos de una sola vez) y `debts.planned_payment` ("cuánto pienso pagar", se usa el mayor contra el mínimo). Las deudas cargadas a mano repiten su fecha cada mes.
-  - [ ] Etapa 4+: dashboard en Inicio ("cuánto me queda de lo que debo pagar"), categorías esencial/discrecional por quincena, simulador en la app.
+  - [x] Etapa 4: tarjeta "Tu quincena" arriba en Inicio (`FortnightCard`): libre de verdad, "te queda por pagar X de Y", pagos agrupados por nómina con tachado cuando están pagados y botón "Pagar" (monto parcial, efectivo o banco, día) → `POST /obligation-payments`. Reemplaza la lista de "Pagos fijos pendientes".
+  - [ ] Etapa 5+: categorías esencial/discrecional por quincena, "¿Puedo comprar esto?" en la app, alertas push de faltante.
 - [ ] Soporte para más bancos: Bancolombia, Nu Colombia
 - [ ] Reporte mensual exportable en PDF
 - [ ] Modo finanzas en pareja (gastos compartidos)

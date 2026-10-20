@@ -74,7 +74,8 @@ def with_obligation(inp: PositionInputs, name: str, **changes) -> PositionInputs
 
 
 def owed_lines(pos, name: str) -> list[Decimal]:
-    return [o.amount for w in pos.windows for o in w.obligations if o.name == name]
+    """What's still owed on it (fully paid lines stay listed with 0)."""
+    return [o.amount for w in pos.windows for o in w.obligations if o.name == name and o.amount]
 
 
 # --- Base state ---
@@ -427,3 +428,10 @@ def test_paying_what_is_due_on_payday_with_that_payday() -> None:
     assert "Tarjeta X (extracto)" in [o.name for o in pos.windows[1].obligations]
     # Same money overall, just one window later: X0 610+300, X1 unchanged.
     assert [w.balance_after for w in pos.windows] == [k(910), k(210), k(860)]
+
+
+def test_paid_obligation_stays_listed_as_done() -> None:
+    pos = compute_position(with_obligation(S0, "Internet", paid=k(50)))
+    (line,) = [o for w in pos.windows for o in w.obligations if o.name == "Internet"]
+    assert (line.amount, line.total) == (0, k(50))
+    assert pos.free == k(260)  # 210 + the 50 no longer owed

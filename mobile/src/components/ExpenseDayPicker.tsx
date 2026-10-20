@@ -18,12 +18,14 @@ type Props = {
   /** Local days back: 0 = today, 1 = yesterday… */
   daysAgo: number;
   onChange: (daysAgo: number) => void;
+  /** Warn about the last cash count (only cash moves the Efectivo balance). */
+  cashNotice?: boolean;
 };
 
 /** Day a cash expense happened. Warns when the day is before the last cash
  *  count: that money was already inside the count, so the backend keeps the
  *  Efectivo balance where it was and only the spending moves. */
-export default function ExpenseDayPicker({ daysAgo, onChange }: Props) {
+export default function ExpenseDayPicker({ daysAgo, onChange, cashNotice = true }: Props) {
   // Past the quick chips, the day is picked with the stepper.
   const other = daysAgo > 2;
   const { data } = useNetWorth();
@@ -31,6 +33,7 @@ export default function ExpenseDayPicker({ daysAgo, onChange }: Props) {
 
   const instant = expenseInstant(daysAgo);
   const beforeCount =
+    cashNotice &&
     countedAt !== null && new Date(instant).getTime() < new Date(countedAt).getTime();
 
   return (

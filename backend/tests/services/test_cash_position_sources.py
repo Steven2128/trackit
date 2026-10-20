@@ -179,7 +179,10 @@ def test_one_off_obligation_is_due_once() -> None:
     # Past the horizon: not yet. Checked off: gone.
     assert planned_obligations([friend], date(2026, 10, 19), date(2026, 10, 31)) == []
     paid = _pp("Deuda amigo", "135000", None, paid_month="2026-10", due_date=date(2026, 11, 1))
-    assert planned_obligations([paid], date(2026, 10, 19), date(2026, 11, 5)) == []
+    (done,) = planned_obligations([paid], date(2026, 10, 19), date(2026, 11, 5))
+    assert done.paid == done.amount  # still on the plan, as done
+    # Once its date passed, a settled one-off leaves the plan.
+    assert planned_obligations([paid], date(2026, 11, 2), date(2026, 11, 20)) == []
 
 
 def test_partial_payments_add_up_per_due_date() -> None:

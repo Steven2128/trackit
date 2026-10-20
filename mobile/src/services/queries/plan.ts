@@ -62,6 +62,8 @@ export const planQueryKey = ["plan"] as const;
 
 function invalidatePlan(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: planQueryKey });
+  // The fortnight position reads all of these.
+  qc.invalidateQueries({ queryKey: ["cash-position"] });
 }
 
 export function useCashFlow() {

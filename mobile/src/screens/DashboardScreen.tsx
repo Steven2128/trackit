@@ -17,15 +17,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BudgetOverview from "../components/BudgetOverview";
 import CategoryIcon from "../components/CategoryIcon";
+import FortnightCard from "../components/FortnightCard";
 import MoneyText from "../components/MoneyText";
-import PaymentChecklistRow from "../components/PaymentChecklistRow";
 import TrendChart from "../components/TrendChart";
 import type { AppStackParamList, AppTabParamList } from "../navigation/AppStack";
 import { useBudgetStatus, type BudgetAlertStatus } from "../services/queries/budgets";
 import { useDashboard, type DashboardResponse } from "../services/queries/dashboard";
 import { useHealthScore, useUnusualSpending } from "../services/queries/insights";
 import { useNetWorth } from "../services/queries/accounts";
-import { useCashFlow } from "../services/queries/plan";
+import { useCashPosition } from "../services/queries/cashPosition";
 import { useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
 import { pageStyle, useIsWide } from "../theme/layout";
@@ -73,7 +73,7 @@ function DashboardContent({
   const { data: budgetStatus } = useBudgetStatus();
   const { data: healthScore } = useHealthScore();
   const { data: unusual } = useUnusualSpending();
-  const cashflow = useCashFlow();
+  const position = useCashPosition();
   const { data: netWorth, refetch: refetchNetWorth } = useNetWorth();
   const user = useAuthStore((s) => s.user);
   const firstName = user?.name?.split(" ")[0];
@@ -99,10 +99,6 @@ function DashboardContent({
     );
   }, [current_month.by_category]);
 
-  // Fixed payments still due this month; checking one here drops it off the list.
-  const checklist = cashflow.data?.checklist ?? [];
-  const pendingPayments = checklist.filter((p) => !p.is_paid);
-
   const trendMonths = monthly_trend.map((m) => m.month);
   const trendTotals = monthly_trend.map((m) => Number(m.total_spent));
 
@@ -120,7 +116,7 @@ function DashboardContent({
           refreshing={isRefetching}
           onRefresh={() => {
             refetch();
-            cashflow.refetch();
+            position.refetch();
             refetchNetWorth();
           }}
           tintColor={colors.primary}
@@ -151,6 +147,7 @@ function DashboardContent({
 
       <View style={isWide ? styles.columns : undefined}>
         <View style={isWide ? styles.column : undefined}>
+          <FortnightCard />
           <View style={styles.quickRow}>
             {healthScore ? (
               <View style={styles.scoreCard}>
@@ -208,34 +205,6 @@ function DashboardContent({
                 );
               })}
             </View>
-          ) : null}
-
-          {checklist.length > 0 ? (
-            <>
-              <Pressable
-                style={({ pressed }) => [styles.pendingHeader, pressed && styles.pressed]}
-                onPress={() => navigation.navigate("Plan")}
-                accessibilityLabel="Ver plan del mes"
-              >
-                <Text style={styles.pendingTitle}>Pagos fijos pendientes</Text>
-                <Text style={styles.pendingProgress}>
-                  {checklist.length - pendingPayments.length}/{checklist.length} pagados
-                </Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-              </Pressable>
-              <View style={styles.pendingBox}>
-                {pendingPayments.length === 0 ? (
-                  <View style={styles.allPaidRow}>
-                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                    <Text style={styles.allPaidText}>Todo pagado este mes</Text>
-                  </View>
-                ) : (
-                  pendingPayments.map((item, i) => (
-                    <PaymentChecklistRow key={item.id ?? item.name + i} item={item} index={i} />
-                  ))
-                )}
-              </View>
-            </>
           ) : null}
 
           <View style={styles.heroRow}>
@@ -398,28 +367,6 @@ const styles = StyleSheet.create({
   },
   unusualRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   unusualText: { color: colors.textPrimary, fontSize: 13, flex: 1 },
-  pendingHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
-  },
-  pendingTitle: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    flex: 1,
-  },
-  pendingProgress: { color: colors.textSecondary, fontSize: 11, fontWeight: "600" },
-  pendingBox: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-  },
-  allPaidRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 12 },
-  allPaidText: { color: colors.success, fontSize: 14, fontWeight: "600" },
   heroRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
   hero: {
     flex: 1,

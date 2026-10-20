@@ -190,8 +190,8 @@ def planned_obligations(
             if due > horizon_end:
                 continue
             paid = p.amount if p.paid_month else _recorded(records, due, planned=p.id)
-            if paid >= p.amount:
-                continue
+            if paid >= p.amount and due < today:
+                continue  # settled and past: off the plan
             out.append(
                 Obligation(p.name, due, p.amount, paid=paid, ref=f"planned:{p.id}:{due}")
             )

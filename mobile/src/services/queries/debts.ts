@@ -65,6 +65,8 @@ export const debtsQueryKey = ["debts"] as const;
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: debtsQueryKey });
+  // The fortnight position reads all of these.
+  qc.invalidateQueries({ queryKey: ["cash-position"] });
   qc.invalidateQueries({ queryKey: dashboardQueryKey });
   // Net worth subtracts debt balances.
   qc.invalidateQueries({ queryKey: ["accounts"] });
