@@ -146,7 +146,7 @@ A diferencia de los bancos de arriba, **el remitente no está en el código**: d
   - `payment` → `credit` `category="debt_payment"` con `debt_id` (no es ingreso) y baja `total_amount` (nunca por debajo de 0).
   - `statement` → actualiza `minimum_payment` y `payment_due_date`. No crea transacción.
 - **Saldo**: solo los movimientos posteriores a `email_linked_at` lo mueven, porque el saldo que el usuario carga al conectar ya incluye todo lo anterior. Los anteriores quedan como historial. Los intereses y cargos del banco no llegan por email, así que el saldo se corrige a mano.
-- **Pago de la tarjeta = débito del banco**: `transfer_matcher.match_debt_payments` parea cada comprobante con el débito que lo pagó (PSE de Davivienda, "Pago exitoso" de Nequi): monto exacto, ±30 min. Ese débito pasa a `debt_payment`. Así el pago no se cuenta como gasto encima de las compras.
+- **Pago de la tarjeta = débito del banco**: `transfer_matcher.match_debt_payments` parea cada comprobante con el débito que lo pagó (PSE de Davivienda, "Pago exitoso" de Nequi): mismo monto con menos de $1 de diferencia (la tarjeta cobra centavos, el banco debita pesos enteros) y ±2 h (el email de RappiCard puede llegar más de una hora tarde). Ese débito pasa a `debt_payment`. Así el pago no se cuenta como gasto encima de las compras.
 - `debt_payment` está excluida del gasto y del "Recibido" en todos los totales. También se puede asignar a mano, por ejemplo a un pago de tarjeta que no llega por email.
 
 ### RappiCard (`rappicard`)

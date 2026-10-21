@@ -5,7 +5,11 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 
-from app.services.transfer_matcher import pair_transfers
+from app.services.transfer_matcher import (
+    DEBT_PAYMENT_TOLERANCE,
+    DEBT_PAYMENT_WINDOW,
+    pair_transfers,
+)
 
 BASE = datetime(2026, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -85,3 +89,31 @@ class TestPairTransfers:
         assert pair_transfers([], []) == []
         assert pair_transfers([_tx("100", 0)], []) == []
         assert pair_transfers([], [_tx("100", 0)]) == []
+
+
+class TestDebtPaymentPairing:
+    """Card receipt vs the bank debit that funded it (match_debt_payments)."""
+
+    def _pair(self, debit: SimpleNamespace, receipt: SimpleNamespace) -> list:
+        return pair_transfers(
+            [debit], [receipt], window=DEBT_PAYMENT_WINDOW, tolerance=DEBT_PAYMENT_TOLERANCE
+        )
+
+    def test_cents_on_the_card_side_pair(self) -> None:
+        """RappiCard bills 402.708,83; Davivienda debits 402.708."""
+        debit = _tx("402708.00", 0)
+        receipt = _tx("402708.83", 65)
+
+        assert self._pair(debit, receipt) == [(debit.id, receipt.id)]
+
+    def test_a_peso_apart_does_not_pair(self) -> None:
+        assert self._pair(_tx("402708", 0), _tx("402709", 5)) == []
+
+    def test_late_email_within_two_hours_pairs(self) -> None:
+        debit = _tx("150000", 0)
+        receipt = _tx("150000", 119)
+
+        assert self._pair(debit, receipt) == [(debit.id, receipt.id)]
+
+    def test_beyond_two_hours_does_not_pair(self) -> None:
+        assert self._pair(_tx("150000", 0), _tx("150000", 121)) == []

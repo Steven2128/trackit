@@ -12,12 +12,14 @@ class MonthCategoryItem(BaseModel):
 class MonthTrendEntry(BaseModel):
     month: str
     total_spent: Decimal
+    total_received: Decimal = Decimal("0")
     by_category: list[MonthCategoryItem]
 
 
 class CurrentMonthSnapshot(BaseModel):
     month: str
     total_spent: Decimal
+    total_received: Decimal = Decimal("0")
     by_category: list[MonthCategoryItem]
     transaction_count: int
 

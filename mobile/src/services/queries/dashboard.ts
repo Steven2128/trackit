@@ -11,12 +11,14 @@ export type MonthCategoryItem = {
 export type MonthTrendEntry = {
   month: string;
   total_spent: string;
+  total_received: string; // credits minus own transfers and card payments
   by_category: MonthCategoryItem[];
 };
 
 export type CurrentMonthSnapshot = {
   month: string;
   total_spent: string;
+  total_received: string;
   by_category: MonthCategoryItem[];
   transaction_count: number;
 };

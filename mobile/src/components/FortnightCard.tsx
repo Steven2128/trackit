@@ -49,10 +49,11 @@ export default function FortnightCard() {
       <Header data={data} />
       <Progress data={data} />
       {data.windows.map((w, i) =>
-        i === 0 && w.obligations.length === 0 ? null : (
+        w.obligations.length === 0 ? null : (
           <WindowBlock key={w.start} window={w} first={i === 0} onPay={setPaying} />
         ),
       )}
+      <QuietWindows windows={data.windows.slice(1).filter((w) => w.obligations.length === 0)} />
       <Warnings data={data} />
       <PayObligationSheet line={paying} onClose={() => setPaying(null)} />
     </View>
@@ -210,6 +211,24 @@ function LineRow({ line, onPay }: { line: PositionLine; onPay: (l: PositionLine)
   );
 }
 
+/** Paydays with nothing due, folded into one line so the card stays short. */
+function QuietWindows({ windows }: { windows: PositionWindow[] }) {
+  if (windows.length === 0) return null;
+  const last = windows[windows.length - 1];
+  const names = windows.map(
+    (w) => `${w.income_names.map(plainName).join(" + ") || "lo que entra"} (${formatIsoDay(w.start)})`,
+  );
+  return (
+    <View style={styles.quiet}>
+      <Ionicons name="checkmark-done-outline" size={14} color={colors.success} />
+      <Text style={styles.quietText}>
+        Sin pagos con {names.join(" ni con ")}. Con eso, el {formatIsoDay(last.start)} te
+        quedarían <MoneyText value={last.balance_after} size="sm" style={styles.quietMoney} />.
+      </Text>
+    </View>
+  );
+}
+
 function Warnings({ data }: { data: CashPosition }) {
   const items = [
     ...data.missing.map((m) => `Falta: ${m}`),
@@ -290,6 +309,9 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   payText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
+  quiet: { flexDirection: "row", gap: 6, alignItems: "flex-start", marginTop: 12 },
+  quietText: { color: colors.textSecondary, fontSize: 12, flex: 1, lineHeight: 17 },
+  quietMoney: { color: colors.textPrimary, fontWeight: "600" },
   warnings: { marginTop: 10, gap: 4 },
   warningRow: { flexDirection: "row", gap: 6, alignItems: "flex-start" },
   warningText: { color: colors.textSecondary, fontSize: 12, flex: 1 },

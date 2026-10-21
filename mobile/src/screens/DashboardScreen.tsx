@@ -17,20 +17,27 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BudgetOverview from "../components/BudgetOverview";
 import CategoryIcon from "../components/CategoryIcon";
+import CashflowTrend from "../components/CashflowTrend";
+import DashboardKpis from "../components/DashboardKpis";
 import FortnightCard from "../components/FortnightCard";
+import GoalsSummary from "../components/GoalsSummary";
+import HealthScoreCard from "../components/HealthScoreCard";
 import MoneyText from "../components/MoneyText";
-import TrendChart from "../components/TrendChart";
+import RecentMovements from "../components/RecentMovements";
 import type { AppStackParamList, AppTabParamList } from "../navigation/AppStack";
 import { useBudgetStatus, type BudgetAlertStatus } from "../services/queries/budgets";
 import { useDashboard, type DashboardResponse } from "../services/queries/dashboard";
 import { useHealthScore, useUnusualSpending } from "../services/queries/insights";
 import { useNetWorth } from "../services/queries/accounts";
 import { useCashPosition } from "../services/queries/cashPosition";
+import { useGoals } from "../services/queries/goals";
 import { useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
 import { pageStyle, useIsWide } from "../theme/layout";
 import { getCategory } from "../utils/categories";
 import { humanizeMonth } from "../utils/dates";
+
+const TOP_CATEGORIES = 5;
 
 export default function DashboardScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useDashboard();
@@ -69,10 +76,12 @@ function DashboardContent({
   refetch: () => void;
   isRefetching: boolean;
 }) {
-  const { current_month, debts, monthly_trend } = data;
+  const { current_month, monthly_trend } = data;
+  const spent = Number(current_month.total_spent);
   const { data: budgetStatus } = useBudgetStatus();
   const { data: healthScore } = useHealthScore();
   const { data: unusual } = useUnusualSpending();
+  const { data: goals } = useGoals();
   const position = useCashPosition();
   const { data: netWorth, refetch: refetchNetWorth } = useNetWorth();
   const user = useAuthStore((s) => s.user);
@@ -98,9 +107,145 @@ function DashboardContent({
       (a, b) => Number(b.total) - Number(a.total),
     );
   }, [current_month.by_category]);
+  const topCategories = sortedCategories.slice(0, TOP_CATEGORIES);
 
-  const trendMonths = monthly_trend.map((m) => m.month);
-  const trendTotals = monthly_trend.map((m) => Number(m.total_spent));
+  const kpis = (
+    <DashboardKpis
+      data={data}
+      netWorth={netWorth}
+      onSpent={() => tabNavigation.navigate("Transactions", undefined)}
+      onReceived={() => tabNavigation.navigate("Transactions", undefined)}
+      onNetWorth={() => navigation.navigate("NetWorth")}
+      onDebts={() => tabNavigation.navigate("DebtTracker")}
+    />
+  );
+
+  const unusualBanner =
+    unusual && unusual.items.length > 0 ? (
+      <View style={styles.unusualBox}>
+        {unusual.items.map((a) => {
+          const cat = getCategory(a.category);
+          return (
+            <View key={a.category} style={styles.unusualRow}>
+              <Ionicons name="trending-up" size={16} color={colors.warning} />
+              <Text style={styles.unusualText}>
+                Gasto inusual en {cat.label}: vas {a.ratio}× tu promedio (
+                <MoneyText value={a.current} size="sm" style={{ color: colors.warning }} />
+                )
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    ) : null;
+
+  const trend = (
+    <>
+      <Text style={styles.sectionLabel}>Ingresos vs. gastos · 6 meses</Text>
+      <CashflowTrend months={monthly_trend} />
+    </>
+  );
+
+  const budget =
+    budgetStatus && budgetStatus.items.length > 0 ? (
+      <>
+        <Text style={styles.sectionLabel}>Presupuesto del mes</Text>
+        <BudgetOverview
+          items={budgetStatus.items}
+          onPress={() => tabNavigation.navigate("Budgets")}
+        />
+      </>
+    ) : null;
+
+  const categories = (
+    <>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionLabel, styles.sectionLabelInline]}>Por categoría</Text>
+        {sortedCategories.length > TOP_CATEGORIES ? (
+          <Pressable
+            onPress={() => tabNavigation.navigate("Transactions", undefined)}
+            hitSlop={8}
+          >
+            <Text style={styles.link}>Ver las {sortedCategories.length}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {topCategories.length === 0 ? (
+        <Text style={styles.emptyCat}>Sin gastos este mes</Text>
+      ) : (
+        topCategories.map((c, i) => {
+          const cat = getCategory(c.category);
+          const alert = c.category ? budgetAlertByCategory.get(c.category) : undefined;
+          const share = spent > 0 ? Math.round((Number(c.total) / spent) * 100) : 0;
+          return (
+            <Pressable
+              key={`${c.category ?? "null"}-${i}`}
+              style={({ pressed }) => [styles.catRow, pressed && styles.pressed]}
+              onPress={() => tabNavigation.navigate("Transactions", { category: c.category })}
+              accessibilityLabel={`Ver movimientos de ${cat.label}`}
+            >
+              <CategoryIcon categoryKey={c.category} />
+              <View style={styles.catBody}>
+                <View style={styles.catLabelRow}>
+                  <Text style={styles.catLabel}>{cat.label}</Text>
+                  {alert ? (
+                    <Ionicons
+                      name={alert === "exceeded" ? "alert-circle" : "warning"}
+                      size={14}
+                      color={alert === "exceeded" ? colors.danger : colors.warning}
+                    />
+                  ) : null}
+                </View>
+                <View style={styles.shareTrack}>
+                  <View
+                    style={[styles.shareFill, { width: `${share}%`, backgroundColor: cat.color }]}
+                  />
+                </View>
+                <Text style={styles.catCount}>
+                  {share}% · {c.count} {c.count === 1 ? "movimiento" : "movimientos"}
+                </Text>
+              </View>
+              <MoneyText value={c.total} size="md" />
+              <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+            </Pressable>
+          );
+        })
+      )}
+    </>
+  );
+
+  const recent = (
+    <RecentMovements
+      month={current_month.month}
+      onSeeAll={() => tabNavigation.navigate("Transactions", undefined)}
+    />
+  );
+
+  const goalsSection = goals ? (
+    <>
+      <Text style={styles.sectionLabel}>Metas de ahorro</Text>
+      <GoalsSummary goals={goals} onPress={() => navigation.navigate("Goals")} />
+    </>
+  ) : null;
+
+  const health = healthScore ? (
+    <>
+      <Text style={styles.sectionLabel}>Salud financiera</Text>
+      <HealthScoreCard score={healthScore} />
+    </>
+  ) : null;
+
+  // Phones have no sidebar: Plan is only reachable from here.
+  const planLink = (
+    <Pressable
+      style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
+      onPress={() => navigation.navigate("Plan")}
+    >
+      <Ionicons name="map-outline" size={16} color={colors.primary} />
+      <Text style={styles.quickText}>Plan del mes</Text>
+      <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+    </Pressable>
+  );
 
   return (
     <ScrollView
@@ -145,152 +290,40 @@ function DashboardContent({
         )}
       </View>
 
-      <View style={isWide ? styles.columns : undefined}>
-        <View style={isWide ? styles.column : undefined}>
+      {isWide ? (
+        <>
+          {kpis}
+          {unusualBanner}
+          <View style={styles.columns}>
+            <View style={styles.column}>
+              <FortnightCard />
+              {trend}
+              {health}
+            </View>
+            <View style={styles.column}>
+              {budget}
+              {categories}
+              {recent}
+              {goalsSection}
+            </View>
+          </View>
+        </>
+      ) : (
+        <>
           <FortnightCard />
-          <View style={styles.quickRow}>
-            {healthScore ? (
-              <View style={styles.scoreCard}>
-                <Text style={styles.scoreValue}>
-                  <Text style={{ color: scoreColor(healthScore.total) }}>{healthScore.total}</Text>
-                  <Text style={styles.scoreMax}>/100</Text>
-                </Text>
-                <Text style={styles.scoreLabel}>Salud financiera</Text>
-              </View>
-            ) : null}
-            <View style={styles.quickCol}>
-              <Pressable
-                style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
-                onPress={() => navigation.navigate("Plan")}
-              >
-                <Ionicons name="map-outline" size={16} color={colors.primary} />
-                <Text style={styles.quickText}>Plan del mes</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
-                onPress={() => navigation.navigate("Goals")}
-              >
-                <Ionicons name="flag-outline" size={16} color={colors.primary} />
-                <Text style={styles.quickText}>Metas de ahorro</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
-                onPress={() => navigation.navigate("NetWorth")}
-              >
-                <Ionicons name="wallet-outline" size={16} color={colors.primary} />
-                <Text style={styles.quickText}>Patrimonio</Text>
-                {netWorth?.accounts.length ? (
-                  <MoneyText value={netWorth.net_worth} size="sm" style={styles.quickMoney} />
-                ) : null}
-                <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-              </Pressable>
-            </View>
-          </View>
-
-          {unusual && unusual.items.length > 0 ? (
-            <View style={styles.unusualBox}>
-              {unusual.items.map((a) => {
-                const cat = getCategory(a.category);
-                return (
-                  <View key={a.category} style={styles.unusualRow}>
-                    <Ionicons name="trending-up" size={16} color={colors.warning} />
-                    <Text style={styles.unusualText}>
-                      Gasto inusual en {cat.label}: vas {a.ratio}× tu promedio (
-                      <MoneyText value={a.current} size="sm" style={{ color: colors.warning }} />
-                      )
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          ) : null}
-
-          <View style={styles.heroRow}>
-            <View style={styles.hero}>
-              <Text style={styles.heroLabel}>Gastado este mes</Text>
-              <MoneyText value={current_month.total_spent} size="lg" />
-              <Text style={styles.heroMeta}>
-                {current_month.transaction_count} transacciones
-              </Text>
-            </View>
-            <View style={[styles.hero, styles.heroDebt, debts.debt_count === 0 && styles.heroDebtNone]}>
-              <Text style={styles.heroLabel}>Deuda total</Text>
-              {debts.debt_count === 0 ? (
-                <Text style={styles.noDebt}>Sin deudas</Text>
-              ) : (
-                <>
-                  <MoneyText value={debts.total_debt} size="lg" />
-                  <Text style={styles.heroMeta}>
-                    {debts.debt_count} · mín <MoneyText value={debts.total_minimum_payment} size="sm" style={{ color: colors.textSecondary, fontWeight: "600" }} />/mes
-                  </Text>
-                </>
-              )}
-            </View>
-          </View>
-
-          <Text style={styles.sectionLabel}>Tendencia 6 meses</Text>
-          <TrendChart months={trendMonths} totals={trendTotals} />
-        </View>
-
-        <View style={isWide ? styles.column : undefined}>
-          {budgetStatus && budgetStatus.items.length > 0 ? (
-            <>
-              <Text style={styles.sectionLabel}>Presupuesto del mes</Text>
-              <BudgetOverview
-                items={budgetStatus.items}
-                onPress={() => tabNavigation.navigate("Budgets")}
-              />
-            </>
-          ) : null}
-
-          <Text style={styles.sectionLabel}>Por categoría</Text>
-          {sortedCategories.length === 0 ? (
-            <Text style={styles.emptyCat}>Sin gastos este mes</Text>
-          ) : (
-            sortedCategories.map((c, i) => {
-              const cat = getCategory(c.category);
-              const alert = c.category ? budgetAlertByCategory.get(c.category) : undefined;
-              return (
-                <Pressable
-                  key={`${c.category ?? "null"}-${i}`}
-                  style={({ pressed }) => [styles.catRow, pressed && styles.pressed]}
-                  onPress={() =>
-                    tabNavigation.navigate("Transactions", { category: c.category })
-                  }
-                  accessibilityLabel={`Ver movimientos de ${cat.label}`}
-                >
-                  <CategoryIcon categoryKey={c.category} />
-                  <View style={styles.catBody}>
-                    <View style={styles.catLabelRow}>
-                      <Text style={styles.catLabel}>{cat.label}</Text>
-                      {alert ? (
-                        <Ionicons
-                          name={alert === "exceeded" ? "alert-circle" : "warning"}
-                          size={14}
-                          color={alert === "exceeded" ? colors.danger : colors.warning}
-                        />
-                      ) : null}
-                    </View>
-                    <Text style={styles.catCount}>{c.count} {c.count === 1 ? "tx" : "txs"}</Text>
-                  </View>
-                  <MoneyText value={c.total} size="md" />
-                  <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-                </Pressable>
-              );
-            })
-          )}
-        </View>
-      </View>
+          {kpis}
+          {unusualBanner}
+          {planLink}
+          {budget}
+          {categories}
+          {recent}
+          {goalsSection}
+          {health}
+          {trend}
+        </>
+      )}
     </ScrollView>
   );
-}
-
-function scoreColor(total: number): string {
-  if (total >= 75) return colors.success;
-  if (total >= 50) return colors.warning;
-  return colors.danger;
 }
 
 const styles = StyleSheet.create({
@@ -326,23 +359,8 @@ const styles = StyleSheet.create({
   greetingBody: { flex: 1 },
   greetingName: { color: colors.textPrimary, fontSize: 24, fontWeight: "700" },
   greetingSub: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
-  quickRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
-  scoreCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 110,
-    gap: 2,
-  },
-  scoreValue: { fontSize: 24, fontWeight: "700" },
-  scoreMax: { color: colors.textSecondary, fontSize: 13, fontWeight: "600" },
-  scoreLabel: { color: colors.textSecondary, fontSize: 11 },
-  quickCol: { flex: 1, gap: 8 },
   quickBtn: {
+    marginBottom: 4,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -357,7 +375,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   quickText: { color: colors.textPrimary, fontSize: 13, fontWeight: "600", flex: 1 },
-  quickMoney: { color: colors.textSecondary, fontWeight: "600" },
   unusualBox: {
     backgroundColor: colors.warningSoft,
     borderRadius: 12,
@@ -367,27 +384,6 @@ const styles = StyleSheet.create({
   },
   unusualRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   unusualText: { color: colors.textPrimary, fontSize: 13, flex: 1 },
-  heroRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-  hero: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-  },
-  heroDebt: { borderLeftWidth: 3, borderLeftColor: colors.danger },
-  // Same accent as the "Sin deudas" text — red only when something is owed.
-  heroDebtNone: { borderLeftColor: colors.success },
-  heroLabel: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: 6,
-  },
-  heroMeta: { color: colors.textSecondary, fontSize: 12, marginTop: 4 },
-  noDebt: { color: colors.success, fontSize: 16, fontWeight: "700", marginTop: 4 },
   sectionLabel: {
     color: colors.textSecondary,
     fontSize: 11,
@@ -396,6 +392,23 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 8,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  sectionLabelInline: { marginTop: 0, marginBottom: 0 },
+  link: { color: colors.primary, fontSize: 12, fontWeight: "600" },
+  shareTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.background,
+    overflow: "hidden",
+    marginTop: 6,
+  },
+  shareFill: { height: 4, borderRadius: 2 },
   catRow: {
     flexDirection: "row",
     alignItems: "center",

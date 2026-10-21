@@ -12,6 +12,8 @@ type Props = {
   amount: string;
   type: "debit" | "credit";
   occurredAt?: string;
+  /** Shown instead of the time (e.g. "ayer" in lists that span days). */
+  whenLabel?: string;
   note?: string | null;
   showChevron?: boolean;
 };
@@ -29,6 +31,7 @@ export default function TransactionRow({
   amount,
   type,
   occurredAt,
+  whenLabel,
   note,
   showChevron = false,
 }: Props) {
@@ -45,7 +48,9 @@ export default function TransactionRow({
           <View style={[styles.catPill, { backgroundColor: `${cat.color}22` }]}>
             <Text style={[styles.catPillText, { color: cat.color }]}>{cat.label}</Text>
           </View>
-          {occurredAt ? <Text style={styles.time}>{formatTime(occurredAt)}</Text> : null}
+          {whenLabel || occurredAt ? (
+            <Text style={styles.time}>{whenLabel ?? formatTime(occurredAt!)}</Text>
+          ) : null}
         </View>
         {note ? (
           <Text style={styles.note} numberOfLines={1}>

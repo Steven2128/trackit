@@ -1,14 +1,15 @@
 # app/api/routes/dashboard.py
 """GET /dashboard — consolidated view: 6-month trend, current month, debts.
 
-Three queries run concurrently. Month windowing uses settings.user_timezone
+Four queries, one after the other: an AsyncSession can't run them
+concurrently (SQLAlchemy 2.1 raises IllegalStateChangeError). Month windowing uses settings.user_timezone
 (default America/Bogota) — same rule as GET /transactions/summary.
-Spending excludes transfer and cash_withdrawal categories.
+Spending excludes transfer, cash_withdrawal and debt_payment; received
+excludes transfer and debt_payment (same rule as /transactions/summary).
 """
 
 from __future__ import annotations
 
-import asyncio
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
@@ -34,6 +35,7 @@ from app.schemas.dashboard import (
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 _EXCLUDED = ("transfer", "cash_withdrawal", "debt_payment")
+_EXCLUDED_FROM_RECEIVED = ("transfer", "debt_payment")
 
 
 @router.get("", response_model=DashboardResponse)
@@ -42,13 +44,12 @@ async def get_dashboard(current_user: CurrentUser, db: DbSession) -> DashboardRe
     trend_months = _six_months(current_month)
     trend_start, _ = month_bounds(trend_months[0])
 
-    trend_rows, tx_count, debt_row = await asyncio.gather(
-        _fetch_trend(db, current_user.id, trend_start),
-        _fetch_count(db, current_user.id, current_month),
-        _fetch_debts(db, current_user.id),
-    )
+    trend_rows = await _fetch_trend(db, current_user.id, trend_start)
+    received_rows = await _fetch_received(db, current_user.id, trend_start)
+    tx_count = await _fetch_count(db, current_user.id, current_month)
+    debt_row = await _fetch_debts(db, current_user.id)
 
-    monthly_trend = _build_trend(trend_rows, trend_months)
+    monthly_trend = _build_trend(trend_rows, trend_months, received_rows)
     last = monthly_trend[-1]
 
     return DashboardResponse(
@@ -56,6 +57,7 @@ async def get_dashboard(current_user: CurrentUser, db: DbSession) -> DashboardRe
         current_month=CurrentMonthSnapshot(
             month=last.month,
             total_spent=last.total_spent,
+            total_received=last.total_received,
             by_category=last.by_category,
             transaction_count=tx_count,
         ),
@@ -87,6 +89,24 @@ async def _fetch_trend(db: AsyncSession, user_id: UUID, trend_start: datetime) -
         )
         .group_by(month_col, Transaction.category)
         .order_by(month_col)
+    )
+    return result.all()
+
+
+async def _fetch_received(db: AsyncSession, user_id: UUID, trend_start: datetime) -> list:
+    tz_str = settings.user_timezone
+    local_ts = func.timezone(tz_str, func.timezone("UTC", Transaction.occurred_at))
+    month_col = func.date_trunc("month", local_ts).label("month")
+
+    result = await db.execute(
+        select(month_col, func.sum(Transaction.amount).label("total"))
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.transaction_type == TransactionType.credit,
+            not_in_excluded(Transaction.category, _EXCLUDED_FROM_RECEIVED),
+            Transaction.occurred_at >= trend_start,
+        )
+        .group_by(month_col)
     )
     return result.all()
 
@@ -132,7 +152,10 @@ def _six_months(current: str) -> list[str]:
     return result
 
 
-def _build_trend(rows, months: list[str]) -> list[MonthTrendEntry]:
+def _build_trend(rows, months: list[str], received_rows=()) -> list[MonthTrendEntry]:
+    received = {
+        f"{r.month.year:04d}-{r.month.month:02d}": Decimal(str(r.total)) for r in received_rows
+    }
     raw: dict[str, list[MonthCategoryItem]] = defaultdict(list)
     for row in rows:
         month_dt: datetime = row.month
@@ -152,6 +175,7 @@ def _build_trend(rows, months: list[str]) -> list[MonthTrendEntry]:
             MonthTrendEntry(
                 month=month_str,
                 total_spent=sum((item.total for item in items), Decimal("0")),
+                total_received=received.get(month_str, Decimal("0")),
                 by_category=items,
             )
         )

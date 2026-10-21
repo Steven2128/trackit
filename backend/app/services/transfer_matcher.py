@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Protocol, Sequence
 
 from sqlalchemy import or_, select, update
@@ -29,9 +30,12 @@ log = logging.getLogger(__name__)
 
 PAIRING_WINDOW = timedelta(minutes=10)
 LOOKBACK = timedelta(days=7)
-# Card payment receipts arrive within seconds of the funding bank debit
-# (PSE from Davivienda, "Pago exitoso" from Nequi); allow some slack.
-DEBT_PAYMENT_WINDOW = timedelta(minutes=30)
+# Card payment receipts usually arrive within seconds of the funding bank
+# debit (PSE from Davivienda, "Pago exitoso" from Nequi), but the RappiCard
+# email can lag over an hour, and the card bills in cents (402.708,83) while
+# the bank debits whole pesos (402.708).
+DEBT_PAYMENT_WINDOW = timedelta(hours=2)
+DEBT_PAYMENT_TOLERANCE = Decimal("1")
 
 # Debit merchants set by the source-bank parsers (Itaú, Davivienda).
 SOURCE_MERCHANTS = ("Portal Internet", LLAVE_MERCHANT)
@@ -50,8 +54,10 @@ def pair_transfers(
     credits: Sequence[_Pairable],
     *,
     window: timedelta = PAIRING_WINDOW,
+    tolerance: Decimal = Decimal("0"),
 ) -> list[tuple[uuid.UUID, uuid.UUID]]:
-    """Greedy one-to-one pairing: exact amount, |Δt| within the window.
+    """Greedy one-to-one pairing: amounts within ``tolerance`` (exact by
+    default, strictly less than it otherwise), |Δt| within the window.
 
     Debits are processed oldest-first; each takes the *closest-in-time*
     unused credit of the same amount. Pure function — no DB access.
@@ -63,7 +69,10 @@ def pair_transfers(
         best = None
         best_delta = None
         for credit in credits:
-            if credit.id in used_credit_ids or credit.amount != debit.amount:
+            if credit.id in used_credit_ids:
+                continue
+            diff = abs(credit.amount - debit.amount)
+            if diff > 0 and diff >= tolerance:
                 continue
             delta = abs(credit.occurred_at - debit.occurred_at)
             if delta > window:
@@ -135,7 +144,7 @@ async def match_debt_payments(
     The receipt (credit, category "debt_payment", linked to a debt) and the
     bank debit are the same money: the debit is re-tagged "debt_payment" so
     the card payment isn't counted as spending on top of the card purchases.
-    Exact amount, ±30 min. Returns pairs created.
+    Same amount give or take the cents, ±2 h. Returns pairs created.
     """
     since = since or datetime.now(timezone.utc) - LOOKBACK
 
@@ -170,7 +179,9 @@ async def match_debt_payments(
         )
     ).all()
 
-    pairs = pair_transfers(debits, receipts, window=DEBT_PAYMENT_WINDOW)
+    pairs = pair_transfers(
+        debits, receipts, window=DEBT_PAYMENT_WINDOW, tolerance=DEBT_PAYMENT_TOLERANCE
+    )
     for debit_id, receipt_id in pairs:
         pair_id = uuid.uuid4()
         await db.execute(
