@@ -5,7 +5,10 @@ import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   parseRef,
   plainName,
+  useObligationPayments,
   useRecordObligationPayment,
+  useUndoObligationPayment,
+  type ObligationPayment,
   type PositionLine,
 } from "../services/queries/cashPosition";
 import { colors } from "../theme/colors";
@@ -28,6 +31,8 @@ export default function PayObligationSheet({ line, onClose }: Props) {
   const sheet = useWebSheet(line !== null);
   const snapPoints = useMemo(() => ["70%"], []);
   const record = useRecordObligationPayment();
+  const undo = useUndoObligationPayment();
+  const recorded = useObligationPayments(line?.ref ?? null);
   const [amount, setAmount] = useState("");
   const [fromCash, setFromCash] = useState(false);
   const [daysAgo, setDaysAgo] = useState(0);
@@ -67,8 +72,30 @@ export default function PayObligationSheet({ line, onClose }: Props) {
     );
   }
 
+  function handleUndo(p: ObligationPayment) {
+    Alert.alert(
+      "Deshacer pago",
+      `Se borra el pago de ${formatCOP(p.amount)} del ${formatIsoDay(p.paid_on)}` +
+        (p.transaction_id ? " y el gasto en efectivo que generó." : "."),
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Deshacer",
+          style: "destructive",
+          onPress: () =>
+            undo.mutate(p.id, {
+              onError: (e) =>
+                Alert.alert("Error", e instanceof Error ? e.message : "No se pudo deshacer."),
+            }),
+        },
+      ],
+    );
+  }
+
   if (!sheet.mounted) return null;
   const paid = line ? Number(line.total) - Number(line.amount) : 0;
+  const done = line !== null && Number(line.amount) === 0;
+  const payments = recorded.data ?? [];
 
   return (
     <BottomSheet
@@ -82,60 +109,110 @@ export default function PayObligationSheet({ line, onClose }: Props) {
       {...sheet.props}
     >
       <BottomSheetView style={styles.body}>
-        <Text style={styles.title}>Pagar · {line ? plainName(line.name) : ""}</Text>
+        <Text style={styles.title}>
+          {done ? "Pagado" : "Pagar"} · {line ? plainName(line.name) : ""}
+        </Text>
         {line ? (
           <Text style={styles.hint}>
             {line.due ? `Vence el ${formatIsoDay(line.due)}. ` : ""}
-            {paid > 0
-              ? `Ya pagaste ${formatCOP(paid)} de ${formatCOP(line.total)}; faltan ${formatCOP(line.amount)}.`
-              : `Son ${formatCOP(line.total)}.`}{" "}
-            Si pagás una parte, lo que falte sigue apartado.
+            {done
+              ? `Ya pagaste los ${formatCOP(line.total)}.`
+              : paid > 0
+                ? `Ya pagaste ${formatCOP(paid)} de ${formatCOP(line.total)}; faltan ${formatCOP(line.amount)}.`
+                : `Son ${formatCOP(line.total)}.`}
+            {done ? "" : " Si pagás una parte, lo que falte sigue apartado."}
           </Text>
         ) : null}
 
-        <Text style={styles.label}>Cuánto pagaste (COP)</Text>
-        <BottomSheetTextInput
-          style={styles.input}
-          placeholder="0"
-          placeholderTextColor={colors.textSecondary}
-          value={amount}
-          onChangeText={(v) => setAmount(formatCOPInput(v))}
-          keyboardType="numeric"
-        />
+        {payments.length > 0 ? (
+          <>
+            <Text style={styles.label}>Pagos registrados</Text>
+            {payments.map((p) => (
+              <View key={p.id} style={styles.recordRow}>
+                <Text style={styles.recordText}>
+                  {formatCOP(p.amount)} · {formatIsoDay(p.paid_on)}
+                  {p.transaction_id ? " · efectivo" : ""}
+                </Text>
+                <Pressable
+                  onPress={() => handleUndo(p)}
+                  disabled={undo.isPending}
+                  style={({ pressed }) => [
+                    styles.undoBtn,
+                    (pressed || undo.isPending) && { opacity: 0.5 },
+                  ]}
+                >
+                  <Text style={styles.undoText}>Deshacer</Text>
+                </Pressable>
+              </View>
+            ))}
+          </>
+        ) : paid > 0 && !recorded.isLoading ? (
+          <Text style={styles.small}>
+            Lo marcaste como pagado desde el Plan del mes; desmarcalo ahí para deshacerlo.
+          </Text>
+        ) : null}
 
-        <Text style={styles.label}>¿Con qué?</Text>
-        <View style={styles.chips}>
-          {[
-            { cash: false, label: "Banco o Nequi" },
-            { cash: true, label: "Efectivo" },
-          ].map((o) => (
+        {done ? null : (
+          <>
+            <Text style={styles.label}>Cuánto pagaste (COP)</Text>
+            <BottomSheetTextInput
+              style={styles.input}
+              placeholder="0"
+              placeholderTextColor={colors.textSecondary}
+              value={amount}
+              onChangeText={(v) => setAmount(formatCOPInput(v))}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.label}>¿Con qué?</Text>
+            <View style={styles.chips}>
+              {[
+                { cash: false, label: "Banco o Nequi" },
+                { cash: true, label: "Efectivo" },
+              ].map((o) => (
+                <Pressable
+                  key={o.label}
+                  onPress={() => setFromCash(o.cash)}
+                  style={[
+                    styles.chip,
+                    fromCash === o.cash && styles.chipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      fromCash === o.cash && styles.chipTextActive,
+                    ]}
+                  >
+                    {o.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.small}>
+              {fromCash
+                ? "También lo resto de tu efectivo."
+                : "El movimiento del banco llega solo por email; acá solo lo marcás como pagado."}
+            </Text>
+
+            <Text style={styles.label}>¿Cuándo?</Text>
+            <ExpenseDayPicker
+              daysAgo={daysAgo}
+              onChange={setDaysAgo}
+              cashNotice={fromCash}
+            />
+
             <Pressable
-              key={o.label}
-              onPress={() => setFromCash(o.cash)}
-              style={[styles.chip, fromCash === o.cash && styles.chipActive]}
+              style={[styles.saveBtn, record.isPending && { opacity: 0.5 }]}
+              disabled={record.isPending}
+              onPress={handleSave}
             >
-              <Text style={[styles.chipText, fromCash === o.cash && styles.chipTextActive]}>
-                {o.label}
+              <Text style={styles.saveText}>
+                {record.isPending ? "Guardando..." : "Registrar pago"}
               </Text>
             </Pressable>
-          ))}
-        </View>
-        <Text style={styles.small}>
-          {fromCash
-            ? "También lo resto de tu efectivo."
-            : "El movimiento del banco llega solo por email; acá solo lo marcás como pagado."}
-        </Text>
-
-        <Text style={styles.label}>¿Cuándo?</Text>
-        <ExpenseDayPicker daysAgo={daysAgo} onChange={setDaysAgo} cashNotice={fromCash} />
-
-        <Pressable
-          style={[styles.saveBtn, record.isPending && { opacity: 0.5 }]}
-          disabled={record.isPending}
-          onPress={handleSave}
-        >
-          <Text style={styles.saveText}>{record.isPending ? "Guardando..." : "Registrar pago"}</Text>
-        </Pressable>
+          </>
+        )}
       </BottomSheetView>
     </BottomSheet>
   );
@@ -145,8 +222,18 @@ const styles = StyleSheet.create({
   bg: { backgroundColor: colors.surface },
   handle: { backgroundColor: colors.border },
   body: { padding: 16, paddingBottom: 32 },
-  title: { color: colors.textPrimary, fontSize: 16, fontWeight: "600", marginBottom: 6 },
-  hint: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: 14 },
+  title: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  hint: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 14,
+  },
   label: {
     color: colors.textSecondary,
     fontSize: 10,
@@ -185,4 +272,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   saveText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  recordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  recordText: { color: colors.textPrimary, fontSize: 13 },
+  undoBtn: {
+    borderWidth: 1,
+    borderColor: colors.danger,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  undoText: { color: colors.danger, fontSize: 12, fontWeight: "700" },
 });

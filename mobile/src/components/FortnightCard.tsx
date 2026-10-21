@@ -169,7 +169,8 @@ function WindowBlock({
 function LineRow({ line, onPay }: { line: PositionLine; onPay: (l: PositionLine) => void }) {
   const done = Number(line.amount) === 0;
   const paid = Number(line.total) - Number(line.amount);
-  const payable = !done && parseRef(line.ref) !== null;
+  // Paid lines open the sheet too, to undo a payment marked by mistake.
+  const payable = parseRef(line.ref) !== null;
   return (
     <View style={styles.line}>
       <Ionicons
@@ -200,9 +201,9 @@ function LineRow({ line, onPay }: { line: PositionLine; onPay: (l: PositionLine)
         <Pressable
           onPress={() => onPay(line)}
           style={({ pressed }) => [styles.payBtn, pressed && { opacity: 0.6 }]}
-          accessibilityLabel={`Pagar ${plainName(line.name)}`}
+          accessibilityLabel={`${done ? "Ver pago de" : "Pagar"} ${plainName(line.name)}`}
         >
-          <Text style={styles.payText}>Pagar</Text>
+          <Text style={styles.payText}>{done ? "Ver" : "Pagar"}</Text>
         </Pressable>
       ) : null}
     </View>

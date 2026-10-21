@@ -81,20 +81,71 @@ export type ObligationPaymentPayload = {
   from_cash: boolean;
 };
 
-export function useRecordObligationPayment() {
+export type ObligationPayment = {
+  id: string;
+  planned_payment_id: string | null;
+  debt_id: string | null;
+  due_date: string;
+  amount: string;
+  paid_on: string;
+  transaction_id: string | null;
+  created_at: string;
+};
+
+const obligationPaymentsQueryKey = ["obligation-payments"] as const;
+
+/** Payments recorded toward one due date (what the line's ref points at). */
+export function useObligationPayments(ref: string | null) {
+  const target = parseRef(ref);
+  return useQuery({
+    queryKey: [...obligationPaymentsQueryKey, ref],
+    enabled: target !== null,
+    queryFn: async () => {
+      const rows = (
+        await api.get<ObligationPayment[]>("/obligation-payments", {
+          params: { since: target!.due },
+        })
+      ).data;
+      return rows.filter(
+        (r) =>
+          r.due_date === target!.due &&
+          (target!.kind === "planned" ? r.planned_payment_id : r.debt_id) === target!.id,
+      );
+    },
+  });
+}
+
+function useInvalidateAfterPayment() {
   const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: cashPositionQueryKey });
+    qc.invalidateQueries({ queryKey: obligationPaymentsQueryKey });
+    // Paid in cash logs a cash expense: balances and lists move too.
+    qc.invalidateQueries({ queryKey: accountsQueryKey });
+    qc.invalidateQueries({ queryKey: ["transactions"] });
+    qc.invalidateQueries({ queryKey: budgetsQueryKey });
+    qc.invalidateQueries({ queryKey: dashboardQueryKey });
+  };
+}
+
+export function useRecordObligationPayment() {
+  const invalidate = useInvalidateAfterPayment();
   return useMutation({
     mutationFn: async (payload: ObligationPaymentPayload) => {
       await api.post("/obligation-payments", payload);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: cashPositionQueryKey });
-      // Paid in cash logs a cash expense: balances and lists move too.
-      qc.invalidateQueries({ queryKey: accountsQueryKey });
-      qc.invalidateQueries({ queryKey: ["transactions"] });
-      qc.invalidateQueries({ queryKey: budgetsQueryKey });
-      qc.invalidateQueries({ queryKey: dashboardQueryKey });
+    onSuccess: invalidate,
+  });
+}
+
+/** Undo a recorded payment; a cash one also takes its cash expense back. */
+export function useUndoObligationPayment() {
+  const invalidate = useInvalidateAfterPayment();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/obligation-payments/${id}`);
     },
+    onSuccess: invalidate,
   });
 }
 
