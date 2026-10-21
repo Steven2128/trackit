@@ -16,7 +16,9 @@ The direction comes from "Clase de Movimiento":
 
 - "Abono ..." (Pago de Nomina, de Proveedores, A Otros Bancos en Linea
   Transfiya) → credit. Davivienda is the user's payroll account, so these are
-  real income. merchant = Lugar de Transacción.
+  real income. merchant = Lugar de Transacción. "Abono Transferencia ACH"
+  (the bonus and the 20th payroll) comes with Lugar = "0000…": with no
+  place, the merchant is the class itself ("Transferencia ACH").
 - "Descuento Transferencia a una llave" → debit, category = "transfer".
   The user only sends to a Bre-B key to move money into their own Nequi and
   pay from there; the real spend is Nequi's "Enviaste" email. Flagged as a
@@ -31,8 +33,13 @@ Notices without "Valor Transacción" (e.g. "Cambio de Clave") return None.
 
 Format gotchas:
 - Amounts use US formatting like Itaú ("$1,186,548").
-- Bodies are Latin-1 while the HTML <meta> claims UTF-8; regexes use "."
-  for accented letters so they still match if the accent was mis-decoded.
+- Bodies were Latin-1 until September 2026 and are UTF-8 since October;
+  regexes use "." for accented letters so either decodes.
+- Davivienda itself breaks non-ASCII letters in some places: the email
+  carries one U+FFFD per lost letter ("PSE NEQUI S.A. COMPA<FFFD><FFFD>A D"
+  for COMPAÑÍA), so they can't be recovered from the bytes. Known words are
+  repaired; a single U+FFFD between letters becomes "Ñ" (upper-case company
+  names drop accents but keep the Ñ); any other U+FFFD is dropped.
 - Classes are padded with runs of spaces ("Compra       en Establecimiento,")
   and sometimes end in a comma.
 """
@@ -62,6 +69,10 @@ _DATETIME_RE = re.compile(
     re.IGNORECASE,
 )
 _AMOUNT_RE = re.compile(r"Valor\s+Transacci.n\s*:\s*\$\s*(?P<amount>[\d,]+(?:\.\d+)?)", re.IGNORECASE)
+_BROKEN = "�"  # what Davivienda leaves where a non-ASCII letter was
+_BROKEN_WORDS = ((re.compile(rf"COMPA{_BROKEN}{{1,2}}A", re.IGNORECASE), "COMPAÑÍA"),)
+_BROKEN_ENYE_RE = re.compile(rf"(?<=[A-Za-z]){_BROKEN}(?=[A-Za-z])")
+_NO_PLACE_RE = re.compile(r"^[\d\s.-]*$")
 _CLASS_RE = re.compile(
     r"Clase\s+de\s+Movimiento\s*:\s*(?P<cls>.+?),?\s+Lugar\s+de\s+Transacci.n\s*:"
     r"\s*(?P<place>.+?)\s+Atentamente",
@@ -88,8 +99,8 @@ class DaviviendaParser(EmailParser):
         if amount is None or occurred_at is None or movement is None:
             return None
 
-        movement_class = movement.group("cls").strip()
-        place = movement.group("place").strip()
+        movement_class = re.sub(r"\s+", " ", movement.group("cls")).strip(" ,.")
+        place = self._clean_place(movement.group("place"), movement_class)
         account = _ACCOUNT_RE.search(text)
         digits = account.group("digits")[-4:] if account else None
         lowered = movement_class.lower()
@@ -125,6 +136,19 @@ class DaviviendaParser(EmailParser):
             category="cash_withdrawal" if lowered.startswith("retiro") else None,
             **common,
         )
+
+    @staticmethod
+    def _clean_place(place: str, movement_class: str) -> str:
+        """Repair the letters Davivienda breaks (U+FFFD), and fall back to the
+        movement class when the place is only zeros (ACH credits)."""
+        for pattern, word in _BROKEN_WORDS:
+            place = pattern.sub(word, place)
+        place = _BROKEN_ENYE_RE.sub("Ñ", place).replace(_BROKEN, "").strip()
+        if _NO_PLACE_RE.match(place):
+            # "Abono Transferencia ACH" → "Transferencia ACH"
+            words = movement_class.split(" ", 1)
+            return words[1] if len(words) > 1 else movement_class
+        return place
 
     @staticmethod
     def _normalize_html(html_body: str) -> str:

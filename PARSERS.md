@@ -112,7 +112,7 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 - **Sender transaccional**: `BANCO_DAVIVIENDA@davivienda.com` (asunto siempre "DAVIVIENDA"). `ServicioNotificaciones@davivienda.com` manda avisos de registro/actualización de datos y `can_parse` lo rechaza.
 - **Estado**: Done (`tests/parsers/test_davivienda.py`)
 - **Parser**: `backend/app/parsers/davivienda.py`
-- **Fixtures**: `backend/tests/fixtures/davivienda/` (6 emails reales anonimizados, guardados en Latin-1 como llegan)
+- **Fixtures**: `backend/tests/fixtures/davivienda/` (8 emails reales anonimizados, guardados como llegan: Latin-1 los de septiembre, UTF-8 los de octubre)
 - **Rol**: desde 2026-09 es la cuenta de nómina y reemplaza a Itaú como cuenta principal. El parser de Itaú queda registrado para el histórico.
 
 ### Template único
@@ -121,7 +121,7 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 
 | Clase de Movimiento | Resultado |
 |---|---|
-| `Abono …` (Pago de Nomina, de Proveedores, A Otros Bancos en Linea Transfiya) | `credit`, merchant = Lugar |
+| `Abono …` (Pago de Nomina, de Proveedores, A Otros Bancos en Linea Transfiya, Transferencia ACH) | `credit`, merchant = Lugar (o la clase si el Lugar son solo ceros) |
 | `Descuento Transferencia a una llave` | `debit`, merchant = `Transferencia llave Davivienda`, `category="transfer"`, pairing candidate |
 | Cualquier otra con valor (Compra en Establecimiento, Descuento en Internet/PSE) | `debit`, merchant = Lugar |
 | Sin "Valor Transacción" (Cambio de Clave) | `None` |
@@ -130,7 +130,9 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 
 - **"Abono A Otros Bancos en Linea Transfiya" es una entrada**, no una salida (confirmado por el usuario: es nómina). Toda clase que empieza con "Abono" es un crédito.
 - **Transferencias a llave = puente a Nequi**: el usuario las usa para pasar plata a su Nequi y pagar desde ahí. Se marcan `transfer` de entrada (pareadas o no) y el gasto real lo registra el "Enviaste" de Nequi. Si alguna va a un tercero, hay que recategorizarla a mano desde la app.
-- **Charset**: el cuerpo viene en Latin-1 aunque el `<meta>` dice UTF-8. `app/integrations/gmail.py::_decode_part_body` respeta el charset del header y cae a cp1252 si UTF-8 falla. Además, los regex usan `.` en las letras acentuadas por si el acento llega roto.
+- **Charset**: hasta septiembre de 2026 el cuerpo venía en Latin-1 aunque el `<meta>` dijera UTF-8; desde octubre viene en UTF-8. `app/integrations/gmail.py::_decode_part_body` respeta el charset del header y cae a cp1252 si UTF-8 falla. Además, los regex usan `.` en las letras acentuadas por si el acento llega roto.
+- **Letras rotas por el propio banco**: en algunos lugares Davivienda manda U+FFFD en vez de la letra (`PSE NEQUI S.A. COMPA��A D`, uno por letra perdida), así que no se puede recuperar de los bytes. `_clean_place` arregla las palabras conocidas (`COMPAÑÍA`), convierte un U+FFFD suelto entre letras en `Ñ` (los nombres en mayúscula pierden tildes pero conservan la Ñ) y descarta el resto.
+- **"Abono Transferencia ACH" sin lugar**: la bonificación y la quincena del 20 llegan con Lugar = `0000000000000000000000000`. Si el lugar son solo ceros, el comercio es la clase sin "Abono": `Transferencia ACH`.
 - **Monto en formato gringo** (`$1,186,548`), igual que Itaú.
 - Las clases vienen con espacios de relleno ("Compra       en Establecimiento,") y a veces con coma final.
 

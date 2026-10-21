@@ -58,6 +58,17 @@ class TestDebits:
         # 2026/09/04 20:20:19 Bogotá → next day 01:20:19 UTC
         assert tx.occurred_at == datetime(2026, 9, 5, 1, 20, 19, tzinfo=timezone.utc)
 
+    def test_pse_with_broken_enye_from_the_bank(self, parser: DaviviendaParser) -> None:
+        """October emails are UTF-8, and Davivienda itself sends U+FFFD for
+        the Ñ and Í of "COMPAÑÍA"."""
+        tx = parser.parse(load_eml_fixture("davivienda/descuento_pse_utf8.eml"))
+
+        assert tx is not None
+        assert tx.amount == Decimal("402708")
+        assert tx.transaction_type == TransactionType.debit
+        assert tx.merchant == "PSE NEQUI S.A. COMPAÑÍA D"
+        assert "�" not in tx.merchant
+
     def test_transferencia_a_llave_is_self_transfer(self, parser: DaviviendaParser) -> None:
         """Key transfers go to the user's own Nequi; Nequi's Enviaste is the spend."""
         tx = parser.parse(load_eml_fixture("davivienda/transferencia_llave.eml"))
@@ -91,6 +102,19 @@ class TestCredits:
         assert tx.amount == Decimal("1186548")
         assert tx.transaction_type == TransactionType.credit
         assert tx.merchant == "ACH EN LINEA DAVIVIENDA"
+
+
+    def test_abono_ach_without_place_uses_the_class(self, parser: DaviviendaParser) -> None:
+        """Bonus and 20th payroll arrive as "Abono Transferencia ACH" with
+        Lugar = "0000000000000000000000000"."""
+        tx = parser.parse(load_eml_fixture("davivienda/abono_ach.eml"))
+
+        assert tx is not None
+        assert tx.amount == Decimal("1000000")
+        assert tx.transaction_type == TransactionType.credit
+        assert tx.merchant == "Transferencia ACH"
+        # 2026/10/20 13:28:29 Bogotá
+        assert tx.occurred_at == datetime(2026, 10, 20, 18, 28, 29, tzinfo=timezone.utc)
 
 
 class TestSkipped:
@@ -149,3 +173,14 @@ def test_nequi_credit_from_davivienda_is_pairing_candidate() -> None:
     assert tx is not None
     assert tx.category == "transfer"
     assert tx.is_pairing_candidate is True
+
+
+class TestCleanPlace:
+    def test_single_broken_letter_between_letters_is_an_enye(self) -> None:
+        assert DaviviendaParser._clean_place("PANADERIA MU�OZ", "Compra") == "PANADERIA MUÑOZ"
+
+    def test_broken_letter_at_the_end_is_dropped(self) -> None:
+        assert DaviviendaParser._clean_place("EXITO BOGOT�", "Compra") == "EXITO BOGOT"
+
+    def test_only_zeros_falls_back_to_the_class(self) -> None:
+        assert DaviviendaParser._clean_place("0000000000", "Abono Transferencia ACH") == "Transferencia ACH"
