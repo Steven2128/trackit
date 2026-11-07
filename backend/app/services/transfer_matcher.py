@@ -23,6 +23,7 @@ from typing import Protocol, Sequence
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.obligation_payment import ObligationPayment
 from app.models.transaction import Transaction, TransactionType
 from app.parsers.davivienda import LLAVE_MERCHANT
 
@@ -202,3 +203,104 @@ async def match_debt_payments(
             extra={"user_id": str(user_id), "pairs": len(pairs)},
         )
     return len(pairs)
+
+
+# --- PSE receipts ----------------------------------------------------------
+
+PSE_SOURCE = "pse"
+# Bank parsers whose debit emails cover a PSE payment.
+PSE_BANK_SOURCES = ("davivienda", "nequi", "itau_co")
+# The PSE receipt's time is its email arrival, seconds after the debit; the
+# bank email may arrive hours late but carries the real debit time.
+PSE_WINDOW = timedelta(hours=2)
+
+
+async def reconcile_pse(
+    db: AsyncSession, user_id: uuid.UUID, *, since: datetime | None = None
+) -> int:
+    """Fold PSE receipts into the bank debit that paid them.
+
+    A PSE receipt (``source="pse"``) and the bank's own debit email are the
+    same payment. When both exist (same amount give or take the cents, ±2 h)
+    the bank row stays — it has the real time and account — and the receipt
+    is deleted, after handing over what the bank row lacks: the biller's name
+    (Davivienda only says "PSE <gateway>"), the category and note the user
+    may have set while only the receipt existed, a card-payment pairing, and
+    any fortnight payment pointing at it. Receipts with no bank debit stay as
+    the payment itself. Returns receipts merged.
+    """
+    since = since or datetime.now(timezone.utc) - LOOKBACK
+
+    receipts = (
+        (
+            await db.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user_id,
+                    Transaction.source == PSE_SOURCE,
+                    Transaction.transaction_type == TransactionType.debit,
+                    Transaction.occurred_at >= since,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not receipts:
+        return 0
+    bank_debits = (
+        (
+            await db.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user_id,
+                    Transaction.source.in_(PSE_BANK_SOURCES),
+                    Transaction.transaction_type == TransactionType.debit,
+                    Transaction.occurred_at >= since - PSE_WINDOW,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    by_id = {t.id: t for t in (*receipts, *bank_debits)}
+    pairs = pair_transfers(
+        receipts, bank_debits, window=PSE_WINDOW, tolerance=DEBT_PAYMENT_TOLERANCE
+    )
+    for receipt_id, bank_id in pairs:
+        await _merge_pse_receipt(db, by_id[receipt_id], by_id[bank_id])
+
+    if pairs:
+        await db.commit()
+        log.info("pse_reconciler merged", extra={"user_id": str(user_id), "merged": len(pairs)})
+    return len(pairs)
+
+
+async def _merge_pse_receipt(db: AsyncSession, receipt: Transaction, bank: Transaction) -> None:
+    apply_pse_receipt(receipt, bank)
+    await db.execute(
+        update(ObligationPayment)
+        .where(ObligationPayment.transaction_id == receipt.id)
+        .values(transaction_id=bank.id)
+    )
+    await db.delete(receipt)
+
+
+def apply_pse_receipt(receipt: _Mergeable, bank: _Mergeable) -> None:
+    """Copy onto the bank debit what only the PSE receipt knows. Pure."""
+    if bank.merchant is None or bank.merchant.upper().startswith("PSE "):
+        bank.merchant = receipt.merchant
+    if receipt.transfer_pair_id is not None and bank.transfer_pair_id is None:
+        # The receipt was already paired with a card payment.
+        bank.transfer_pair_id = receipt.transfer_pair_id
+        bank.category = receipt.category
+    elif bank.category is None and receipt.category is not None:
+        bank.category = receipt.category
+    if bank.note is None:
+        bank.note = receipt.note
+
+
+class _Mergeable(Protocol):
+    merchant: str | None
+    category: str | None
+    note: str | None
+    transfer_pair_id: uuid.UUID | None

@@ -18,6 +18,7 @@ Cuando agregues un banco nuevo:
 | Itaú                   | CO   | Done       | `notificaciones@clienteitau.co`     | `app/parsers/itau_co.py`              |
 | Nequi                  | CO   | Done       | `notificaciones@nequi.com.co`, `somos@nequi.com.co` | `app/parsers/nequi.py` |
 | Davivienda             | CO   | Done       | `BANCO_DAVIVIENDA@davivienda.com`   | `app/parsers/davivienda.py`           |
+| PSE (ACH Colombia)     | CO   | Done       | `serviciopse@achcolombia.com.co`    | `app/parsers/pse.py`                  |
 | Daviplata              | CO   | Backlog    | Sin notificaciones por email (0 hits en 90 días) | `app/parsers/daviplata.py` (TBD) |
 | Banco Falabella        | CO   | Backlog    | Solo marketing observado (`contacto@co.bancofalabella.com`) | `app/parsers/falabella_co.py` (TBD) |
 
@@ -123,6 +124,7 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 |---|---|
 | `Abono …` (Pago de Nomina, de Proveedores, A Otros Bancos en Linea Transfiya, Transferencia ACH) | `credit`, merchant = Lugar (o la clase si el Lugar son solo ceros) |
 | `Descuento Transferencia a una llave` | `debit`, merchant = `Transferencia llave Davivienda`, `category="transfer"`, pairing candidate |
+| `Descuento Compra con llave` | `debit`, merchant = Lugar. Es pagarle a la llave Bre-B de un comercio (ej. un servicio): **gasto**, no transferencia |
 | Cualquier otra con valor (Compra en Establecimiento, Descuento en Internet/PSE) | `debit`, merchant = Lugar |
 | Sin "Valor Transacción" (Cambio de Clave) | `None` |
 
@@ -135,6 +137,19 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 - **"Abono Transferencia ACH" sin lugar**: la bonificación y la quincena del 20 llegan con Lugar = `0000000000000000000000000`. Si el lugar son solo ceros, el comercio es la clase sin "Abono": `Transferencia ACH`.
 - **Monto en formato gringo** (`$1,186,548`), igual que Itaú.
 - Las clases vienen con espacios de relleno ("Compra       en Establecimiento,") y a veces con coma final.
+
+---
+
+## PSE (ACH Colombia)
+
+- **Sender**: `serviciopse@achcolombia.com.co`. Asunto "PSE - Transacción Aprobada ✅ CUS …" o "Rechazada ❌".
+- **Parser**: `backend/app/parsers/pse.py` · **Tests**: `tests/parsers/test_pse.py` · **Fixtures**: `tests/fixtures/pse/` (anonimizados).
+- **Para qué**: es la copia de respaldo de un pago PSE. El banco que paga manda su propio email (el "Descuento en Internet" de Davivienda o el "Pago exitoso" de Nequi), pero a veces Davivienda no lo manda nunca o llega horas tarde. Caso real: Vanti 16.520 el 07-nov-2026, sin email de Davivienda.
+- **Template**: "Valor: $ 16.520,00 · Empresa: 101 FINTECH S.A.S. · Descripción: Vanti S.A. ESP Fra 63100161 · Fecha de la transacción: 07/11/2026 · CUS". Solo las **aprobadas** generan transacción (`debit`, `source="pse"`). Las rechazadas devuelven `None`.
+- **Comercio**: si la Empresa es una pasarela (GOU PAYMENTS, 101 FINTECH, …), se usa la Descripción sin números de factura. Si eso no deja nada útil ("PAGO 7568985"), queda la Empresa.
+- **Sin hora ni banco**: el cuerpo solo trae la fecha, así que `occurred_at` es la hora de llegada del email (llega segundos después del débito).
+- **Conciliación** (`transfer_matcher.reconcile_pse`, corre al final de cada sync, antes de los otros matchers): cada recibo PSE se busca contra los débitos de Davivienda, Nequi o Itaú con el mismo monto (diferencia menor a $1) y ±2 h. Si hay pareja, **queda la fila del banco** (tiene la hora y la cuenta reales), que hereda del recibo el nombre del comercio (si el del banco es genérico, "PSE …"), la categoría y la nota que el usuario haya puesto, el pareo con un pago de tarjeta y los pagos de quincena que apuntaban al recibo. Después **se borra el recibo**. Si no hay pareja, el recibo es el pago, y en el saldo cuenta como débito de **Davivienda** (`net_worth.BANK_SOURCES`), porque Nequi siempre manda su propio email.
+- **Límite conocido**: si el email de Davivienda tarda más de 7 días (el `LOOKBACK` del matcher), el pago queda duplicado y hay que borrar una de las filas a mano.
 
 ---
 

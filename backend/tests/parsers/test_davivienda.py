@@ -81,6 +81,18 @@ class TestDebits:
         assert tx.is_pairing_candidate is True
         assert tx.occurred_at == datetime(2026, 9, 6, 22, 44, 36, tzinfo=timezone.utc)
 
+    def test_compra_con_llave_is_a_purchase(self, parser: DaviviendaParser) -> None:
+        """Paying a merchant's Bre-B key is spending, not a self-transfer."""
+        tx = parser.parse(load_eml_fixture("davivienda/compra_con_llave.eml"))
+
+        assert tx is not None
+        assert tx.amount == Decimal("97850")
+        assert tx.transaction_type == TransactionType.debit
+        assert tx.merchant == "PAYAMENTOS COLOMBIAN S A"
+        assert tx.category is None
+        assert tx.is_pairing_candidate is False
+        assert tx.occurred_at == datetime(2026, 11, 7, 16, 48, 22, tzinfo=timezone.utc)
+
 
 class TestCredits:
     def test_abono_pago_de_nomina(self, parser: DaviviendaParser) -> None:

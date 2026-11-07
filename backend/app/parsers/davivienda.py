@@ -27,7 +27,9 @@ The direction comes from "Clase de Movimiento":
   to the user's cash account, it isn't spent yet. No real sample yet; the
   class name is assumed from Davivienda's naming.
 - Anything else with an amount (Compra en Establecimiento, Descuento en
-  Internet / PSE, ...) → debit, merchant = Lugar de Transacción.
+  Internet / PSE, "Descuento Compra con llave" — paying a merchant's Bre-B
+  key, e.g. a utility bill, which is real spending and not a transfer) →
+  debit, merchant = Lugar de Transacción.
 
 Notices without "Valor Transacción" (e.g. "Cambio de Clave") return None.
 
@@ -120,7 +122,7 @@ class DaviviendaParser(EmailParser):
                 **common,
             )
 
-        if "llave" in lowered:
+        if "transferencia" in lowered and "llave" in lowered:
             return ParsedTransaction(
                 transaction_type=TransactionType.debit,
                 merchant=LLAVE_MERCHANT,

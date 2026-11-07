@@ -1,0 +1,264 @@
+Delivered-To: user@example.test
+From: serviciopse@achcolombia.com.co
+To: user@example.test
+Message-ID: <aprobada_agregador@pse.test>
+Subject: =?utf-8?q?PSE_-_Transacci=C3=B3n_Aprobada_=E2=9C=85_CUS_900000001?=
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 8bit
+Date: Sat, 07 Nov 2026 16:54:10 +0000
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Bienvenido al sistema Protegido ACH.</title>
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+        <style>
+            @import url("https://fonts.googleapis.com/css2?family=Red Hat Display:wght@900&display=swap");
+            @import url("https://fonts.googleapis.com/css2?family=Red Hat Display:wght@800&display=swap");
+            @import url("https://fonts.googleapis.com/css2?family=Red Hat Display:wght@700&display=swap");
+            @import url("https://fonts.googleapis.com/css2?family=Red Hat Display:wght@500&display=swap");
+            @import url("https://fonts.googleapis.com/css2?family=Red Hat Display:wght@400&display=swap");
+            body {
+            margin: 0; font-family: Red Hat Display, sans-serif;
+            }
+            table {
+            border-spacing: 0 !important; border-collapse: collapse !important;
+            }
+            table, tr, td {
+            border: none; padding: 0; outline: none;
+            }
+            img {
+            border: none; padding: 0; margin: 0; outline: none; display: block;
+            }
+            a:link, a:visited, a:active {
+            text-decoration:none;
+            }
+        </style>
+    </head>
+    <body>
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="800">
+            <tbody>
+                <tr>
+                    <td>
+                        <img width="800px" src="https://ui.pse.com.co/ui/images/email/Header_tran.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;" />
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table>
+                            <tr>
+                                <td colspan="3" width="800px" height="40px"></td>
+                            </tr>
+                            <tr>
+                                <td width="40px" height="35px"></td>
+                                <td align="left" colspan="2">
+                                    <span style="font-family: Red Hat Display; font-weight: 900; font-size: 20px; line-height: 100%; letter-spacing: -1%; vertical-align: middle; color: #07487D;">¡Hola, Usuario Prueba!</span> 
+                                </td>
+                            </tr>
+                            <tr>
+                                <td></td>
+                                <td align="left" colspan="2"><img src="https://ui.pse.com.co/ui/images/email/estado_aprobada.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="2"><br/></td>
+                                <td width="310px" align="center" rowspan="10">
+                                    <img width="310px" src="https://ui.pse.com.co/ui/images/email/aprobada1-1_tran.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td height="38px" style="background: #07487D;"></td>
+                                <td align="left">
+                                    <div style="width:450px; height:38px; border: none; border-radius:0px 10px 10px 0px; background-color:#07487D; text-align: center; display: table;">
+                                        <div style="color: #FDB813; text-align: left; font-family: Red Hat Display; font-weight: 900; font-size: 19px; line-height: 18.89px; letter-spacing: 0%; display: table-cell; vertical-align: middle;" >&nbsp;Los siguientes son los datos de tu transacción:</div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="2"><br/></td>
+                            </tr>
+                            <tr>
+                                <td></td>
+                                <td align="left" height="30px">
+                                    <span style="color: #07487D; font-family: Red Hat Display; font-weight: 800; font-size: 17px; line-height: 100%; letter-spacing: 0%; vertical-align: middle;">Valor:</span>
+                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 700; font-size: 17px; line-height: 100%; letter-spacing: 0%;">$ 105.930,00</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td></td>
+                                <td align="left" height="30px">
+                                    <span style="color: #07487D; font-family: Red Hat Display; font-weight: 800; font-size: 17px; line-height: 100%; letter-spacing: 0%;">Empresa:</span>
+                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 400; font-size: 17px; line-height: 100%; letter-spacing: 0%;">GOU PAYMENTS S.A EASPBV</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td></td>
+                                <td align="left" height="30px">
+                                    <span style="color: #07487D; font-family: Red Hat Display; font-weight: 800; font-size: 17px; line-height: 100%; letter-spacing: 0%;">Descripción:</span>
+                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 400; font-size: 17px; line-height: 100%; letter-spacing: 0%;">PAGO 1234567</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td></td>
+                                <td align="left" height="30px">
+                                    <span style="color: #07487D; font-family: Red Hat Display; font-weight: 800; font-size: 17px; line-height: 100%; letter-spacing: 0%;">Fecha de la transacción:</span>
+                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 400; font-size: 17px; line-height: 100%; letter-spacing: 0%;">07/11/2026</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td></td>
+                                <td align="left" height="30px">
+                                    <span style="color: #07487D; font-family: Red Hat Display; font-weight: 800; font-size: 17px; line-height: 100%; letter-spacing: 0%;">CUS:</span>
+                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 400; font-size: 17px; line-height: 100%; letter-spacing: 0%;">900000001</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td height="30px"></td>
+                                <td align="left">
+                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 500; font-size: 16px; line-height: 100%; letter-spacing: 0%; vertical-align: middle;">Gracias por utilizar nuestro servicio.</span> 
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="2"><br/></td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table width="100%">
+                            <tr width="100%">
+                                <td width="40px"></td>
+                                <td width="760px" height="241px" >
+                                    <div style="width:760px; height:241px; border: none; border-radius:5px 5px 5px 5px; background-color:#EAEAEA; ">
+                                        <table width="100%">
+                                            <tr width="100%">
+                                                <td width="100%" colspan="3">
+                                                    <div style="width:760px; height:38px; border: none; border-radius: 5px  5px  5px  5px; background-color:#CDDAE5; text-align: center; display: table;">
+                                                        <div style="color: #07487D; text-align: left; font-family: Red Hat Display; font-weight: 800; font-size: 18px; line-height: 20px; letter-spacing: 0%; display: table-cell; vertical-align: middle;" >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ten encuenta estos tips de seguridad:</div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr width="100%" height="40px">
+                                                <td width="27px"></td>
+                                                <td width="40px">
+                                                    <img src="https://ui.pse.com.co/ui/images/email/tips1.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;" />
+                                                </td>
+                                                <td>
+                                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; vertical-align: middle;">Usa dispositivos personales o de confianza para realizar tus pagos.</span> 
+                                                </td>
+                                            </tr>
+                                            <tr width="100%" height="40px">
+                                                <td></td>
+                                                <td>
+                                                    <img src="https://ui.pse.com.co/ui/images/email/tips2.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;" />
+                                                </td>
+                                                <td>
+                                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; vertical-align: middle;">No abras enlaces sospechosos.</span> 
+                                                </td>
+                                            </tr>
+                                            <tr width="100%" height="40px">
+                                                <td></td>
+                                                <td>
+                                                    <img src="https://ui.pse.com.co/ui/images/email/tips3.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;" />
+                                                </td>
+                                                <td>
+                                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; vertical-align: middle;">Cambia tus contraseñas con regularidad.</span> 
+                                                </td>
+                                            </tr>
+                                            <tr width="100%" height="40px">
+                                                <td></td>
+                                                <td>
+                                                    <img src="https://ui.pse.com.co/ui/images/email/tips4.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;" />
+                                                </td>
+                                                <td>
+                                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; vertical-align: middle;">Digita manualmente la URL del portal de tu entidad financiera.</span> 
+                                                </td>
+                                            </tr>
+                                            <tr width="100%" height="40px">
+                                                <td></td>
+                                                <td>
+                                                    <img src="https://ui.pse.com.co/ui/images/email/tips5.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;" />
+                                                </td>
+                                                <td>
+                                                    <span style="color: #454545; font-family: Red Hat Display; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; vertical-align: middle;">Recuerda que PSE nunca te contactará para solicitarte información personal.</span> 
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td><br/></td>
+                </tr>
+                <tr width="800px" height="384px" background="https://ui.pse.com.co/ui/images/email/Footer.png">
+                    <td>
+                        <table width="800px" height="110px">
+                            <tr>
+                                <td colspan="2" height="110px"></td>
+                            </tr>
+                            <tr>
+                                <td width="350px"></td>
+                                <td><a href="https://www.pse.com.co/persona-centro-de-ayuda" style="text-decoration:none;" target="_blank">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td>
+                            </tr>
+                        </table>
+                        <table width="800px" height="254px">
+                            <tr>
+                                <td colspan="3" height="120px"></td>
+                            </tr>
+                            <tr>
+                                <td width="405px"></td>
+                                <td width="195px"><a href="https://www.linkedin.com/company/transacciones-ach/" style="text-decoration:none;" target="_blank">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td>
+                                <td><a href="https://twitter.com/ACHColombia_" style="text-decoration:none;" target="_blank">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" height="20px"></td>
+                            </tr>
+                            <tr>
+                                <td></td>
+                                <td><a href="https://www.facebook.com/ACHColombiaOficial" style="text-decoration:none;" target="_blank">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td>
+                                <td><a href="https://www.youtube.com/channel/UCmc_nqNv0MjYxizCScRTSVQ" style="text-decoration:none;" target="_blank">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" height="65px"></td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table width="759px" align="center" border="0" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td colspan="2" height="15px"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" width="759px" height="66px">
+                                    <img width="759px" height="66px" src="https://ui.pse.com.co/ui/images/email/Disclaimer_01.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td width="310px" height="16px"> 
+                                    <a href="https://www.pse.com.co/web/guest/persona-centro-de-ayuda" style="text-decoration:none;" target="_blank"> 
+                                    <img width="310px" height="16px" src="https://ui.pse.com.co/ui/images/email/Disclaimer_02-1.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;"/>
+                                    </a>
+                                </td>
+                                <td width="449px" height="16px"> 
+                                    <img width="449px" height="16px" src="https://ui.pse.com.co/ui/images/email/Disclaimer_02-2.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" width="759px" height="43px"> 
+                                    <img width="759px" height="43px" src="https://ui.pse.com.co/ui/images/email/Disclaimer_03.png" style="border: none; padding: 0; margin: 0; outline: none; display: block;"/>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </body>
+</html>

@@ -10,7 +10,7 @@ Computing instead of incrementing a stored balance means a re-synced or
 re-categorized email can never be applied twice. Which account a movement
 touches comes from ``Transaction.source`` (the parser that read it):
 
-- davivienda / nequi: every credit adds, every debit subtracts — transfers
+- davivienda (+ unmatched PSE receipts) / nequi: every credit adds, every debit subtracts — transfers
   and card payments included, since that money did leave/enter the account.
   A Davivienda → Nequi transfer subtracts on one side and adds on the other,
   so net worth doesn't move.
@@ -40,9 +40,12 @@ from app.models.debt import Debt
 from app.models.transaction import Transaction, TransactionType
 
 # Transaction.source values whose movements belong to each bank account.
-BANK_SOURCES: dict[AccountKind, str] = {
-    AccountKind.davivienda: "davivienda",
-    AccountKind.nequi: "nequi",
+# "pse" is a PSE receipt whose bank debit email never arrived; the user pays
+# PSE from Davivienda (Nequi always sends its own email, which absorbs the
+# receipt — see transfer_matcher.reconcile_pse).
+BANK_SOURCES: dict[AccountKind, tuple[str, ...]] = {
+    AccountKind.davivienda: ("davivienda", "pse"),
+    AccountKind.nequi: ("nequi",),
 }
 CASH_SOURCE = "cash"
 _WITHDRAWAL_SOURCES = ("davivienda", "nequi", "itau_co")
@@ -61,7 +64,7 @@ def account_delta(kind: AccountKind, m: Movement) -> Decimal:
     """Signed effect of one movement on an account of ``kind`` (0 if none)."""
     signed = m.amount if m.transaction_type == TransactionType.credit else -m.amount
     if kind in BANK_SOURCES:
-        return signed if m.source == BANK_SOURCES[kind] else Decimal("0")
+        return signed if m.source in BANK_SOURCES[kind] else Decimal("0")
     # Cash: withdrawals land here; typed-in cash movements move it directly.
     if m.source == CASH_SOURCE:
         return signed

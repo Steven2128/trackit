@@ -8,6 +8,8 @@ from types import SimpleNamespace
 from app.services.transfer_matcher import (
     DEBT_PAYMENT_TOLERANCE,
     DEBT_PAYMENT_WINDOW,
+    PSE_WINDOW,
+    apply_pse_receipt,
     pair_transfers,
 )
 
@@ -117,3 +119,51 @@ class TestDebtPaymentPairing:
 
     def test_beyond_two_hours_does_not_pair(self) -> None:
         assert self._pair(_tx("150000", 0), _tx("150000", 121)) == []
+
+
+class TestApplyPseReceipt:
+    """What the bank debit inherits from the PSE receipt it absorbs."""
+
+    @staticmethod
+    def _row(merchant, category=None, note=None, pair=None) -> SimpleNamespace:
+        return SimpleNamespace(
+            merchant=merchant, category=category, note=note, transfer_pair_id=pair
+        )
+
+    def test_generic_pse_merchant_takes_the_biller(self) -> None:
+        bank = self._row("PSE 101 FINTECH S.A.S.")
+        apply_pse_receipt(self._row("Vanti S.A. ESP", "utilities", "gas oct"), bank)
+
+        assert (bank.merchant, bank.category, bank.note) == (
+            "Vanti S.A. ESP",
+            "utilities",
+            "gas oct",
+        )
+
+    def test_bank_data_wins_when_present(self) -> None:
+        bank = self._row("COMCEL PAGO DE FACTURA", "utilities", "mine")
+        apply_pse_receipt(self._row("Claro", "phone", "theirs"), bank)
+
+        assert (bank.merchant, bank.category, bank.note) == (
+            "COMCEL PAGO DE FACTURA",
+            "utilities",
+            "mine",
+        )
+
+    def test_card_payment_pairing_moves_to_the_bank_debit(self) -> None:
+        pair = uuid.uuid4()
+        bank = self._row("PSE Banco de Bogota")
+        apply_pse_receipt(self._row("Banco de Bogota", "debt_payment", pair=pair), bank)
+
+        assert (bank.category, bank.transfer_pair_id) == ("debt_payment", pair)
+
+
+def test_pse_receipt_pairs_with_late_bank_debit_in_whole_pesos() -> None:
+    """Receipt timestamped at email arrival; bank debit minutes earlier."""
+    receipt = _tx("16520", 0)
+    bank = _tx("16520", -40)
+    other = _tx("16520", -200)
+
+    assert pair_transfers(
+        [receipt], [other, bank], window=PSE_WINDOW, tolerance=DEBT_PAYMENT_TOLERANCE
+    ) == [(receipt.id, bank.id)]

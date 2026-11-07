@@ -46,7 +46,11 @@ from app.models.transaction import Transaction, TransactionType
 from app.parsers import REGISTERED_PARSERS
 from app.parsers.cards import CARD_FORMATS, CardEvent, CardEventKind
 from app.services.categorizer import UserRule, categorize
-from app.services.transfer_matcher import match_debt_payments, match_transfers
+from app.services.transfer_matcher import (
+    match_debt_payments,
+    match_transfers,
+    reconcile_pse,
+)
 from app.parsers.base import EmailEnvelope, EmailParser, ParsedTransaction
 
 log = logging.getLogger(__name__)
@@ -127,6 +131,8 @@ async def sync_provider_connection(
     await db.commit()
 
     try:
+        # PSE first: the merged bank debit can then pair with a card receipt.
+        await reconcile_pse(db, connection.user_id)
         await match_transfers(db, connection.user_id)
         await match_debt_payments(db, connection.user_id)
     except Exception:  # noqa: BLE001 — pairing is best-effort, never fail the sync

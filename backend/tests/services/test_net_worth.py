@@ -41,6 +41,9 @@ class TestAccountDelta:
             (AccountKind.davivienda, _m("davivienda", D, "190000", "transfer"), "-190000"),
             (AccountKind.davivienda, _m("davivienda", D, "384000", "debt_payment"), "-384000"),
             (AccountKind.nequi, _m("nequi", C, "190000", "transfer"), "190000"),
+            # A PSE receipt with no bank email was paid from Davivienda.
+            (AccountKind.davivienda, _m("pse", D, "16520"), "-16520"),
+            (AccountKind.nequi, _m("pse", D, "16520"), "0"),
             # Other sources don't touch them.
             (AccountKind.davivienda, _m("nequi", D, "50000"), "0"),
             (AccountKind.nequi, _m("card", D, "29400"), "0"),
