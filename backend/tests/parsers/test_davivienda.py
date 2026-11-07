@@ -69,15 +69,15 @@ class TestDebits:
         assert tx.merchant == "PSE NEQUI S.A. COMPAÑÍA D"
         assert "�" not in tx.merchant
 
-    def test_transferencia_a_llave_is_self_transfer(self, parser: DaviviendaParser) -> None:
-        """Key transfers go to the user's own Nequi; Nequi's Enviaste is the spend."""
+    def test_transferencia_a_llave_is_spending_until_paired(self, parser: DaviviendaParser) -> None:
+        """A Bre-B payment may go to a third party; only a Nequi pair makes it a transfer."""
         tx = parser.parse(load_eml_fixture("davivienda/transferencia_llave.eml"))
 
         assert tx is not None
         assert tx.amount == Decimal("190000")
         assert tx.transaction_type == TransactionType.debit
         assert tx.merchant == LLAVE_MERCHANT
-        assert tx.category == "transfer"
+        assert tx.category is None
         assert tx.is_pairing_candidate is True
         assert tx.occurred_at == datetime(2026, 9, 6, 22, 44, 36, tzinfo=timezone.utc)
 

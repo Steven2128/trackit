@@ -19,10 +19,12 @@ The direction comes from "Clase de Movimiento":
   real income. merchant = Lugar de Transacción. "Abono Transferencia ACH"
   (the bonus and the 20th payroll) comes with Lugar = "0000…": with no
   place, the merchant is the class itself ("Transferencia ACH").
-- "Descuento Transferencia a una llave" → debit, category = "transfer".
-  The user only sends to a Bre-B key to move money into their own Nequi and
-  pay from there; the real spend is Nequi's "Enviaste" email. Flagged as a
-  pairing candidate so the matcher links it to Nequi's "Recibiste".
+- "Descuento Transferencia a una llave" → debit, no category: a Bre-B
+  payment. It may be the user moving money to their own Nequi or paying a
+  third party, and the email doesn't say which. Flagged as a pairing
+  candidate: when the matcher finds Nequi's "Recibiste" for the same amount
+  it becomes "transfer"; otherwise it stays as spending for the user to
+  name.
 - "Retiro ..." (ATM) → debit, category = "cash_withdrawal" — the money moves
   to the user's cash account, it isn't spent yet. No real sample yet; the
   class name is assumed from Davivienda's naming.
@@ -126,8 +128,8 @@ class DaviviendaParser(EmailParser):
             return ParsedTransaction(
                 transaction_type=TransactionType.debit,
                 merchant=LLAVE_MERCHANT,
-                # Self-transfer to the user's Nequi, never spending on its own.
-                category="transfer",
+                # Spending until the matcher pairs it with a Nequi credit
+                # (then it was a self-transfer and becomes "transfer").
                 is_pairing_candidate=True,
                 **common,
             )

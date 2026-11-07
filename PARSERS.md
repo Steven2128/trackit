@@ -123,7 +123,7 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 | Clase de Movimiento | Resultado |
 |---|---|
 | `Abono …` (Pago de Nomina, de Proveedores, A Otros Bancos en Linea Transfiya, Transferencia ACH) | `credit`, merchant = Lugar (o la clase si el Lugar son solo ceros) |
-| `Descuento Transferencia a una llave` | `debit`, merchant = `Transferencia llave Davivienda`, `category="transfer"`, pairing candidate |
+| `Descuento Transferencia a una llave` | `debit`, merchant = `Transferencia llave Davivienda`, sin categoría (cuenta como gasto), pairing candidate. Pasa a `transfer` solo si se parea con un "Recibiste" de Nequi |
 | `Descuento Compra con llave` | `debit`, merchant = Lugar. Es pagarle a la llave Bre-B de un comercio (ej. un servicio): **gasto**, no transferencia |
 | Cualquier otra con valor (Compra en Establecimiento, Descuento en Internet/PSE) | `debit`, merchant = Lugar |
 | Sin "Valor Transacción" (Cambio de Clave) | `None` |
@@ -131,7 +131,7 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 ### Gotchas
 
 - **"Abono A Otros Bancos en Linea Transfiya" es una entrada**, no una salida (confirmado por el usuario: es nómina). Toda clase que empieza con "Abono" es un crédito.
-- **Transferencias a llave = puente a Nequi**: el usuario las usa para pasar plata a su Nequi y pagar desde ahí. Se marcan `transfer` de entrada (pareadas o no) y el gasto real lo registra el "Enviaste" de Nequi. Si alguna va a un tercero, hay que recategorizarla a mano desde la app.
+- **Transferencias a llave**: pueden ser un puente a Nequi (el usuario pasa plata a su Nequi y paga desde ahí; el gasto real lo registra el "Enviaste" de Nequi) o un pago Bre-B a un tercero. El email no dice cuál. Desde 2026-11-07 entran **sin categoría, como gasto**, y el matcher las pasa a `transfer` cuando encuentra el "Recibiste" de Nequi por el mismo monto (±10 min). Antes entraban como `transfer` siempre, y los pagos a terceros quedaban fuera del gasto. Las que no se parean las nombra y categoriza el usuario desde la app.
 - **Charset**: hasta septiembre de 2026 el cuerpo venía en Latin-1 aunque el `<meta>` dijera UTF-8; desde octubre viene en UTF-8. `app/integrations/gmail.py::_decode_part_body` respeta el charset del header y cae a cp1252 si UTF-8 falla. Además, los regex usan `.` en las letras acentuadas por si el acento llega roto.
 - **Letras rotas por el propio banco**: en algunos lugares Davivienda manda U+FFFD en vez de la letra (`PSE NEQUI S.A. COMPA��A D`, uno por letra perdida), así que no se puede recuperar de los bytes. `_clean_place` arregla las palabras conocidas (`COMPAÑÍA`), convierte un U+FFFD suelto entre letras en `Ñ` (los nombres en mayúscula pierden tildes pero conservan la Ñ) y descarta el resto.
 - **"Abono Transferencia ACH" sin lugar**: la bonificación y la quincena del 20 llegan con Lugar = `0000000000000000000000000`. Si el lugar son solo ceros, el comercio es la clase sin "Abono": `Transferencia ACH`.
