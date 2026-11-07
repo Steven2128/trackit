@@ -19,6 +19,7 @@ Cuando agregues un banco nuevo:
 | Nequi                  | CO   | Done       | `notificaciones@nequi.com.co`, `somos@nequi.com.co` | `app/parsers/nequi.py` |
 | Davivienda             | CO   | Done       | `BANCO_DAVIVIENDA@davivienda.com`   | `app/parsers/davivienda.py`           |
 | PSE (ACH Colombia)     | CO   | Done       | `serviciopse@achcolombia.com.co`    | `app/parsers/pse.py`                  |
+| Uber (recibos de viaje)| CO   | Done       | `noreply@uber.com`                  | `app/parsers/uber.py`                 |
 | Daviplata              | CO   | Backlog    | Sin notificaciones por email (0 hits en 90 días) | `app/parsers/daviplata.py` (TBD) |
 | Banco Falabella        | CO   | Backlog    | Solo marketing observado (`contacto@co.bancofalabella.com`) | `app/parsers/falabella_co.py` (TBD) |
 
@@ -148,8 +149,23 @@ Leyenda: `Backlog` (planeado) · `WIP` (en desarrollo) · `Done` (tests pasan, i
 - **Template**: "Valor: $ 16.520,00 · Empresa: 101 FINTECH S.A.S. · Descripción: Vanti S.A. ESP Fra 63100161 · Fecha de la transacción: 07/11/2026 · CUS". Solo las **aprobadas** generan transacción (`debit`, `source="pse"`). Las rechazadas devuelven `None`.
 - **Comercio**: si la Empresa es una pasarela (GOU PAYMENTS, 101 FINTECH, …), se usa la Descripción sin números de factura. Si eso no deja nada útil ("PAGO 7568985"), queda la Empresa.
 - **Sin hora ni banco**: el cuerpo solo trae la fecha, así que `occurred_at` es la hora de llegada del email (llega segundos después del débito).
-- **Conciliación** (`transfer_matcher.reconcile_pse`, corre al final de cada sync, antes de los otros matchers): cada recibo PSE se busca contra los débitos de Davivienda, Nequi o Itaú con el mismo monto (diferencia menor a $1) y ±2 h. Si hay pareja, **queda la fila del banco** (tiene la hora y la cuenta reales), que hereda del recibo el nombre del comercio (si el del banco es genérico, "PSE …"), la categoría y la nota que el usuario haya puesto, el pareo con un pago de tarjeta y los pagos de quincena que apuntaban al recibo. Después **se borra el recibo**. Si no hay pareja, el recibo es el pago, y en el saldo cuenta como débito de **Davivienda** (`net_worth.BANK_SOURCES`), porque Nequi siempre manda su propio email.
+- **Conciliación** (`transfer_matcher.reconcile_receipts`, corre al final de cada sync, antes de los otros matchers): cada recibo PSE se busca contra los débitos de Davivienda, Nequi o Itaú con el mismo monto (diferencia menor a $1) y ±2 h. Si hay pareja, **queda la fila del banco** (tiene la hora y la cuenta reales), que hereda del recibo el nombre del comercio (si el del banco es genérico, "PSE …"), la categoría y la nota que el usuario haya puesto, el pareo con un pago de tarjeta y los pagos de quincena que apuntaban al recibo. Después **se borra el recibo**. Si no hay pareja, el recibo es el pago, y en el saldo cuenta como débito de **Davivienda** (`net_worth.BANK_SOURCES`), porque Nequi siempre manda su propio email.
 - **Límite conocido**: si el email de Davivienda tarda más de 7 días (el `LOOKBACK` del matcher), el pago queda duplicado y hay que borrar una de las filas a mano.
+
+---
+
+## Uber (recibos de viaje)
+
+- **Sender**: `noreply@uber.com` ("Recibos de Uber" / "Uber Receipts"). Asuntos "Tu viaje del jueves por la noche con Uber", "Your Friday afternoon trip with Uber". Solo se leen los de **viaje/trip**.
+- **Parser**: `backend/app/parsers/uber.py` · **Tests**: `tests/parsers/test_uber.py` · **Fixtures**: `tests/fixtures/uber/`. Están **recortados**: solo el bloque Total/Pagos y el tipo de viaje, sin direcciones ni conductor.
+- **Monto**: "Total COP 4,969", en formato gringo, igual en español y en inglés.
+- **Medio de pago** (línea "Pagos" / "Payments"). Define de qué cuenta sale el viaje (`ParsedTransaction.source`):
+  - `Cash` / `Efectivo` → `source="cash"`: gasto de Efectivo, como uno tipeado. Si es anterior al último conteo, `keep_cash_reconciled` lo absorbe en el ajuste, igual que un gasto manual.
+  - Tarjeta "(Davivienda)" → `source="uber"`: Davivienda no siempre manda email de estos cobros chicos. Cuenta en el saldo de Davivienda (`net_worth.BANK_SOURCES`) y `reconcile_receipts` lo une al débito del banco si ese email llega.
+  - Otra tarjeta → `None`, porque el email de esa tarjeta ya registra el cobro.
+- **Comercio**: "Uber <producto>" ("Uber Moto", "UberYa"). El categorizador lo manda a `transport`.
+- **Hora**: la de llegada del email (llega al pagar el viaje). La fecha del cuerpo es día/mes en español y mes/día en inglés, por eso no se usa.
+- **Ojo**: si el usuario también tipea el viaje a mano como gasto en efectivo, queda duplicado.
 
 ---
 

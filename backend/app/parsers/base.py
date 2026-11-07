@@ -48,6 +48,9 @@ class ParsedTransaction:
     card_last_digits: str | None = None
     raw_email_reference: str | None = None
     is_pairing_candidate: bool = False
+    # Account the money came out of, when it isn't the parser's own (an Uber
+    # trip paid in cash → "cash"). None = the parser name.
+    source: str | None = None
 
 
 class EmailParser(ABC):

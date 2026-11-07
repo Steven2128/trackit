@@ -205,23 +205,26 @@ async def match_debt_payments(
     return len(pairs)
 
 
-# --- PSE receipts ----------------------------------------------------------
+# --- Payment receipts (PSE, Uber) -------------------------------------------
 
+# Receipts from the payee's side that may duplicate a bank debit email: a
+# PSE receipt, an Uber trip paid with the Davivienda card.
+RECEIPT_SOURCES = ("pse", "uber")
 PSE_SOURCE = "pse"
-# Bank parsers whose debit emails cover a PSE payment.
+# Bank parsers whose debit emails cover such a payment.
 PSE_BANK_SOURCES = ("davivienda", "nequi", "itau_co")
-# The PSE receipt's time is its email arrival, seconds after the debit; the
+# The receipt's time is its email arrival, seconds after the debit; the
 # bank email may arrive hours late but carries the real debit time.
 PSE_WINDOW = timedelta(hours=2)
 
 
-async def reconcile_pse(
+async def reconcile_receipts(
     db: AsyncSession, user_id: uuid.UUID, *, since: datetime | None = None
 ) -> int:
-    """Fold PSE receipts into the bank debit that paid them.
+    """Fold payment receipts into the bank debit that paid them.
 
-    A PSE receipt (``source="pse"``) and the bank's own debit email are the
-    same payment. When both exist (same amount give or take the cents, ±2 h)
+    A receipt (``source`` in RECEIPT_SOURCES: a PSE receipt, an Uber trip
+    paid by card) and the bank's own debit email are the same payment. When both exist (same amount give or take the cents, ±2 h)
     the bank row stays — it has the real time and account — and the receipt
     is deleted, after handing over what the bank row lacks: the biller's name
     (Davivienda only says "PSE <gateway>"), the category and note the user
@@ -236,7 +239,7 @@ async def reconcile_pse(
             await db.execute(
                 select(Transaction).where(
                     Transaction.user_id == user_id,
-                    Transaction.source == PSE_SOURCE,
+                    Transaction.source.in_(RECEIPT_SOURCES),
                     Transaction.transaction_type == TransactionType.debit,
                     Transaction.occurred_at >= since,
                 )

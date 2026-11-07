@@ -72,7 +72,10 @@ async def get_dashboard(current_user: CurrentUser, db: DbSession) -> DashboardRe
 
 async def _fetch_trend(db: AsyncSession, user_id: UUID, trend_start: datetime) -> list:
     tz_str = settings.user_timezone
-    local_ts = func.timezone(tz_str, func.timezone("UTC", Transaction.occurred_at))
+    # timestamptz → local wall time. (Wrapping it in timezone("UTC", …) first
+    # turned it back into UTC, so late-evening movements on the last day of
+    # a month landed in the next one.)
+    local_ts = func.timezone(tz_str, Transaction.occurred_at)
     month_col = func.date_trunc("month", local_ts).label("month")
 
     result = await db.execute(
@@ -96,7 +99,10 @@ async def _fetch_trend(db: AsyncSession, user_id: UUID, trend_start: datetime) -
 
 async def _fetch_received(db: AsyncSession, user_id: UUID, trend_start: datetime) -> list:
     tz_str = settings.user_timezone
-    local_ts = func.timezone(tz_str, func.timezone("UTC", Transaction.occurred_at))
+    # timestamptz → local wall time. (Wrapping it in timezone("UTC", …) first
+    # turned it back into UTC, so late-evening movements on the last day of
+    # a month landed in the next one.)
+    local_ts = func.timezone(tz_str, Transaction.occurred_at)
     month_col = func.date_trunc("month", local_ts).label("month")
 
     result = await db.execute(

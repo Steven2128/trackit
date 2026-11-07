@@ -40,11 +40,12 @@ from app.models.debt import Debt
 from app.models.transaction import Transaction, TransactionType
 
 # Transaction.source values whose movements belong to each bank account.
-# "pse" is a PSE receipt whose bank debit email never arrived; the user pays
-# PSE from Davivienda (Nequi always sends its own email, which absorbs the
-# receipt — see transfer_matcher.reconcile_pse).
+# "pse" / "uber" are payee receipts (a PSE payment, an Uber trip paid with
+# the Davivienda card) whose bank debit email never arrived; the user pays
+# them from Davivienda (Nequi always sends its own email, which absorbs the
+# receipt — see transfer_matcher.reconcile_receipts).
 BANK_SOURCES: dict[AccountKind, tuple[str, ...]] = {
-    AccountKind.davivienda: ("davivienda", "pse"),
+    AccountKind.davivienda: ("davivienda", "pse", "uber"),
     AccountKind.nequi: ("nequi",),
 }
 CASH_SOURCE = "cash"

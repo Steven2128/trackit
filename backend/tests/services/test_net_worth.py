@@ -44,6 +44,8 @@ class TestAccountDelta:
             # A PSE receipt with no bank email was paid from Davivienda.
             (AccountKind.davivienda, _m("pse", D, "16520"), "-16520"),
             (AccountKind.nequi, _m("pse", D, "16520"), "0"),
+            # Uber trip paid with the Davivienda card, no bank email.
+            (AccountKind.davivienda, _m("uber", D, "4969"), "-4969"),
             # Other sources don't touch them.
             (AccountKind.davivienda, _m("nequi", D, "50000"), "0"),
             (AccountKind.nequi, _m("card", D, "29400"), "0"),

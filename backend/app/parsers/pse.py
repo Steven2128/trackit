@@ -16,7 +16,7 @@ Why parse it at all: the paying bank sends its own debit email (Davivienda's
 "Descuento en Internet", Nequi's "Pago exitoso"), but sometimes that email
 never arrives or arrives hours late. The PSE receipt is a backup copy of the
 same payment. Every approved receipt is stored as a debit with
-``source="pse"``, and ``transfer_matcher.reconcile_pse`` merges it into the
+``source="pse"``, and ``transfer_matcher.reconcile_receipts`` merges it into the
 bank debit when that one shows up, so the payment is counted once.
 
 - Only approved receipts become a transaction; rejected or pending → None.

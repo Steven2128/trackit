@@ -46,10 +46,11 @@ from app.models.transaction import Transaction, TransactionType
 from app.parsers import REGISTERED_PARSERS
 from app.parsers.cards import CARD_FORMATS, CardEvent, CardEventKind
 from app.services.categorizer import UserRule, categorize
+from app.services.net_worth import CASH_SOURCE, keep_cash_reconciled
 from app.services.transfer_matcher import (
     match_debt_payments,
     match_transfers,
-    reconcile_pse,
+    reconcile_receipts,
 )
 from app.parsers.base import EmailEnvelope, EmailParser, ParsedTransaction
 
@@ -131,8 +132,8 @@ async def sync_provider_connection(
     await db.commit()
 
     try:
-        # PSE first: the merged bank debit can then pair with a card receipt.
-        await reconcile_pse(db, connection.user_id)
+        # Receipts first: the merged bank debit can then pair with a card receipt.
+        await reconcile_receipts(db, connection.user_id)
         await match_transfers(db, connection.user_id)
         await match_debt_payments(db, connection.user_id)
     except Exception:  # noqa: BLE001 — pairing is best-effort, never fail the sync
@@ -214,17 +215,23 @@ async def _process_message(
 
     # Savepoint per insert: a concurrent sync (manual + cron overlap) can win
     # the race after our dedupe SELECT; the unique index is the source of truth.
+    source = parsed.source or parser.name
     try:
         async with db.begin_nested():
-            db.add(
-                _to_transaction(
-                    parsed,
-                    connection,
-                    fallback_message_id=message_id,
-                    source=parser.name,
-                    user_rules=user_rules,
-                )
+            tx = _to_transaction(
+                parsed,
+                connection,
+                fallback_message_id=message_id,
+                source=source,
+                user_rules=user_rules,
             )
+            db.add(tx)
+            if source == CASH_SOURCE:
+                # A cash expense dated before the last cash count is already
+                # inside it — same rule as the ones the user types in.
+                await keep_cash_reconciled(
+                    db, connection.user_id, None, (tx.amount, tx.occurred_at)
+                )
             await db.flush()
     except IntegrityError:
         result.skipped_duplicate += 1
