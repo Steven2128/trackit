@@ -13,6 +13,8 @@ class IncomeSourceBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=128)
     amount: Decimal = Field(..., gt=0, le=MAX_NUMERIC_14_2)
     expected_day: int = Field(..., ge=1, le=31)
+    # Can arrive early, from this day of the previous month.
+    early_from_day: int | None = Field(default=None, ge=1, le=31)
 
 
 class IncomeSourceCreate(IncomeSourceBase):
@@ -23,6 +25,7 @@ class IncomeSourceUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128)
     amount: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_14_2)
     expected_day: int | None = Field(default=None, ge=1, le=31)
+    early_from_day: int | None = Field(default=None, ge=1, le=31)
 
 
 class IncomeSourceOut(IncomeSourceBase):

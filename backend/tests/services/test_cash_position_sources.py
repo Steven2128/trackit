@@ -325,3 +325,29 @@ def test_water_skips_its_off_month_and_utilities_are_estimates() -> None:
     assert {"Luz (7/12)", "Luz (7/1)"} <= set(by_name)
     assert by_name["Luz (7/12)"].status == AmountStatus.estimated
     assert by_name["Arriendo (24/11)"].status == AmountStatus.confirmed
+
+
+# --- income paid early ---
+
+EARLY_BONUS = SimpleNamespace(
+    name="Bonificación", amount=Decimal("1050905"), expected_day=8, early_from_day=21
+)
+
+
+def test_bonus_paid_on_the_30th_counts_for_next_month() -> None:
+    """The real case: November's bonus landed on 30-Oct."""
+    credits = [Credit(date(2026, 10, 30), Decimal("1050905"))]
+    out = expected_incomes([EARLY_BONUS], credits, date(2026, 11, 7), date(2026, 12, 5))
+    assert out == []
+
+
+def test_without_early_window_the_30th_is_too_soon() -> None:
+    credits = [Credit(date(2026, 10, 30), Decimal("1050905"))]
+    out = expected_incomes([BONUS], credits, date(2026, 11, 7), date(2026, 12, 5))
+    assert [i.name for i in out] == ["Bonificación (6/11)"]
+
+
+def test_early_window_starts_on_its_day() -> None:
+    credits = [Credit(date(2026, 10, 20), Decimal("1050905"))]  # the day before the 21st
+    out = expected_incomes([EARLY_BONUS], credits, date(2026, 11, 7), date(2026, 12, 5))
+    assert [i.name for i in out] == ["Bonificación (6/11)"]

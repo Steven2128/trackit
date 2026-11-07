@@ -52,6 +52,7 @@ class IncomeSourceLike(Protocol):
     name: str
     amount: Decimal
     expected_day: int
+    # Optional: may arrive from this day of the previous month.
 
 
 class PlannedPaymentLike(Protocol):
@@ -134,6 +135,18 @@ def _months(start: date, end: date) -> list[tuple[int, int]]:
     return out
 
 
+def _earliest_arrival(on: date, src: object) -> date:
+    """First day a deposit can count as this expected one: a few days
+    before, or from ``early_from_day`` of the previous month for income
+    that's sometimes paid early (the bonus after the 20th)."""
+    default = on - timedelta(days=RECEIVED_DAYS_BEFORE)
+    early = getattr(src, "early_from_day", None)
+    if not early:
+        return default
+    y, m = (on.year - 1, 12) if on.month == 1 else (on.year, on.month - 1)
+    return min(default, date(y, m, min(early, calendar.monthrange(y, m)[1])))
+
+
 def expected_incomes(
     sources: Sequence[IncomeSourceLike],
     credits: Sequence[Credit],
@@ -154,12 +167,9 @@ def expected_incomes(
 
     pairs = []
     for ei, (on, src) in enumerate(expected):
+        earliest = _earliest_arrival(on, src)
         for ci, c in enumerate(credits):
-            near = (
-                on - timedelta(days=RECEIVED_DAYS_BEFORE)
-                <= c.on
-                <= on + timedelta(days=RECEIVED_DAYS_AFTER)
-            )
+            near = earliest <= c.on <= on + timedelta(days=RECEIVED_DAYS_AFTER)
             gap = abs(c.amount - src.amount) / src.amount
             if near and gap <= 1 - RECEIVED_MIN_SHARE:
                 pairs.append((gap, abs((c.on - on).days), ei, ci))

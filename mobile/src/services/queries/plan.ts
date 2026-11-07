@@ -7,6 +7,7 @@ export type IncomeSourceOut = {
   name: string;
   amount: string;
   expected_day: number;
+  early_from_day: number | null; // may arrive from this day of the previous month
   created_at: string;
 };
 
@@ -14,6 +15,7 @@ export type IncomeSourcePayload = {
   name: string;
   amount: string;
   expected_day: number;
+  early_from_day?: number | null;
 };
 
 export type PlannedPaymentOut = {

@@ -29,6 +29,10 @@ class IncomeSource(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     expected_day: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-31
+    # Can be paid early, from this day of the previous month (the bonus is
+    # due in the first 5 business days but sometimes lands after the 20th).
+    # NULL = only a few days before expected_day.
+    early_from_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

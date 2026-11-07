@@ -47,6 +47,8 @@ type FormState = {
   varies: boolean; // amount is an estimate
   shared: boolean;
   sharedPct: string;
+  early: boolean; // income that can arrive the previous month
+  earlyDay: string;
 };
 
 const EVERY_OPTIONS = [1, 2, 3];
@@ -66,6 +68,8 @@ const EMPTY_EXTRA = {
   varies: false,
   shared: false,
   sharedPct: "50",
+  early: false,
+  earlyDay: "21",
 };
 
 function fromEditing(editing: PlanItemEditing | null): FormState {
@@ -91,10 +95,13 @@ function fromEditing(editing: PlanItemEditing | null): FormState {
       oneOff: false,
       date: "",
       ...EMPTY_EXTRA,
+      early: i.early_from_day !== null,
+      earlyDay: String(i.early_from_day ?? 21),
     };
   }
   const p = editing.item;
   return {
+    ...EMPTY_EXTRA,
     name: p.name,
     amount: toCOPInput(p.amount),
     day: p.due_day !== null ? String(p.due_day) : "",
@@ -184,6 +191,13 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
       Alert.alert("Falta el día", "Indicá el día del mes en que te cae este ingreso.");
       return null;
     }
+    if (isIncome && form.early) {
+      const early = Number(form.earlyDay);
+      if (!Number.isInteger(early) || early < 1 || early > 31) {
+        Alert.alert("Día inválido", "El día del mes anterior debe estar entre 1 y 31.");
+        return null;
+      }
+    }
     if (form.shared) {
       const pct = Number(form.sharedPct);
       if (!Number.isInteger(pct) || pct < 1 || pct > 100) {
@@ -212,6 +226,7 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
         name: values.name,
         amount: values.amount.toString(),
         expected_day: values.day as number,
+        early_from_day: form.early ? Number(form.earlyDay) : null,
       };
       if (editing.item) {
         updateIncome.mutate({ id: editing.item.id, payload }, { onSuccess: onClose, onError });
@@ -321,6 +336,33 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
               thumbColor={form.oneOff ? colors.primary : colors.textSecondary}
             />
           </View>
+        ) : null}
+
+        {isIncome ? (
+          <>
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>A veces lo pagan antes, el mes anterior</Text>
+              <Switch
+                value={form.early}
+                onValueChange={(v) => setForm((f) => ({ ...f, early: v }))}
+                trackColor={{ false: colors.surfaceMuted, true: colors.primaryDim }}
+                thumbColor={form.early ? colors.primary : colors.textSecondary}
+              />
+            </View>
+            {form.early ? (
+              <Field label="Puede llegar desde el día (del mes anterior)">
+                <BottomSheetTextInput
+                  style={styles.input}
+                  placeholder="21"
+                  placeholderTextColor={colors.textSecondary}
+                  value={form.earlyDay}
+                  onChangeText={(v) => setForm((f) => ({ ...f, earlyDay: v.replace(/\D/g, "") }))}
+                  keyboardType="numeric"
+                  maxLength={2}
+                />
+              </Field>
+            ) : null}
+          </>
         ) : null}
 
         {!isIncome && form.oneOff ? (
