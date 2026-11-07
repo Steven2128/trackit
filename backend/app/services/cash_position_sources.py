@@ -7,8 +7,10 @@ Pure: the route (``GET /cashflow/position``) loads rows and passes them in.
 - expected income: each ``income_sources`` row on its day of each month,
   weekend paydays on the Friday before, skipped once a matching deposit
   shows up in the movements;
-- obligations: each ``planned_payments`` row — monthly on ``due_day``, or
-  once on ``due_date`` (money owed to a friend) — and each debt's next due
+- obligations: each ``planned_payments`` row — on ``due_day`` every month
+  or every ``every_months`` (water: every 2, counted from ``first_month``),
+  or once on ``due_date`` (money owed to a friend); bills whose amount
+  varies count as estimates — and each debt's next due
   date for the larger of its minimum and what the user plans to pay.
   What's already paid toward a due date = ``obligation_payments`` for it
   (partial or ahead); the old monthly check-off still counts as paid in
@@ -175,6 +177,24 @@ def expected_incomes(
     ]
 
 
+def is_due_month(p: object, year: int, month: int) -> bool:
+    """Whether a recurring planned payment is due in this month: every
+    month by default, or every N months counted from its first month (the
+    water bill comes every two). Rows without the columns (older fakes) are
+    monthly."""
+    every = getattr(p, "every_months", 1) or 1
+    if every == 1:
+        return True
+    anchor = getattr(p, "first_month", None)
+    if anchor is None:
+        created = getattr(p, "created_at", None)
+        if created is None:
+            return True
+        anchor = f"{created:%Y-%m}"
+    ay, am = (int(x) for x in anchor.split("-"))
+    return ((year * 12 + month) - (ay * 12 + am)) % every == 0
+
+
 def planned_obligations(
     payments: Sequence[PlannedPaymentLike],
     today: date,
@@ -201,6 +221,8 @@ def planned_obligations(
             out.append(Obligation(p.name, None, p.amount, paid=paid, ref=f"planned:{p.id}:"))
             continue
         for y, m in _months(today, horizon_end):
+            if not is_due_month(p, y, m):
+                continue
             due = date(y, m, min(p.due_day, calendar.monthrange(y, m)[1]))
             if due > horizon_end:
                 continue
@@ -214,6 +236,12 @@ def planned_obligations(
                     f"{p.name} ({due.day}/{due.month})",
                     due,
                     p.amount,
+                    # A bill that changes every time: the amount is a guess.
+                    status=(
+                        AmountStatus.estimated
+                        if getattr(p, "amount_varies", False)
+                        else AmountStatus.confirmed
+                    ),
                     paid=paid,
                     ref=f"planned:{p.id}:{due}",
                 )

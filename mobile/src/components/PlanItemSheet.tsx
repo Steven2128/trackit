@@ -1,4 +1,4 @@
-import BottomSheet, { BottomSheetTextInput, BottomSheetView } from "./sheet";
+import BottomSheet, { BottomSheetScrollView, BottomSheetTextInput } from "./sheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Keyboard,
@@ -22,7 +22,7 @@ import {
 import { colors } from "../theme/colors";
 import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
-import { dmyToIso, isoToDmy } from "../utils/dates";
+import { currentMonthYYYYMM, dmyToIso, isoToDmy, shiftMonth } from "../utils/dates";
 import { useWebSheet } from "./useWebSheet";
 
 export type PlanItemEditing =
@@ -42,11 +42,44 @@ type FormState = {
   isDebt: boolean;
   oneOff: boolean; // due once on `date` (a debt with a friend)
   date: string; // DD/MM/AAAA
+  every: number; // months between bills (water: 2)
+  comesThisMonth: boolean; // for every > 1: whether this month has one
+  varies: boolean; // amount is an estimate
+  shared: boolean;
+  sharedPct: string;
+};
+
+const EVERY_OPTIONS = [1, 2, 3];
+
+/** Same rule as the backend's is_due_month. */
+function dueThisMonth(every: number, firstMonth: string | null): boolean {
+  if (every <= 1 || !firstMonth) return true;
+  const [fy, fm] = firstMonth.split("-").map(Number);
+  const [y, m] = currentMonthYYYYMM().split("-").map(Number);
+  const diff = y * 12 + m - (fy * 12 + fm);
+  return ((diff % every) + every) % every === 0;
+}
+
+const EMPTY_EXTRA = {
+  every: 1,
+  comesThisMonth: true,
+  varies: false,
+  shared: false,
+  sharedPct: "50",
 };
 
 function fromEditing(editing: PlanItemEditing | null): FormState {
   if (!editing?.item)
-    return { name: "", amount: "", day: "", grace: "0", isDebt: false, oneOff: false, date: "" };
+    return {
+      name: "",
+      amount: "",
+      day: "",
+      grace: "0",
+      isDebt: false,
+      oneOff: false,
+      date: "",
+      ...EMPTY_EXTRA,
+    };
   if (editing.kind === "income") {
     const i = editing.item;
     return {
@@ -57,6 +90,7 @@ function fromEditing(editing: PlanItemEditing | null): FormState {
       isDebt: false,
       oneOff: false,
       date: "",
+      ...EMPTY_EXTRA,
     };
   }
   const p = editing.item;
@@ -68,6 +102,11 @@ function fromEditing(editing: PlanItemEditing | null): FormState {
     isDebt: p.is_debt_payment,
     oneOff: p.due_date !== null,
     date: p.due_date ? isoToDmy(p.due_date) : "",
+    every: p.every_months,
+    comesThisMonth: dueThisMonth(p.every_months, p.first_month),
+    varies: p.amount_varies,
+    shared: p.shared_pct !== null,
+    sharedPct: String(p.shared_pct ?? 50),
   };
 }
 
@@ -145,6 +184,13 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
       Alert.alert("Falta el día", "Indicá el día del mes en que te cae este ingreso.");
       return null;
     }
+    if (form.shared) {
+      const pct = Number(form.sharedPct);
+      if (!Number.isInteger(pct) || pct < 1 || pct > 100) {
+        Alert.alert("Porcentaje inválido", "Lo que pone la otra persona va de 1 a 100%.");
+        return null;
+      }
+    }
     const grace = form.grace.trim() === "" ? 0 : Number(form.grace);
     if (!Number.isInteger(grace) || grace < 0 || grace > 60) {
       Alert.alert("Plazo inválido", "Los días de plazo deben estar entre 0 y 60.");
@@ -180,6 +226,15 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
         grace_days: values.grace,
         is_debt_payment: form.isDebt,
         due_date: values.date,
+        every_months: form.oneOff ? 1 : form.every,
+        first_month:
+          !form.oneOff && form.every > 1
+            ? form.comesThisMonth
+              ? currentMonthYYYYMM()
+              : shiftMonth(currentMonthYYYYMM(), 1)
+            : null,
+        amount_varies: form.varies,
+        shared_pct: form.shared ? Number(form.sharedPct) : null,
       };
       if (editing.item) {
         updatePayment.mutate({ id: editing.item.id, payload }, { onSuccess: onClose, onError });
@@ -223,7 +278,7 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
       handleIndicatorStyle={styles.handle}
       {...sheet.props}
     >
-      <BottomSheetView style={styles.body}>
+      <BottomSheetScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>
           {isIncome
             ? isEdit
@@ -305,6 +360,71 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
                 keyboardType="numeric"
               />
             </Field>
+            <Field label="Se repite cada">
+              <View style={styles.chips}>
+                {EVERY_OPTIONS.map((n) => (
+                  <Pressable
+                    key={n}
+                    onPress={() => setForm((f) => ({ ...f, every: n }))}
+                    style={[styles.chip, form.every === n && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, form.every === n && styles.chipTextActive]}>
+                      {n === 1 ? "1 mes" : `${n} meses`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </Field>
+            {form.every > 1 ? (
+              <Field label="¿Viene este mes?">
+                <View style={styles.chips}>
+                  {[true, false].map((v) => (
+                    <Pressable
+                      key={String(v)}
+                      onPress={() => setForm((f) => ({ ...f, comesThisMonth: v }))}
+                      style={[styles.chip, form.comesThisMonth === v && styles.chipActive]}
+                    >
+                      <Text
+                        style={[styles.chipText, form.comesThisMonth === v && styles.chipTextActive]}
+                      >
+                        {v ? "Sí, este mes" : "No, el que viene"}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </Field>
+            ) : null}
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>El monto cambia cada vez (es un estimado)</Text>
+              <Switch
+                value={form.varies}
+                onValueChange={(v) => setForm((f) => ({ ...f, varies: v }))}
+                trackColor={{ false: colors.surfaceMuted, true: colors.primaryDim }}
+                thumbColor={form.varies ? colors.primary : colors.textSecondary}
+              />
+            </View>
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Lo comparto (me devuelven una parte)</Text>
+              <Switch
+                value={form.shared}
+                onValueChange={(v) => setForm((f) => ({ ...f, shared: v }))}
+                trackColor={{ false: colors.surfaceMuted, true: colors.primaryDim }}
+                thumbColor={form.shared ? colors.primary : colors.textSecondary}
+              />
+            </View>
+            {form.shared ? (
+              <Field label="% que pone la otra persona">
+                <BottomSheetTextInput
+                  style={styles.input}
+                  placeholder="50"
+                  placeholderTextColor={colors.textSecondary}
+                  value={form.sharedPct}
+                  onChangeText={(v) => setForm((f) => ({ ...f, sharedPct: v.replace(/\D/g, "") }))}
+                  keyboardType="numeric"
+                  maxLength={3}
+                />
+              </Field>
+            ) : null}
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>Es pago de deuda (va primero)</Text>
               <Switch
@@ -334,7 +454,7 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
             <Text style={styles.deleteText}>Eliminar</Text>
           </Pressable>
         ) : null}
-      </BottomSheetView>
+      </BottomSheetScrollView>
     </BottomSheet>
   );
 }
@@ -377,6 +497,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   switchLabel: { color: colors.textPrimary, fontSize: 14, flex: 1 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  chipActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+  chipText: { color: colors.textSecondary, fontSize: 13 },
+  chipTextActive: { color: colors.primary, fontWeight: "600" },
   saveBtn: {
     backgroundColor: colors.primary,
     padding: 14,

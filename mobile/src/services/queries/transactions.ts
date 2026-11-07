@@ -60,6 +60,22 @@ export function useTransactions(filters: TransactionFilters) {
   });
 }
 
+export type SharedSummary = {
+  covered_for_others: string; // others' parts of shared expenses, all time
+  reimbursed: string; // what came back as "reimbursement" credits
+  pending: string; // still owed to the user
+  items: TransactionOut[]; // latest shared debits and reimbursements
+};
+
+/** Running tab of shared expenses (GET /transactions/shared). Lives under
+ * the "transactions" key, so every movement edit refreshes it. */
+export function useSharedSummary() {
+  return useQuery({
+    queryKey: ["transactions", "shared"],
+    queryFn: async () => (await api.get<SharedSummary>("/transactions/shared")).data,
+  });
+}
+
 export type TransactionPatch = {
   id: string;
   category?: string | null;

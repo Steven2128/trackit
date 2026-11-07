@@ -19,8 +19,10 @@ from app.services.cash_position_sources import (
     debt_obligations,
     default_horizon,
     expected_incomes,
+    is_due_month,
     planned_obligations,
 )
+from app.services.cash_position import AmountStatus
 
 Q5 = SimpleNamespace(name="Quincena 5", amount=Decimal("1136548"), expected_day=5)
 BONUS = SimpleNamespace(name="Bonificación", amount=Decimal("1050905"), expected_day=8)
@@ -271,3 +273,55 @@ def test_users_fortnight_end_to_end() -> None:
     assert pos.windows[1].balance_after == Decimal("193839.17")
     assert pos.free == Decimal("193839.17")
     assert pos.status is PositionStatus.provisional  # incomes are estimates
+
+
+# --- bills every N months, variable amounts ---
+
+
+@pytest.mark.parametrize(
+    ("first_month", "year", "month", "due"),
+    [
+        ("2026-11", 2026, 11, True),
+        ("2026-11", 2026, 12, False),
+        ("2026-11", 2027, 1, True),
+        ("2026-11", 2027, 2, False),
+        ("2026-12", 2026, 10, True),  # parity holds backwards too
+        ("2026-12", 2026, 11, False),
+    ],
+)
+def test_every_two_months(first_month, year, month, due) -> None:
+    p = SimpleNamespace(every_months=2, first_month=first_month)
+    assert is_due_month(p, year, month) is due
+
+
+def test_monthly_and_old_rows_are_always_due() -> None:
+    assert is_due_month(SimpleNamespace(every_months=1, first_month=None), 2026, 12)
+    assert is_due_month(SimpleNamespace(), 2026, 12)
+
+
+def test_anchor_defaults_to_the_creation_month() -> None:
+    from datetime import datetime, timezone
+
+    p = SimpleNamespace(
+        every_months=2, first_month=None, created_at=datetime(2026, 11, 7, tzinfo=timezone.utc)
+    )
+    assert is_due_month(p, 2027, 1) and not is_due_month(p, 2026, 12)
+
+
+def test_water_skips_its_off_month_and_utilities_are_estimates() -> None:
+    water = _pp("Agua", "105930", 7)
+    water.every_months, water.first_month, water.amount_varies = 2, "2026-11", True
+    power = _pp("Luz", "97850", 7)
+    power.every_months, power.first_month, power.amount_varies = 1, None, True
+    rent = _pp("Arriendo", "850000", 24)
+
+    out = planned_obligations(
+        [water, power, rent], today=date(2026, 11, 20), horizon_end=date(2027, 1, 20)
+    )
+    by_name = {o.name: o for o in out}
+
+    assert "Agua (7/12)" not in by_name
+    assert "Agua (7/1)" in by_name
+    assert {"Luz (7/12)", "Luz (7/1)"} <= set(by_name)
+    assert by_name["Luz (7/12)"].status == AmountStatus.estimated
+    assert by_name["Arriendo (24/11)"].status == AmountStatus.confirmed

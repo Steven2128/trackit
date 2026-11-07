@@ -26,6 +26,7 @@ from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
 from app.schemas.account import CashExpenseIn
 from app.schemas.transaction import (
     CategorySummaryItem,
+    SharedSummary,
     TransactionListResponse,
     TransactionOut,
     TransactionSummary,
@@ -88,6 +89,48 @@ async def list_transactions(
     items = [TransactionOut.model_validate(t) for t in rows_result.scalars().all()]
 
     return TransactionListResponse(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/shared", response_model=SharedSummary)
+async def shared_summary(current_user: CurrentUser, db: DbSession) -> SharedSummary:
+    """What others owe for shared expenses: the sum of their parts minus
+    what came back as reimbursements. All time — it's a running balance,
+    like a tab with the brother."""
+    covered = await _sum_shared(
+        db, [Transaction.user_id == current_user.id, Transaction.shared_amount.is_not(None)]
+    )
+    reimbursed = await _sum_amount(
+        db,
+        [
+            Transaction.user_id == current_user.id,
+            Transaction.transaction_type == TransactionType.credit,
+            Transaction.category == "reimbursement",
+        ],
+    )
+    rows = await db.execute(
+        select(Transaction)
+        .where(
+            Transaction.user_id == current_user.id,
+            Transaction.shared_amount.is_not(None) | (Transaction.category == "reimbursement"),
+        )
+        .order_by(Transaction.occurred_at.desc())
+        .limit(30)
+    )
+    return SharedSummary(
+        covered_for_others=covered,
+        reimbursed=reimbursed,
+        pending=max(covered - reimbursed, Decimal("0")),
+        items=[TransactionOut.model_validate(t) for t in rows.scalars().all()],
+    )
+
+
+async def _sum_shared(db, filters: list[ColumnElement]) -> Decimal:
+    value = (
+        await db.execute(
+            select(func.coalesce(func.sum(Transaction.shared_amount), 0)).where(*filters)
+        )
+    ).scalar_one()
+    return Decimal(value) if not isinstance(value, Decimal) else value
 
 
 @router.post("/cash", response_model=TransactionOut, status_code=status.HTTP_201_CREATED)

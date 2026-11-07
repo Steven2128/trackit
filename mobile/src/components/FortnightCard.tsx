@@ -191,6 +191,16 @@ function LineRow({ line, onPay }: { line: PositionLine; onPay: (l: PositionLine)
               {" "}· pagaste <MoneyText value={paid} size="sm" style={styles.lineMetaMoney} />
             </>
           ) : null}
+          {line.shared_pct ? (
+            <>
+              {" "}· te devuelven{" "}
+              <MoneyText
+                value={Math.round((Number(line.total) * line.shared_pct) / 100)}
+                size="sm"
+                style={styles.lineMetaMoney}
+              />
+            </>
+          ) : null}
         </Text>
       </View>
       <MoneyText

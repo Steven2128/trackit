@@ -89,7 +89,7 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [ ] Reporte mensual exportable en PDF
 - [ ] Modo finanzas en pareja (gastos compartidos)
   - [x] Entrega 1 (2026-11-07): `transactions.shared_amount` (la parte que pone otra persona; el gasto cuenta solo `amount - shared_amount`, la cuenta baja por el total) + categoría `reimbursement` (la devolución no cuenta como Recibido). Se edita desde "Editar movimiento" → "Lo comparto".
-  - [ ] Entrega 2: servicios compartidos en "Tu quincena" (agua bimestral, luz y gas mensuales, vencen el 7, montos variables → estimados) + "tu hermano te debe X".
+  - [x] Entrega 2 (2026-11-07): pagos fijos cada N meses (`every_months` + `first_month`; agua cada 2), monto variable → estimado (`amount_varies`), parte compartida (`shared_pct`, "te devuelven X" en Tu quincena) + tarjeta "Compartido" en Inicio (`GET /transactions/shared`: te deben = partes de otros − reembolsos).
 
 ## Principios de ingeniería
 

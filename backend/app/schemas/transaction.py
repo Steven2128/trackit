@@ -60,6 +60,17 @@ class TransactionUpdate(BaseModel):
     _occurred_at = field_validator("occurred_at")(check_expense_date)
 
 
+class SharedSummary(BaseModel):
+    """Running balance of shared expenses: what others' parts added up to,
+    what they paid back (reimbursement credits) and what's still owed."""
+
+    covered_for_others: Decimal
+    reimbursed: Decimal
+    pending: Decimal
+    # Latest shared debits and reimbursement credits, newest first.
+    items: list[TransactionOut]
+
+
 class TransactionListResponse(BaseModel):
     items: list[TransactionOut]
     total: int

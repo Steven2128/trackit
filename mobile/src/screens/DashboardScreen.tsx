@@ -24,6 +24,7 @@ import GoalsSummary from "../components/GoalsSummary";
 import HealthScoreCard from "../components/HealthScoreCard";
 import MoneyText from "../components/MoneyText";
 import RecentMovements from "../components/RecentMovements";
+import SharedExpensesCard from "../components/SharedExpensesCard";
 import type { AppStackParamList, AppTabParamList } from "../navigation/AppStack";
 import { useBudgetStatus, type BudgetAlertStatus } from "../services/queries/budgets";
 import { useDashboard, type DashboardResponse } from "../services/queries/dashboard";
@@ -297,6 +298,7 @@ function DashboardContent({
           <View style={styles.columns}>
             <View style={styles.column}>
               <FortnightCard />
+              <SharedExpensesCard />
               {trend}
               {health}
             </View>
@@ -311,6 +313,7 @@ function DashboardContent({
       ) : (
         <>
           <FortnightCard />
+          <SharedExpensesCard />
           {kpis}
           {unusualBanner}
           {planLink}

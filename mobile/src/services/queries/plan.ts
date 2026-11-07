@@ -25,6 +25,10 @@ export type PlannedPaymentOut = {
   is_debt_payment: boolean;
   paid_month: string | null;
   due_date: string | null; // one-off: YYYY-MM-DD
+  every_months: number; // 2 = every other month (water)
+  first_month: string | null; // YYYY-MM the every-N count starts from
+  amount_varies: boolean; // amount is an estimate (utilities)
+  shared_pct: number | null; // share someone else pays back (50 = half)
   created_at: string;
 };
 
@@ -35,6 +39,10 @@ export type PlannedPaymentPayload = {
   grace_days?: number;
   is_debt_payment?: boolean;
   due_date?: string | null;
+  every_months?: number;
+  first_month?: string | null;
+  amount_varies?: boolean;
+  shared_pct?: number | null;
 };
 
 export type UpcomingPaymentOut = {

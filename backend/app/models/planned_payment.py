@@ -46,6 +46,20 @@ class PlannedPayment(Base):
     # One-off obligation (money owed to a friend): due once on this date,
     # due_day is then ignored. NULL = recurring every month on due_day.
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Recurring every N months (water: every 2). Due only in months that are
+    # a multiple of N away from ``first_month`` ("YYYY-MM"); NULL anchor =
+    # the month it was created.
+    every_months: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+    first_month: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    # The bill changes every time (utilities): ``amount`` is an estimate.
+    amount_varies: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    # Share of the bill someone else pays back (50 = half). The user still
+    # pays it all on the due date; it only tells them what to collect.
+    shared_pct: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

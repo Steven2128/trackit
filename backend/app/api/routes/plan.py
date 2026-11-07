@@ -49,6 +49,7 @@ from app.services.cash_position_sources import (
     PaymentRecord,
     build_inputs,
     default_horizon,
+    is_due_month,
 )
 from app.services.net_worth import keep_cash_reconciled, net_worth
 
@@ -190,8 +191,13 @@ async def cash_flow(current_user: CurrentUser, db: DbSession) -> CashFlowRespons
             is_paid=p.paid_month == this_month,
         )
         for p in payments_result.scalars().all()
-        # A one-off belongs to this month's plan only in (or past) its month.
-        if p.due_date is None or f"{p.due_date:%Y-%m}" <= this_month
+        # A one-off belongs to this month's plan only in (or past) its month;
+        # a bill every N months only in the months it comes.
+        if (
+            f"{p.due_date:%Y-%m}" <= this_month
+            if p.due_date is not None
+            else is_due_month(p, *(int(x) for x in this_month.split("-")))
+        )
     ]
 
     today = datetime.now(user_tz()).date()
@@ -328,6 +334,7 @@ async def cash_position(
         records=records,
     )
     pos = compute_position(inputs)
+    shared_pct = {f"planned:{p.id}": p.shared_pct for p in payments if p.shared_pct}
     notes: list[str] = []
     if not snap.accounts:
         notes.insert(0, "No hay cuentas cargadas en Patrimonio: el saldo es 0.")
@@ -359,6 +366,7 @@ async def cash_position(
                         due=o.due,
                         total=o.total,
                         ref=o.ref,
+                        shared_pct=shared_pct.get(":".join((o.ref or "").split(":")[:2])),
                     )
                     for o in w.obligations
                 ],

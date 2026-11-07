@@ -17,6 +17,7 @@ export type PositionLine = {
   due: string | null; // YYYY-MM-DD
   total: string; // what the due date asks for; paid = total − amount
   ref: string | null; // "planned:<id>:<due>" | "debt:<id>:<due>"
+  shared_pct: number | null; // part someone else pays back after
 };
 
 export type PositionWindow = {

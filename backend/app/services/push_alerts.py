@@ -32,6 +32,7 @@ from app.services.cash_flow import (
     UpcomingPayment,
     compute_cash_flow,
 )
+from app.services.cash_position_sources import is_due_month
 from app.services.spending_anomalies import SpendingAnomaly
 
 DEADLINE_ALERT_DAYS = 3
@@ -170,6 +171,7 @@ async def collect_user_alerts(db: AsyncSession, user_id) -> list[PushAlert]:
     payments_result = await db.execute(
         select(PlannedPayment).where(PlannedPayment.user_id == user_id)
     )
+    today = datetime.now(user_tz()).date()
     incomes = [
         IncomeLike(name=i.name, amount=i.amount, expected_day=i.expected_day)
         for i in incomes_result.scalars().all()
@@ -183,8 +185,9 @@ async def collect_user_alerts(db: AsyncSession, user_id) -> list[PushAlert]:
             is_debt_payment=p.is_debt_payment,
         )
         for p in payments_result.scalars().all()
+        # A bill every N months only alerts in the months it comes.
+        if is_due_month(p, today.year, today.month)
     ]
-    today = datetime.now(user_tz()).date()
     upcoming = compute_cash_flow(incomes, payments, today).upcoming if payments else []
 
     _, anomalies = await _detect_user_anomalies(user_id, db)

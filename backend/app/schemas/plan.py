@@ -43,6 +43,13 @@ class PlannedPaymentBase(BaseModel):
     is_debt_payment: bool = False
     # One-off (money owed to a friend): due once on this date.
     due_date: date | None = None
+    # Every N months (water bill: 2), counted from first_month ("YYYY-MM").
+    every_months: int = Field(default=1, ge=1, le=12)
+    first_month: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
+    # The amount is an estimate (utilities).
+    amount_varies: bool = False
+    # Share someone else pays back (50 = half).
+    shared_pct: int | None = Field(default=None, ge=1, le=100)
 
 
 class PlannedPaymentCreate(PlannedPaymentBase):
@@ -56,6 +63,10 @@ class PlannedPaymentUpdate(BaseModel):
     grace_days: int | None = Field(default=None, ge=0, le=60)
     is_debt_payment: bool | None = None
     due_date: date | None = None
+    every_months: int | None = Field(default=None, ge=1, le=12)
+    first_month: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
+    amount_varies: bool | None = None
+    shared_pct: int | None = Field(default=None, ge=1, le=100)
     # "YYYY-MM" to check off for that month; null to un-check.
     paid_month: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
 
@@ -104,6 +115,9 @@ class PositionLineOut(BaseModel):
     # "planned:<id>:<due>" / "debt:<id>:<due>" — what POST
     # /obligation-payments needs to pay it.
     ref: str | None
+    # Share someone else pays back (planned payments only): the user pays
+    # the whole total, then collects this part.
+    shared_pct: int | None = None
 
 
 class PositionWindowOut(BaseModel):
