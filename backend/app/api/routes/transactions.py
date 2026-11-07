@@ -22,7 +22,7 @@ from sqlalchemy.sql import ColumnElement
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.time_utils import current_month_local, month_filter, not_in_excluded
-from app.models.transaction import Transaction, TransactionType
+from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
 from app.schemas.account import CashExpenseIn
 from app.schemas.transaction import (
     CategorySummaryItem,
@@ -37,12 +37,14 @@ from app.services.net_worth import keep_cash_reconciled
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 EXCLUDED_FROM_SPENT_CATEGORIES = ("transfer", "cash_withdrawal", "debt_payment")
-EXCLUDED_FROM_RECEIVED_CATEGORIES = ("transfer", "debt_payment")
+# "reimbursement": someone paying back their part of a shared expense —
+# not income (see Transaction.shared_amount).
+EXCLUDED_FROM_RECEIVED_CATEGORIES = ("transfer", "debt_payment", "reimbursement")
 
 # Manual recategorization accepts anything the system itself can emit:
 # categorizer rules plus the layers reserved to transfer_matcher/parsers.
 ALLOWED_CATEGORIES = {rule.category for rule in RULES} | set(
-    EXCLUDED_FROM_SPENT_CATEGORIES
+    EXCLUDED_FROM_SPENT_CATEGORIES + EXCLUDED_FROM_RECEIVED_CATEGORIES
 )
 
 # User-defined categories are free-form slugs (mobile slugifies the display
@@ -149,7 +151,7 @@ async def update_transaction(
     current_user: CurrentUser,
     db: DbSession,
 ) -> TransactionOut:
-    """Manual edit (category, merchant name, note; amount and date for cash expenses)
+    """Manual edit (category, merchant name, note, shared part; amount and date for cash expenses)
     — feeds budget bars, summaries, dashboard and the cash balance. Partial:
     only fields present in the body change."""
     provided = payload.model_fields_set
@@ -225,6 +227,17 @@ async def update_transaction(
                 status_code=status.HTTP_409_CONFLICT, detail="date_not_editable"
             )
         tx.occurred_at = payload.occurred_at
+    if "shared_amount" in provided:
+        shared = payload.shared_amount or None  # 0 clears it
+        if shared is not None and tx.transaction_type != TransactionType.debit:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="shared_needs_debit"
+            )
+        tx.shared_amount = shared
+    if tx.shared_amount is not None and tx.shared_amount > tx.amount:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="shared_exceeds_amount"
+        )
     if tx.source == "cash" and provided & {"amount", "occurred_at"}:
         await keep_cash_reconciled(db, current_user.id, before, (tx.amount, tx.occurred_at))
     await db.commit()
@@ -262,7 +275,7 @@ async def transactions_summary(
     by_category_rows = await db.execute(
         select(
             Transaction.category,
-            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+            func.coalesce(func.sum(OWN_AMOUNT), 0).label("total"),
             func.count().label("count"),
         )
         .where(
@@ -271,7 +284,7 @@ async def transactions_summary(
             not_in_excluded(Transaction.category, EXCLUDED_FROM_SPENT_CATEGORIES),
         )
         .group_by(Transaction.category)
-        .order_by(func.sum(Transaction.amount).desc())
+        .order_by(func.sum(OWN_AMOUNT).desc())
     )
     by_category = [
         CategorySummaryItem(category=row.category, total=row.total, count=row.count)
@@ -294,7 +307,7 @@ async def transactions_summary(
 
 async def _sum_amount(db, filters: list[ColumnElement]) -> Decimal:
     result = await db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(*filters)
+        select(func.coalesce(func.sum(OWN_AMOUNT), 0)).where(*filters)
     )
     value = result.scalar_one()
     return Decimal(value) if not isinstance(value, Decimal) else value

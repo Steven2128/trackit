@@ -15,7 +15,7 @@ import {
   type AccountKind,
 } from "../services/queries/accounts";
 import { colors } from "../theme/colors";
-import { CATEGORIES } from "../utils/categories";
+import { CATEGORIES, INTERNAL_CATEGORIES } from "../utils/categories";
 import { formatCOP, formatCOPInput, parseCOP } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import { expenseInstant } from "../utils/dates";
@@ -36,7 +36,7 @@ type Props = {
 
 // Categories that make sense for a cash expense (no system-only ones).
 const SPENDABLE = CATEGORIES.filter(
-  (c) => !["transfer", "cash_withdrawal", "debt_payment"].includes(c.key),
+  (c) => !INTERNAL_CATEGORIES.includes(c.key),
 );
 
 export default function AccountSheet({ editing, onClose }: Props) {

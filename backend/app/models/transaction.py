@@ -68,6 +68,11 @@ class Transaction(Base):
     # "cash" for typed-in cash expenses. Drives account balances (net_worth).
     # NULL on rows synced before the column existed.
     source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Part of a debit someone else covers (the brother's half of a shared
+    # bill): spending counts only amount - shared_amount, while the account
+    # still drops by the full amount. Their payback arrives as a credit with
+    # category "reimbursement", which isn't income. NULL = not shared.
+    shared_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     # Credit-card movement (purchase or card payment) read from the card's
     # email sender — see Debt.email_sender.
     debt_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -100,3 +105,8 @@ class Transaction(Base):
             postgresql_where=text("raw_email_reference IS NOT NULL"),
         ),
     )
+
+
+# The user's own part of a movement — what spending sums add up. Equals
+# ``amount`` unless the expense is shared (see Transaction.shared_amount).
+OWN_AMOUNT = Transaction.amount - func.coalesce(Transaction.shared_amount, 0)

@@ -88,6 +88,8 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [ ] Soporte para más bancos: Bancolombia, Nu Colombia
 - [ ] Reporte mensual exportable en PDF
 - [ ] Modo finanzas en pareja (gastos compartidos)
+  - [x] Entrega 1 (2026-11-07): `transactions.shared_amount` (la parte que pone otra persona; el gasto cuenta solo `amount - shared_amount`, la cuenta baja por el total) + categoría `reimbursement` (la devolución no cuenta como Recibido). Se edita desde "Editar movimiento" → "Lo comparto".
+  - [ ] Entrega 2: servicios compartidos en "Tu quincena" (agua bimestral, luz y gas mensuales, vencen el 7, montos variables → estimados) + "tu hermano te debe X".
 
 ## Principios de ingeniería
 

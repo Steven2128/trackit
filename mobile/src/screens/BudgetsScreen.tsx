@@ -23,14 +23,14 @@ import {
 import { useCategoryRules, useDeleteCategoryRule } from "../services/queries/categoryRules";
 import { colors } from "../theme/colors";
 import { pageStyle } from "../theme/layout";
-import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
+import { CATEGORIES, INTERNAL_CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
 import { humanizeMonth } from "../utils/dates";
 import { Alert } from "../utils/alert";
 
 // Budgets make sense for spending categories only — internal movements
 // (transfer, cash_withdrawal) are excluded from spending everywhere else.
 const BUDGETABLE = CATEGORIES.filter(
-  (c) => !["transfer", "cash_withdrawal", "debt_payment"].includes(c.key),
+  (c) => !INTERNAL_CATEGORIES.includes(c.key),
 );
 
 const STATUS_COLOR: Record<BudgetAlertStatus, string> = {

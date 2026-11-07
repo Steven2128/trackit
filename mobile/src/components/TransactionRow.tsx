@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { colors } from "../theme/colors";
 import { getCategory } from "../utils/categories";
+import { formatCOP } from "../utils/currency";
 import CategoryIcon from "./CategoryIcon";
 import MoneyText from "./MoneyText";
 
@@ -15,6 +16,8 @@ type Props = {
   /** Shown instead of the time (e.g. "ayer" in lists that span days). */
   whenLabel?: string;
   note?: string | null;
+  /** Part someone else covers on a shared expense. */
+  sharedAmount?: string | null;
   showChevron?: boolean;
 };
 
@@ -33,6 +36,7 @@ export default function TransactionRow({
   occurredAt,
   whenLabel,
   note,
+  sharedAmount,
   showChevron = false,
 }: Props) {
   const cat = getCategory(category);
@@ -52,6 +56,11 @@ export default function TransactionRow({
             <Text style={styles.time}>{whenLabel ?? formatTime(occurredAt!)}</Text>
           ) : null}
         </View>
+        {sharedAmount ? (
+          <Text style={styles.shared} numberOfLines={1}>
+            Compartido · tu parte {formatCOP(Number(amount) - Number(sharedAmount))}
+          </Text>
+        ) : null}
         {note ? (
           <Text style={styles.note} numberOfLines={1}>
             {note}
@@ -91,4 +100,5 @@ const styles = StyleSheet.create({
   catPillText: { fontSize: 11, fontWeight: "600" },
   time: { color: colors.textSecondary, fontSize: 11, fontVariant: ["tabular-nums"] },
   note: { color: colors.textSecondary, fontSize: 12, fontStyle: "italic" },
+  shared: { color: colors.primary, fontSize: 12, fontWeight: "500" },
 });

@@ -24,7 +24,7 @@ from app.models.budget import Budget
 from app.models.debt import Debt
 from app.models.income_source import IncomeSource
 from app.models.savings_goal import SavingsGoal
-from app.models.transaction import Transaction, TransactionType
+from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
 from app.services.budget_status import budget_alert_status
 from app.services.health_score import compute_health_score
 from app.services.spending_anomalies import SpendingAnomaly, detect_anomalies
@@ -71,7 +71,7 @@ async def _detect_user_anomalies(
     current_rows = await db.execute(
         select(
             Transaction.category,
-            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+            func.coalesce(func.sum(OWN_AMOUNT), 0).label("total"),
         )
         .where(
             Transaction.user_id == user_id,
@@ -93,7 +93,7 @@ async def _detect_user_anomalies(
         select(
             Transaction.category,
             month_key.label("month"),
-            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+            func.coalesce(func.sum(OWN_AMOUNT), 0).label("total"),
         )
         .where(
             Transaction.user_id == user_id,
@@ -163,7 +163,7 @@ async def health_score(
         spent_rows = await db.execute(
             select(
                 Transaction.category,
-                func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+                func.coalesce(func.sum(OWN_AMOUNT), 0).label("total"),
             )
             .where(
                 Transaction.user_id == current_user.id,

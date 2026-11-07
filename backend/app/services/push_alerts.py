@@ -24,7 +24,7 @@ from app.core.time_utils import current_month_local, month_filter, user_tz
 from app.models.budget import Budget
 from app.models.income_source import IncomeSource
 from app.models.planned_payment import PlannedPayment
-from app.models.transaction import Transaction, TransactionType
+from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
 from app.services.budget_status import budget_alert_status, budget_pct
 from app.services.cash_flow import (
     IncomeLike,
@@ -145,7 +145,7 @@ async def collect_user_alerts(db: AsyncSession, user_id) -> list[PushAlert]:
         spent_rows = await db.execute(
             select(
                 Transaction.category,
-                func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+                func.coalesce(func.sum(OWN_AMOUNT), 0).label("total"),
             )
             .where(
                 Transaction.user_id == user_id,

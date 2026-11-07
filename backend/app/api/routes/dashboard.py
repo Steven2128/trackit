@@ -4,8 +4,9 @@
 Four queries, one after the other: an AsyncSession can't run them
 concurrently (SQLAlchemy 2.1 raises IllegalStateChangeError). Month windowing uses settings.user_timezone
 (default America/Bogota) — same rule as GET /transactions/summary.
-Spending excludes transfer, cash_withdrawal and debt_payment; received
-excludes transfer and debt_payment (same rule as /transactions/summary).
+Spending excludes transfer, cash_withdrawal and debt_payment and counts
+only the user's part of shared expenses; received excludes transfer,
+debt_payment and reimbursement (same rule as /transactions/summary).
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
 from app.core.time_utils import current_month_local, month_bounds, not_in_excluded
 from app.models.debt import Debt
-from app.models.transaction import Transaction, TransactionType
+from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
 from app.schemas.dashboard import (
     CurrentMonthSnapshot,
     DashboardResponse,
@@ -35,7 +36,7 @@ from app.schemas.dashboard import (
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 _EXCLUDED = ("transfer", "cash_withdrawal", "debt_payment")
-_EXCLUDED_FROM_RECEIVED = ("transfer", "debt_payment")
+_EXCLUDED_FROM_RECEIVED = ("transfer", "debt_payment", "reimbursement")
 
 
 @router.get("", response_model=DashboardResponse)
@@ -78,7 +79,7 @@ async def _fetch_trend(db: AsyncSession, user_id: UUID, trend_start: datetime) -
         select(
             month_col,
             Transaction.category,
-            func.sum(Transaction.amount).label("total"),
+            func.sum(OWN_AMOUNT).label("total"),
             func.count().label("cnt"),
         )
         .where(
@@ -99,7 +100,7 @@ async def _fetch_received(db: AsyncSession, user_id: UUID, trend_start: datetime
     month_col = func.date_trunc("month", local_ts).label("month")
 
     result = await db.execute(
-        select(month_col, func.sum(Transaction.amount).label("total"))
+        select(month_col, func.sum(OWN_AMOUNT).label("total"))
         .where(
             Transaction.user_id == user_id,
             Transaction.transaction_type == TransactionType.credit,

@@ -18,10 +18,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time_utils import not_in_excluded
-from app.models.transaction import Transaction, TransactionType
+from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
 
 EXCLUDED_FROM_SPENT_CATEGORIES = ("transfer", "cash_withdrawal", "debt_payment")
-EXCLUDED_FROM_RECEIVED_CATEGORIES = ("transfer", "debt_payment")
+EXCLUDED_FROM_RECEIVED_CATEGORIES = ("transfer", "debt_payment", "reimbursement")
 
 
 @dataclass
@@ -115,7 +115,7 @@ async def build_weekly_summary(
     by_category_rows = await db.execute(
         select(
             Transaction.category,
-            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+            func.coalesce(func.sum(OWN_AMOUNT), 0).label("total"),
             func.count().label("count"),
         )
         .where(
@@ -124,7 +124,7 @@ async def build_weekly_summary(
             not_in_excluded(Transaction.category, EXCLUDED_FROM_SPENT_CATEGORIES),
         )
         .group_by(Transaction.category)
-        .order_by(func.sum(Transaction.amount).desc())
+        .order_by(func.sum(OWN_AMOUNT).desc())
     )
     by_category = [
         CategoryTotal(category=row.category, total=Decimal(row.total), count=row.count)
@@ -148,7 +148,7 @@ async def build_weekly_summary(
 
 async def _sum_amount(db: AsyncSession, filters: list) -> Decimal:
     result = await db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(*filters)
+        select(func.coalesce(func.sum(OWN_AMOUNT), 0)).where(*filters)
     )
     value = result.scalar_one()
     return Decimal(value) if not isinstance(value, Decimal) else value

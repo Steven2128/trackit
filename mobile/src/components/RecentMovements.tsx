@@ -36,6 +36,7 @@ export default function RecentMovements({
               type={t.transaction_type}
               whenLabel={whenLabel(t.occurred_at)}
               note={t.note}
+              sharedAmount={t.shared_amount}
             />
           </Pressable>
         ))

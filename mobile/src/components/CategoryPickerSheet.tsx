@@ -20,7 +20,7 @@ import {
   type TransactionOut,
 } from "../services/queries/transactions";
 import { colors } from "../theme/colors";
-import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
+import { CATEGORIES, INTERNAL_CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
 import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import { daysAgo as daysAgoOf, expenseInstant } from "../utils/dates";
@@ -38,7 +38,6 @@ const SCOPES: { key: RuleScope; label: string }[] = [
   { key: "all", label: "Todos (también los anteriores)" },
 ];
 
-const NO_RULE_CATEGORIES = ["transfer", "cash_withdrawal", "debt_payment"];
 
 type Props = {
   isVisible: boolean;
@@ -61,9 +60,13 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   const [amount, setAmount] = useState("");
   const [daysAgo, setDaysAgo] = useState(0);
   const [scope, setScope] = useState<RuleScope>("one");
+  // Shared expense: the part someone else pays back (debits only).
+  const [isShared, setIsShared] = useState(false);
+  const [shared, setShared] = useState("");
   // Typed-in cash expenses: amount and day editable, and deletable. Bank rows mirror
   // their notification email, so their amount stays read-only.
   const isCash = transaction?.source === "cash";
+  const isDebit = transaction?.transaction_type === "debit";
 
   useEffect(() => {
     if (transaction) {
@@ -73,8 +76,18 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       setAmount(toCOPInput(transaction.amount));
       setDaysAgo(daysAgoOf(transaction.occurred_at));
       setScope("one");
+      setIsShared(!!transaction.shared_amount);
+      setShared(transaction.shared_amount ? toCOPInput(transaction.shared_amount) : "");
     }
   }, [transaction]);
+
+  // Amount the shared part is measured against: the edited one for cash.
+  const total = isCash ? parseCOP(amount) : Math.round(Number(transaction?.amount ?? 0));
+
+  function toggleShared() {
+    if (!isShared && !shared) setShared(toCOPInput(String(Math.round(total / 2))));
+    setIsShared(!isShared);
+  }
 
   const suggestion = useRuleSuggestion(transaction?.merchant);
   const pattern = suggestion.data ?? null;
@@ -85,7 +98,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
     !!transaction &&
     pattern !== null &&
     selected !== null &&
-    !NO_RULE_CATEGORIES.includes(selected) &&
+    !INTERNAL_CATEGORIES.includes(selected) &&
     selected !== transaction.category;
 
   useEffect(() => {
@@ -112,6 +125,15 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       Alert.alert("Monto inválido", "Escribí un monto en pesos mayor a 0.");
       return;
     }
+    const sharedValue = isDebit && isShared ? parseCOP(shared) : 0;
+    if (isDebit && isShared && (sharedValue <= 0 || sharedValue > total)) {
+      Alert.alert(
+        "Parte compartida inválida",
+        "Lo que pone la otra persona tiene que ser mayor a 0 y no pasar del monto.",
+      );
+      return;
+    }
+    const previousShared = Math.round(Number(transaction.shared_amount ?? 0));
     Keyboard.dismiss();
     mutation.mutate(
       {
@@ -126,6 +148,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
         ...(isCash && daysAgo !== daysAgoOf(transaction.occurred_at)
           ? { occurred_at: expenseInstant(daysAgo) }
           : {}),
+        ...(isDebit && sharedValue !== previousShared ? { shared_amount: sharedValue } : {}),
       },
       {
         onSuccess: () => {
@@ -302,6 +325,45 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
           multiline
         />
 
+        {isDebit ? (
+          <>
+            <Pressable
+              style={({ pressed }) => [styles.sharedToggle, pressed && styles.pressed]}
+              onPress={toggleShared}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: isShared }}
+            >
+              <Ionicons
+                name={isShared ? "checkbox" : "square-outline"}
+                size={20}
+                color={isShared ? colors.primary : colors.textSecondary}
+              />
+              <Text style={styles.sharedToggleText}>
+                Lo comparto (otra persona me devuelve una parte)
+              </Text>
+            </Pressable>
+            {isShared ? (
+              <>
+                <Text style={styles.label}>Lo pone la otra persona (COP)</Text>
+                <BottomSheetTextInput
+                  style={styles.input}
+                  placeholder="0"
+                  placeholderTextColor={colors.textSecondary}
+                  value={shared}
+                  onChangeText={(v) => setShared(formatCOPInput(v))}
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                />
+                <Text style={styles.sharedHint}>
+                  Tu parte: <MoneyText value={String(Math.max(0, total - parseCOP(shared)))} size="sm" />
+                  {" "}— es lo que cuenta como gasto. Cuando te devuelva, marcá esa entrada
+                  como Reembolso.
+                </Text>
+              </>
+            ) : null}
+          </>
+        ) : null}
+
         <Text style={styles.label}>Categoría</Text>
         {CATEGORIES.map((cat) => (
           <OptionRow
@@ -390,6 +452,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 2,
   },
+  sharedToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 10,
+    paddingVertical: 6,
+  },
+  sharedToggleText: { color: colors.textPrimary, fontSize: 14, flex: 1 },
+  sharedHint: { color: colors.textSecondary, fontSize: 12, marginTop: 4 },
   input: {
     backgroundColor: colors.background,
     borderWidth: 1,

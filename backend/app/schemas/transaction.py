@@ -39,6 +39,8 @@ class TransactionOut(BaseModel):
     debt_id: uuid.UUID | None = None
     # Account the money moved in ("davivienda", "nequi", "card", "cash", ...).
     source: str | None = None
+    # Part of a debit someone else covers; spending counts amount - this.
+    shared_amount: Decimal | None = None
 
 
 class TransactionUpdate(BaseModel):
@@ -52,6 +54,8 @@ class TransactionUpdate(BaseModel):
     amount: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_12_2)
     # Also cash-only: the day the user actually spent it.
     occurred_at: datetime | None = None
+    # Debits only: the part someone else pays back. None or 0 = not shared.
+    shared_amount: Decimal | None = Field(default=None, ge=0, le=MAX_NUMERIC_12_2)
 
     _occurred_at = field_validator("occurred_at")(check_expense_date)
 

@@ -20,6 +20,8 @@ export type TransactionOut = {
   debt_id: string | null;
   // Account the money moved in; "cash" = typed in by the user (editable amount).
   source: string | null;
+  // Part of a debit someone else covers; spending counts amount - this.
+  shared_amount: string | null;
 };
 
 export type TransactionListResponse = {
@@ -66,6 +68,8 @@ export type TransactionPatch = {
   // Cash expenses only — the backend rejects them on bank rows.
   amount?: number;
   occurred_at?: string;
+  // Debits only; 0 = not shared.
+  shared_amount?: number;
 };
 
 function invalidateTransactionViews(qc: ReturnType<typeof useQueryClient>) {

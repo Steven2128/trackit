@@ -23,7 +23,7 @@ from app.db.session import AsyncSessionLocal
 from app.models.transaction import Transaction
 from app.services.categorizer import categorize
 
-PROTECTED_CATEGORIES = ("transfer", "cash_withdrawal", "debt_payment")
+PROTECTED_CATEGORIES = ("transfer", "cash_withdrawal", "debt_payment", "reimbursement")
 
 log = logging.getLogger("recategorize")
 

@@ -72,6 +72,7 @@ def _tx(source: str | None):
         id=uuid.uuid4(), amount=Decimal("1"), merchant="Desayuno", category="food",
         transaction_type=TransactionType.debit, currency="COP", card_last_digits=None,
         occurred_at=OCCURRED, note=None, debt_id=None, source=source,
+        shared_amount=None,
     )
 
 
@@ -189,3 +190,72 @@ def test_bank_transaction_amount_is_rejected(source) -> None:
     assert resp.json()["detail"] == "amount_not_editable"
     assert row.amount == Decimal("1")
     assert not session.committed
+
+
+# --- shared expenses ---
+
+
+def _bill(amount: str = "97850", type_=TransactionType.debit):
+    row = _tx("davivienda")
+    row.amount, row.transaction_type = Decimal(amount), type_
+    return row
+
+
+def test_bank_debit_can_be_shared() -> None:
+    row = _bill()
+    client, session = _client(row)
+    resp = client.patch(f"/transactions/{row.id}", json={"shared_amount": "48925"})
+
+    assert resp.status_code == 200
+    assert row.shared_amount == Decimal("48925")
+    assert Decimal(resp.json()["shared_amount"]) == Decimal("48925")
+    assert session.committed
+
+
+@pytest.mark.parametrize("value", ["0", None])
+def test_zero_or_null_unshares(value) -> None:
+    row = _bill()
+    row.shared_amount = Decimal("48925")
+    client, _ = _client(row)
+    resp = client.patch(f"/transactions/{row.id}", json={"shared_amount": value})
+
+    assert resp.status_code == 200
+    assert row.shared_amount is None
+
+
+def test_shared_part_cannot_exceed_the_amount() -> None:
+    row = _bill()
+    client, session = _client(row)
+    resp = client.patch(f"/transactions/{row.id}", json={"shared_amount": "97851"})
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "shared_exceeds_amount"
+    assert not session.committed
+
+
+def test_credits_cannot_be_shared() -> None:
+    row = _bill("48925", TransactionType.credit)
+    client, _ = _client(row)
+    resp = client.patch(f"/transactions/{row.id}", json={"shared_amount": "1000"})
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "shared_needs_debit"
+
+
+def test_lowering_a_cash_amount_below_the_shared_part_is_rejected() -> None:
+    row = _tx("cash")
+    row.amount, row.shared_amount = Decimal("20000"), Decimal("10000")
+    client, session = _client(row)
+    resp = client.patch(f"/transactions/{row.id}", json={"amount": "5000"})
+
+    assert resp.status_code == 422
+    assert not session.committed
+
+
+def test_reimbursement_is_an_allowed_category() -> None:
+    row = _bill("48925", TransactionType.credit)
+    client, _ = _client(row)
+    resp = client.patch(f"/transactions/{row.id}", json={"category": "reimbursement"})
+
+    assert resp.status_code == 200
+    assert row.category == "reimbursement"

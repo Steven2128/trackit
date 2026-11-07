@@ -224,7 +224,7 @@ async def cash_flow(current_user: CurrentUser, db: DbSession) -> CashFlowRespons
 
 
 # Deposits that are the user's own money moving, never income.
-_NOT_INCOME = ("transfer", "debt_payment")
+_NOT_INCOME = ("transfer", "debt_payment", "reimbursement")
 
 
 @router.get("/cashflow/position", response_model=CashPositionResponse)

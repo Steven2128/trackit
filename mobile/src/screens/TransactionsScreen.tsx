@@ -23,7 +23,15 @@ import {
 } from "../services/queries/transactions";
 import { colors } from "../theme/colors";
 import { pageStyle } from "../theme/layout";
-import { CATEGORIES, customCategoryKeys, getCategory } from "../utils/categories";
+import {
+  CATEGORIES,
+  EXCLUDED_FROM_RECEIVED,
+  EXCLUDED_FROM_SPENT,
+  INTERNAL_CATEGORIES,
+  customCategoryKeys,
+  getCategory,
+  ownAmount,
+} from "../utils/categories";
 import {
   currentMonthYYYYMM,
   dayKey,
@@ -35,13 +43,9 @@ import {
 type Section = { title: string; sortKey: string; total: number; data: TransactionOut[] };
 
 const FILTERABLE = CATEGORIES.filter(
-  (c) => !["transfer", "cash_withdrawal", "debt_payment"].includes(c.key),
+  (c) => !INTERNAL_CATEGORIES.includes(c.key),
 );
 
-// Mirror of the backend's spending semantics (transactions.py) so the
-// header tiles match /transactions/summary for the same rows.
-const EXCLUDED_FROM_SPENT = ["transfer", "cash_withdrawal", "debt_payment"];
-const EXCLUDED_FROM_RECEIVED = ["transfer", "debt_payment"];
 
 export default function TransactionsScreen() {
   const [month, setMonth] = useState<string>(currentMonthYYYYMM());
@@ -79,7 +83,7 @@ export default function TransactionsScreen() {
     let spent = 0;
     let received = 0;
     for (const tx of items) {
-      const amount = Number(tx.amount);
+      const amount = ownAmount(tx);
       if (
         tx.transaction_type === "debit" &&
         !EXCLUDED_FROM_SPENT.includes(tx.category ?? "")
@@ -110,7 +114,7 @@ export default function TransactionsScreen() {
         (sum, tx) =>
           tx.transaction_type === "debit" &&
           !EXCLUDED_FROM_SPENT.includes(tx.category ?? "")
-            ? sum + Number(tx.amount)
+            ? sum + ownAmount(tx)
             : sum,
         0,
       );
@@ -274,6 +278,7 @@ export default function TransactionsScreen() {
                   type={item.transaction_type}
                   occurredAt={item.occurred_at}
                   note={item.note}
+                  sharedAmount={item.shared_amount}
                   showChevron
                 />
               </Pressable>

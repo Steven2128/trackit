@@ -18,7 +18,7 @@ from app.api.routes.transactions import ALLOWED_CATEGORIES
 from app.core.time_utils import current_month_local, month_filter
 from app.models.budget import Budget
 from app.models.merchant_category_rule import MerchantCategoryRule
-from app.models.transaction import Transaction, TransactionType
+from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
 from app.schemas.budget import (
     BudgetOut,
     BudgetRename,
@@ -185,7 +185,7 @@ async def budgets_status(
     spent_rows = await db.execute(
         select(
             Transaction.category,
-            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+            func.coalesce(func.sum(OWN_AMOUNT), 0).label("total"),
         )
         .where(
             Transaction.user_id == current_user.id,
