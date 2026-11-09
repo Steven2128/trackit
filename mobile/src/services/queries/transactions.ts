@@ -4,6 +4,7 @@ import { api } from "../api";
 import { accountsQueryKey } from "./accounts";
 import { budgetsQueryKey } from "./budgets";
 import { dashboardQueryKey } from "./dashboard";
+import { debtsQueryKey } from "./debts";
 
 export type TransactionType = "debit" | "credit";
 
@@ -86,9 +87,13 @@ export type TransactionPatch = {
   occurred_at?: string;
   // Debits only; 0 = not shared.
   shared_amount?: number;
+  // Debits only: the hand-entered debt this paid (lowers its balance); null unlinks.
+  debt_id?: string | null;
 };
 
 function invalidateTransactionViews(qc: ReturnType<typeof useQueryClient>) {
+  // A debt link moves that debt's balance.
+  qc.invalidateQueries({ queryKey: debtsQueryKey });
   // Category and amount feed every derived view, and cash rows also move the
   // Efectivo balance in Patrimonio.
   qc.invalidateQueries({ queryKey: ["transactions"] });

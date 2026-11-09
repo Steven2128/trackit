@@ -22,6 +22,7 @@ from sqlalchemy.sql import ColumnElement
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.time_utils import current_month_local, month_filter, not_in_excluded
+from app.models.debt import Debt
 from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
 from app.schemas.account import CashExpenseIn
 from app.schemas.transaction import (
@@ -187,6 +188,50 @@ def _is_allowed_category(category: str) -> bool:
     return category in ALLOWED_CATEGORIES or bool(CUSTOM_CATEGORY_RE.match(category))
 
 
+async def _own_debt(db: DbSession, user_id: uuid.UUID, debt_id: uuid.UUID) -> Debt | None:
+    return (
+        await db.execute(select(Debt).where(Debt.id == debt_id, Debt.user_id == user_id))
+    ).scalar_one_or_none()
+
+
+async def _relink_debt(
+    db: DbSession, user_id: uuid.UUID, tx: Transaction, debt_id: uuid.UUID | None
+) -> None:
+    """Point a debit at the hand-entered debt it paid.
+
+    Manual debts have no email to lower their balance, so the link does it;
+    moving or clearing the link gives the amount back to the old debt.
+    Email-linked cards are refused on both ends: their own payment email
+    already lowers the balance and counts toward the due date, so a bank
+    debit linked to them too would count twice.
+    """
+    if debt_id == tx.debt_id:
+        return
+    if tx.transaction_type != TransactionType.debit:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="debt_needs_debit"
+        )
+    old = await _own_debt(db, user_id, tx.debt_id) if tx.debt_id is not None else None
+    if tx.source == "card" or (old is not None and old.email_sender):
+        # A card purchase read from the card's emails: its debt is the card.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="debt_not_editable")
+    new = None
+    if debt_id is not None:
+        new = await _own_debt(db, user_id, debt_id)
+        if new is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="debt_not_found")
+        if new.email_sender:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="debt_has_email"
+            )
+    if old is not None:
+        old.total_amount = old.total_amount + tx.amount
+    if new is not None:
+        new.total_amount = max(new.total_amount - tx.amount, Decimal(0))
+        tx.category = "debt_payment"
+    tx.debt_id = debt_id
+
+
 @router.patch("/{transaction_id}", response_model=TransactionOut)
 async def update_transaction(
     transaction_id: uuid.UUID,
@@ -194,7 +239,8 @@ async def update_transaction(
     current_user: CurrentUser,
     db: DbSession,
 ) -> TransactionOut:
-    """Manual edit (category, merchant name, note, shared part; amount and date for cash expenses)
+    """Manual edit (category, merchant name, note, shared part, the manual debt a debit paid;
+    amount and date for cash expenses)
     — feeds budget bars, summaries, dashboard and the cash balance. Partial:
     only fields present in the body change."""
     provided = payload.model_fields_set
@@ -277,6 +323,8 @@ async def update_transaction(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="shared_needs_debit"
             )
         tx.shared_amount = shared
+    if "debt_id" in provided:
+        await _relink_debt(db, current_user.id, tx, payload.debt_id)
     if tx.shared_amount is not None and tx.shared_amount > tx.amount:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="shared_exceeds_amount"

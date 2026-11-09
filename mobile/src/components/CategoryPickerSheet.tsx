@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { useBudgetStatus } from "../services/queries/budgets";
+import { useDebts } from "../services/queries/debts";
 import { useRuleSuggestion, useSaveCategoryRule } from "../services/queries/categoryRules";
 import {
   useDeleteCashTransaction,
@@ -67,6 +68,14 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   // their notification email, so their amount stays read-only.
   const isCash = transaction?.source === "cash";
   const isDebit = transaction?.transaction_type === "debit";
+  // Which hand-entered debt a payment went to (a loan from mom, a bank loan
+  // without emails). Cards read by email are left out: their own payment
+  // email already lowers them. Card purchases keep their card.
+  const [debtId, setDebtId] = useState<string | null>(null);
+  const { data: debts } = useDebts();
+  const manualDebts = useMemo(() => (debts ?? []).filter((d) => !d.email_sender), [debts]);
+  const canPickDebt =
+    isDebit && transaction?.source !== "card" && selected === "debt_payment";
 
   useEffect(() => {
     if (transaction) {
@@ -78,6 +87,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       setScope("one");
       setIsShared(!!transaction.shared_amount);
       setShared(transaction.shared_amount ? toCOPInput(transaction.shared_amount) : "");
+      setDebtId(transaction.debt_id);
     }
   }, [transaction]);
 
@@ -134,6 +144,9 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       return;
     }
     const previousShared = Math.round(Number(transaction.shared_amount ?? 0));
+    // Leaving "Pago de deuda" unlinks it (the backend gives the amount back).
+    const nextDebtId = canPickDebt ? debtId : null;
+    const debtChanged = transaction.source !== "card" && nextDebtId !== transaction.debt_id;
     Keyboard.dismiss();
     mutation.mutate(
       {
@@ -149,6 +162,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
           ? { occurred_at: expenseInstant(daysAgo) }
           : {}),
         ...(isDebit && sharedValue !== previousShared ? { shared_amount: sharedValue } : {}),
+        ...(debtChanged ? { debt_id: nextDebtId } : {}),
       },
       {
         onSuccess: () => {
@@ -254,6 +268,38 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
           </Text>
         </Pressable>
       </View>
+
+      {/* Pinned like the rule box: "Pago de deuda" sits far down the list. */}
+      {canPickDebt ? (
+        <View style={styles.scopeBox}>
+          <Text style={styles.scopeTitle}>¿A qué deuda fue este pago?</Text>
+          {manualDebts.length === 0 ? (
+            <Text style={styles.scopeHint}>
+              No tenés deudas cargadas a mano. Creala en Deudas (ej: "Mamá") y volvé.
+            </Text>
+          ) : (
+            <View style={styles.scopeChips}>
+              {[{ id: null, bank_name: "Ninguna" }, ...manualDebts].map((d) => (
+                <Pressable
+                  key={d.id ?? "none"}
+                  onPress={() => setDebtId(d.id)}
+                  style={[styles.scopeChip, debtId === d.id && styles.scopeChipActive]}
+                >
+                  <Text style={[styles.scopeText, debtId === d.id && styles.scopeTextActive]}>
+                    {d.bank_name}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          {debtId && debtId !== transaction?.debt_id ? (
+            <Text style={styles.scopeHint}>
+              Le baja <MoneyText value={transaction?.amount ?? "0"} size="sm" /> al saldo de{" "}
+              {manualDebts.find((d) => d.id === debtId)?.bank_name}.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Pinned too: it appears right when a category is tapped, which is
           usually far down the list. */}

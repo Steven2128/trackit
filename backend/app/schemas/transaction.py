@@ -56,6 +56,9 @@ class TransactionUpdate(BaseModel):
     occurred_at: datetime | None = None
     # Debits only: the part someone else pays back. None or 0 = not shared.
     shared_amount: Decimal | None = Field(default=None, ge=0, le=MAX_NUMERIC_12_2)
+    # Debits only: the hand-entered debt this paid (a family loan, a bank
+    # loan without emails). Lowers that debt's balance; None unlinks it.
+    debt_id: uuid.UUID | None = None
 
     _occurred_at = field_validator("occurred_at")(check_expense_date)
 
