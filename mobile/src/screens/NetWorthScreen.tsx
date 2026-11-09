@@ -163,7 +163,7 @@ export default function NetWorthScreen() {
             onPress={() => setEditing({ mode: "cash" })}
           >
             <Ionicons name="remove-circle-outline" size={18} color={colors.primary} />
-            <Text style={styles.cashText}>Registrar gasto en efectivo</Text>
+            <Text style={styles.cashText}>Registrar gasto a mano</Text>
           </Pressable>
         ) : null}
 

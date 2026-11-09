@@ -14,6 +14,7 @@ import {
   useUpsertAccount,
   type AccountKind,
 } from "../services/queries/accounts";
+import { useCreateManualMovement } from "../services/queries/transactions";
 import { colors } from "../theme/colors";
 import { CATEGORIES, INTERNAL_CATEGORIES } from "../utils/categories";
 import { formatCOP, formatCOPInput, parseCOP } from "../utils/currency";
@@ -34,6 +35,15 @@ type Props = {
   onClose: () => void;
 };
 
+// Where a typed-in expense came out of. Bank ones are for payments whose
+// email never arrived (a Didi order with no receipt): they lower that balance,
+// and if the email shows up later the sync attaches it instead of duplicating.
+const FROM: { key: "cash" | "davivienda" | "nequi"; label: string }[] = [
+  { key: "cash", label: "Efectivo" },
+  { key: "davivienda", label: "Davivienda" },
+  { key: "nequi", label: "Nequi" },
+];
+
 // Categories that make sense for a cash expense (no system-only ones).
 const SPENDABLE = CATEGORIES.filter(
   (c) => !INTERNAL_CATEGORIES.includes(c.key),
@@ -47,8 +57,10 @@ export default function AccountSheet({ editing, onClose }: Props) {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [daysAgo, setDaysAgo] = useState(0);
+  const [from, setFrom] = useState<(typeof FROM)[number]["key"]>("cash");
 
   useEffect(() => {
+    setFrom("cash");
     setAmount("");
     setDescription("");
     setCategory(null);
@@ -60,7 +72,8 @@ export default function AccountSheet({ editing, onClose }: Props) {
   const upsert = useUpsertAccount();
   const reconcile = useReconcileAccount();
   const cash = useCreateCashExpense();
-  const busy = upsert.isPending || reconcile.isPending || cash.isPending;
+  const manual = useCreateManualMovement();
+  const busy = upsert.isPending || reconcile.isPending || cash.isPending || manual.isPending;
 
   const onError = (e: unknown) =>
     Alert.alert("Error", e instanceof Error ? e.message : "No se pudo guardar.");
@@ -103,14 +116,24 @@ export default function AccountSheet({ editing, onClose }: Props) {
       Alert.alert("Faltan datos", "Poné el monto y en qué gastaste.");
       return;
     }
+    // Today goes without a date so the server stamps "now".
+    const when = daysAgo > 0 ? { occurred_at: expenseInstant(daysAgo) } : {};
+    if (from !== "cash") {
+      manual.mutate(
+        {
+          account: from,
+          transaction_type: "debit",
+          amount: value,
+          merchant: description.trim(),
+          category,
+          ...when,
+        },
+        { onSuccess: onClose, onError },
+      );
+      return;
+    }
     cash.mutate(
-      {
-        amount: value.toString(),
-        merchant: description.trim(),
-        category,
-        // Today goes without a date so the server stamps "now".
-        ...(daysAgo > 0 ? { occurred_at: expenseInstant(daysAgo) } : {}),
-      },
+      { amount: value.toString(), merchant: description.trim(), category, ...when },
       { onSuccess: onClose, onError },
     );
   }
@@ -120,13 +143,14 @@ export default function AccountSheet({ editing, onClose }: Props) {
       ? `Saldo de ${editing.name}`
       : editing?.mode === "reconcile"
         ? `Conciliar ${editing.name}`
-        : "Gasto en efectivo";
+        : "Gasto a mano";
   const hint =
     editing?.mode === "setup"
       ? "Escribí el saldo que ves hoy en el banco (o el efectivo que tenés). Desde ahora la app lo actualiza con cada movimiento."
       : editing?.mode === "reconcile"
         ? `La app calcula ${formatCOP(editing.computed)}. Escribí el saldo real; si no coincide, la diferencia queda registrada.`
-        : "Resta del efectivo y cuenta como gasto del día que elijas.";
+        : "Para gastos sin email: resta de la cuenta que elijas y cuenta como gasto del día. " +
+          "Si el email del banco llega después, no se duplica.";
 
   if (!sheet.mounted) return null;
 
@@ -159,6 +183,20 @@ export default function AccountSheet({ editing, onClose }: Props) {
 
         {editing?.mode === "cash" ? (
           <>
+            <Text style={styles.label}>¿De dónde salió?</Text>
+            <View style={styles.chips}>
+              {FROM.map((f) => (
+                <Pressable
+                  key={f.key}
+                  onPress={() => setFrom(f.key)}
+                  style={[styles.chip, from === f.key && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, from === f.key && styles.chipTextActive]}>
+                    {f.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
             <Text style={styles.label}>¿En qué?</Text>
             <BottomSheetTextInput
               style={styles.input}
