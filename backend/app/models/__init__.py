@@ -1,5 +1,6 @@
 from app.models.account import Account, AccountAdjustment, AccountKind
 from app.models.budget import Budget
+from app.models.contact import Contact
 from app.models.debt import Debt
 from app.models.fund_hold import FundHold
 from app.models.income_source import IncomeSource
@@ -18,6 +19,7 @@ __all__ = [
     "AccountAdjustment",
     "AccountKind",
     "Budget",
+    "Contact",
     "Debt",
     "FundHold",
     "IncomeSource",

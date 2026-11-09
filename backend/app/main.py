@@ -11,6 +11,7 @@ from app.api.routes import (
     accounts,
     auth,
     budgets,
+    contacts,
     cron,
     dashboard,
     debts,
@@ -112,6 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(gmail.router)
     app.include_router(transactions.router)
+    app.include_router(contacts.router)
     app.include_router(debts.router)
     app.include_router(accounts.router)
     app.include_router(dashboard.router)

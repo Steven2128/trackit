@@ -90,6 +90,8 @@ Stack: FastAPI + PostgreSQL (backend) · React Native + Expo (mobile) · Gmail O
 - [ ] Reporte mensual exportable en PDF
 - [ ] Modo finanzas en pareja (gastos compartidos)
   - [x] Entrega 1 (2026-11-07): `transactions.shared_amount` (la parte que pone otra persona; el gasto cuenta solo `amount - shared_amount`, la cuenta baja por el total) + categoría `reimbursement` (la devolución no cuenta como Recibido). Se edita desde "Editar movimiento" → "Lo comparto".
+  - [x] Entrega 3 (2026-11-09): cuentas por persona — tabla `contacts` + `transactions.contact_id`. Balance calculado (no guardado) en `services/contact_balance.py`: lo que pagó el usuario por el otro (`shared_amount`) − lo que pagó el otro por el usuario (filas `source="contact"`, no mueven cuentas, la parte propia cuenta como gasto) − reembolsos recibidos + reembolsos/préstamos enviados (`reimbursement` en un débito ya no cuenta como gasto). `POST /transactions/manual` para lo que llega por llave sin email (si es anterior a la última conciliación, el ajuste lo absorbe); si el email aparece después, el sync lo engancha a la fila tipeada (±3 días, mismo monto) en vez de duplicarla. Tarjeta "Compartido" con balance por persona, "Me pagó todo / Le pagué todo" y hoja "Movimiento con una persona".
+  - [ ] Entrega 4: arriendo apartado entero desde la quincena del 5, con la parte fija de Jesús (550k) como plata del arriendo.
   - [x] Entrega 2 (2026-11-07): pagos fijos cada N meses (`every_months` + `first_month`; agua cada 2), monto variable → estimado (`amount_varies`), parte compartida (`shared_pct`, "te devuelven X" en Tu quincena) + tarjeta "Compartido" en Inicio (`GET /transactions/shared`: te deben = partes de otros − reembolsos).
 
 ## Principios de ingeniería

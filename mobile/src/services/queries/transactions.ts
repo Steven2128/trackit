@@ -23,6 +23,10 @@ export type TransactionOut = {
   source: string | null;
   // Part of a debit someone else covers; spending counts amount - this.
   shared_amount: string | null;
+  // Who it's shared with / paid back by. source "contact" = they paid it.
+  contact_id: string | null;
+  // Typed in by the user: amount, day and deletion are editable.
+  manual: boolean;
 };
 
 export type TransactionListResponse = {
@@ -64,8 +68,10 @@ export function useTransactions(filters: TransactionFilters) {
 export type SharedSummary = {
   covered_for_others: string; // others' parts of shared expenses, all time
   reimbursed: string; // what came back as "reimbursement" credits
-  pending: string; // still owed to the user
-  items: TransactionOut[]; // latest shared debits and reimbursements
+  pending: string; // still owed to the user (only what has no person)
+  // Per person: > 0 they owe the user, < 0 the user owes them.
+  people: { contact_id: string; name: string; balance: string }[];
+  items: TransactionOut[]; // latest shared debits, reimbursements and person movements
 };
 
 /** Running tab of shared expenses (GET /transactions/shared). Lives under
@@ -89,7 +95,31 @@ export type TransactionPatch = {
   shared_amount?: number;
   // Debits only: the hand-entered debt this paid (lowers its balance); null unlinks.
   debt_id?: string | null;
+  contact_id?: string | null;
 };
+
+/** A movement with no email (POST /transactions/manual). account "contact"
+ * = an expense the person paid: shared_amount is their part. */
+export type ManualMovement = {
+  account: "davivienda" | "nequi" | "cash" | "contact";
+  transaction_type: TransactionType;
+  amount: number;
+  merchant: string;
+  category?: string | null;
+  contact_id?: string | null;
+  shared_amount?: number;
+  note?: string | null;
+  occurred_at?: string;
+};
+
+export function useCreateManualMovement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: ManualMovement) =>
+      (await api.post<TransactionOut>("/transactions/manual", payload)).data,
+    onSuccess: () => invalidateTransactionViews(qc),
+  });
+}
 
 function invalidateTransactionViews(qc: ReturnType<typeof useQueryClient>) {
   // A debt link moves that debt's balance.
@@ -116,7 +146,7 @@ export function useUpdateTransaction() {
   });
 }
 
-/** Deletes a typed-in cash expense (the backend refuses bank rows). */
+/** Deletes a typed-in movement (the backend refuses rows from an email). */
 export function useDeleteCashTransaction() {
   const qc = useQueryClient();
   return useMutation({

@@ -22,11 +22,15 @@ from sqlalchemy.sql import ColumnElement
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.time_utils import current_month_local, month_filter, not_in_excluded
+from app.models.account import AccountKind
+from app.models.contact import Contact
 from app.models.debt import Debt
 from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
 from app.schemas.account import CashExpenseIn
 from app.schemas.transaction import (
     CategorySummaryItem,
+    ContactBalance,
+    ManualMovementIn,
     SharedSummary,
     TransactionListResponse,
     TransactionOut,
@@ -34,13 +38,21 @@ from app.schemas.transaction import (
     TransactionUpdate,
 )
 from app.services.categorizer import RULES
-from app.services.net_worth import keep_cash_reconciled
+from app.services.contact_balance import CONTACT_SOURCE, balance_effect
+from app.services.net_worth import (
+    MANUAL_ACCOUNT_SOURCES,
+    CashExpense,
+    keep_cash_reconciled,
+    keep_reconciled,
+    outflow,
+)
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
-EXCLUDED_FROM_SPENT_CATEGORIES = ("transfer", "cash_withdrawal", "debt_payment")
-# "reimbursement": someone paying back their part of a shared expense —
-# not income (see Transaction.shared_amount).
+# "reimbursement": money between the user and a contact — paying back their
+# part of a shared expense, or lending — is neither income nor spending
+# (see Transaction.shared_amount and services/contact_balance.py).
+EXCLUDED_FROM_SPENT_CATEGORIES = ("transfer", "cash_withdrawal", "debt_payment", "reimbursement")
 EXCLUDED_FROM_RECEIVED_CATEGORIES = ("transfer", "debt_payment", "reimbursement")
 
 # Manual recategorization accepts anything the system itself can emit:
@@ -97,8 +109,15 @@ async def shared_summary(current_user: CurrentUser, db: DbSession) -> SharedSumm
     """What others owe for shared expenses: the sum of their parts minus
     what came back as reimbursements. All time — it's a running balance,
     like a tab with the brother."""
+    # The three totals cover what isn't assigned to anyone yet.
+    unassigned = Transaction.contact_id.is_(None)
     covered = await _sum_shared(
-        db, [Transaction.user_id == current_user.id, Transaction.shared_amount.is_not(None)]
+        db,
+        [
+            Transaction.user_id == current_user.id,
+            Transaction.shared_amount.is_not(None),
+            unassigned,
+        ],
     )
     reimbursed = await _sum_amount(
         db,
@@ -106,23 +125,56 @@ async def shared_summary(current_user: CurrentUser, db: DbSession) -> SharedSumm
             Transaction.user_id == current_user.id,
             Transaction.transaction_type == TransactionType.credit,
             Transaction.category == "reimbursement",
+            unassigned,
         ],
     )
+    contacts = (
+        (await db.execute(select(Contact).where(Contact.user_id == current_user.id)))
+        .scalars()
+        .all()
+    )
+    named = (
+        (
+            await db.execute(
+                select(Transaction).where(
+                    Transaction.user_id == current_user.id,
+                    Transaction.contact_id.is_not(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    people = contact_balances(contacts, named)
     rows = await db.execute(
         select(Transaction)
         .where(
             Transaction.user_id == current_user.id,
-            Transaction.shared_amount.is_not(None) | (Transaction.category == "reimbursement"),
+            Transaction.shared_amount.is_not(None)
+            | (Transaction.category == "reimbursement")
+            | Transaction.contact_id.is_not(None),
         )
         .order_by(Transaction.occurred_at.desc())
-        .limit(30)
+        .limit(60)
     )
     return SharedSummary(
         covered_for_others=covered,
         reimbursed=reimbursed,
         pending=max(covered - reimbursed, Decimal("0")),
+        people=people,
         items=[TransactionOut.model_validate(t) for t in rows.scalars().all()],
     )
+
+
+def contact_balances(contacts, rows) -> list[ContactBalance]:
+    """One balance per contact (zero ones included, so they can be picked),
+    biggest debts first."""
+    totals = {c.id: Decimal("0") for c in contacts}
+    for row in rows:
+        if row.contact_id in totals:
+            totals[row.contact_id] += balance_effect(row)
+    people = [ContactBalance(contact_id=c.id, name=c.name, balance=totals[c.id]) for c in contacts]
+    return sorted(people, key=lambda p: (-abs(p.balance), p.name.lower()))
 
 
 async def _sum_shared(db, filters: list[ColumnElement]) -> Decimal:
@@ -162,11 +214,64 @@ async def create_cash_expense(
     return TransactionOut.model_validate(tx)
 
 
+@router.post("/manual", response_model=TransactionOut, status_code=status.HTTP_201_CREATED)
+async def create_manual_movement(
+    payload: ManualMovementIn, current_user: CurrentUser, db: DbSession
+) -> TransactionOut:
+    """A movement with no email: a payback that came by "llave", money lent,
+    or an expense a contact paid (``account="contact"``: only the user's part
+    counts as spending and no account moves). Dated before the account's last
+    reconciliation, it's absorbed by that adjustment so the balance the user
+    already checked stays put."""
+    if payload.category is not None and not _is_allowed_category(payload.category):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="unknown_category"
+        )
+    if payload.contact_id is not None:
+        await _own_contact(db, current_user.id, payload.contact_id)
+    shared = payload.shared_amount or None
+    if payload.account == CONTACT_SOURCE:
+        if payload.transaction_type != TransactionType.debit or payload.contact_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="contact_paid_needs_debit",
+            )
+        # Their part may be 0: they paid something that was all the user's.
+        shared = payload.shared_amount or Decimal("0")
+    elif shared is not None and payload.transaction_type != TransactionType.debit:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="shared_needs_debit"
+        )
+    if shared is not None and shared > payload.amount:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="shared_exceeds_amount"
+        )
+    tx = Transaction(
+        user_id=current_user.id,
+        provider_connection_id=None,
+        amount=payload.amount,
+        merchant=payload.merchant.strip(),
+        category=payload.category,
+        transaction_type=payload.transaction_type,
+        currency="COP",
+        occurred_at=payload.occurred_at or datetime.now(timezone.utc),
+        source=payload.account,
+        shared_amount=shared,
+        contact_id=payload.contact_id,
+        note=(payload.note or "").strip() or None,
+    )
+    db.add(tx)
+    await _reconcile(db, current_user.id, tx.source, None, _outflow(tx))
+    await db.commit()
+    await db.refresh(tx)
+    return TransactionOut.model_validate(tx)
+
+
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_cash_expense(
     transaction_id: uuid.UUID, current_user: CurrentUser, db: DbSession
 ) -> None:
-    """Only typed-in cash expenses can be deleted; email rows would just come
+    """Only typed-in movements can be deleted; email rows would just come
     back on the next sync."""
     tx = (
         await db.execute(
@@ -177,15 +282,49 @@ async def delete_cash_expense(
     ).scalar_one_or_none()
     if tx is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="transaction_not_found")
-    if tx.source != "cash":
+    if not _editable(tx):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="not_a_manual_transaction")
-    await keep_cash_reconciled(db, current_user.id, (tx.amount, tx.occurred_at), None)
+    await _reconcile(db, current_user.id, tx.source, _outflow(tx), None)
     await db.delete(tx)
     await db.commit()
 
 
 def _is_allowed_category(category: str) -> bool:
     return category in ALLOWED_CATEGORIES or bool(CUSTOM_CATEGORY_RE.match(category))
+
+
+def _editable(tx: Transaction) -> bool:
+    """Cash rows and anything typed in: there's no email to diverge from."""
+    return tx.source == "cash" or bool(getattr(tx, "manual", False))
+
+
+def _outflow(tx: Transaction) -> CashExpense:
+    return outflow(tx.transaction_type, tx.amount, tx.occurred_at)
+
+
+async def _reconcile(
+    db: DbSession,
+    user_id: uuid.UUID,
+    source: str | None,
+    before: CashExpense,
+    after: CashExpense,
+) -> None:
+    """Keep the last reconciliation of the account a typed-in row moves."""
+    kind = MANUAL_ACCOUNT_SOURCES.get(source or "")
+    if kind is AccountKind.cash:
+        await keep_cash_reconciled(db, user_id, before, after)
+    elif kind is not None:
+        await keep_reconciled(db, user_id, kind, before, after)
+
+
+async def _own_contact(db: DbSession, user_id: uuid.UUID, contact_id: uuid.UUID) -> None:
+    found = (
+        await db.execute(
+            select(Contact.id).where(Contact.id == contact_id, Contact.user_id == user_id)
+        )
+    ).scalar_one_or_none()
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact_not_found")
 
 
 async def _own_debt(db: DbSession, user_id: uuid.UUID, debt_id: uuid.UUID) -> Debt | None:
@@ -239,8 +378,8 @@ async def update_transaction(
     current_user: CurrentUser,
     db: DbSession,
 ) -> TransactionOut:
-    """Manual edit (category, merchant name, note, shared part, the manual debt a debit paid;
-    amount and date for cash expenses)
+    """Manual edit (category, merchant name, note, shared part, contact, the manual debt a
+    debit paid; amount and date for cash and typed-in movements)
     — feeds budget bars, summaries, dashboard and the cash balance. Partial:
     only fields present in the body change."""
     provided = payload.model_fields_set
@@ -292,7 +431,7 @@ async def update_transaction(
         tx.merchant = merchant
     if "note" in provided:
         tx.note = note
-    before = (tx.amount, tx.occurred_at)
+    before = _outflow(tx)
     if "amount" in provided:
         if payload.amount is None:
             raise HTTPException(
@@ -300,7 +439,7 @@ async def update_transaction(
             )
         # Bank rows mirror their notification email; editing the amount would
         # just diverge from the bank (and from the statement reconciler).
-        if tx.source != "cash":
+        if not _editable(tx):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail="amount_not_editable"
             )
@@ -311,7 +450,7 @@ async def update_transaction(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid_date"
             )
         # Same reason: a bank row's date is the one in its email.
-        if tx.source != "cash":
+        if not _editable(tx):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail="date_not_editable"
             )
@@ -325,12 +464,21 @@ async def update_transaction(
         tx.shared_amount = shared
     if "debt_id" in provided:
         await _relink_debt(db, current_user.id, tx, payload.debt_id)
+    if "contact_id" in provided:
+        if payload.contact_id is not None:
+            await _own_contact(db, current_user.id, payload.contact_id)
+        elif tx.source == CONTACT_SOURCE:
+            # Without them it'd be an expense nobody paid.
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="contact_required"
+            )
+        tx.contact_id = payload.contact_id
     if tx.shared_amount is not None and tx.shared_amount > tx.amount:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="shared_exceeds_amount"
         )
-    if tx.source == "cash" and provided & {"amount", "occurred_at"}:
-        await keep_cash_reconciled(db, current_user.id, before, (tx.amount, tx.occurred_at))
+    if provided & {"amount", "occurred_at"}:
+        await _reconcile(db, current_user.id, tx.source, before, _outflow(tx))
     await db.commit()
     await db.refresh(tx)
     return TransactionOut.model_validate(tx)

@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.time_utils import not_in_excluded
 from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
 
-EXCLUDED_FROM_SPENT_CATEGORIES = ("transfer", "cash_withdrawal", "debt_payment")
+EXCLUDED_FROM_SPENT_CATEGORIES = ("transfer", "cash_withdrawal", "debt_payment", "reimbursement")
 EXCLUDED_FROM_RECEIVED_CATEGORIES = ("transfer", "debt_payment", "reimbursement")
 
 

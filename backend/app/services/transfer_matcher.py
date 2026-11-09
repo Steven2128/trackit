@@ -172,6 +172,8 @@ async def match_debt_payments(
                 *unpaired,
                 Transaction.transaction_type == TransactionType.debit,
                 Transaction.debt_id.is_(None),
+                # An expense a contact paid never left the user's accounts.
+                Transaction.source.is_distinct_from("contact"),
                 or_(
                     Transaction.category.is_(None),
                     Transaction.category.notin_(("transfer", "debt_payment")),

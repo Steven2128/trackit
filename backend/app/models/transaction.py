@@ -81,9 +81,24 @@ class Transaction(Base):
         nullable=True,
         index=True,
     )
+    # Who a shared expense, a payback or an expense they paid is with — see
+    # services/contact_balance.py. source="contact" marks an expense the
+    # contact paid: no account of the user moves, only their part counts.
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contacts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    @property
+    def manual(self) -> bool:
+        """Typed in by the user (no email behind it): amount, date and
+        deletion are editable."""
+        return self.provider_connection_id is None and self.raw_email_reference is None
 
     __table_args__ = (
         Index(

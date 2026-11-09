@@ -6,44 +6,117 @@ import { colors } from "../theme/colors";
 import { daysAgo, formatShortDay } from "../utils/dates";
 import CategoryPickerSheet from "./CategoryPickerSheet";
 import MoneyText from "./MoneyText";
+import PersonMovementSheet, { type PersonMovementPreset } from "./PersonMovementSheet";
 import TransactionRow from "./TransactionRow";
 
 const COLLAPSED = 3;
 
-/** The tab with whoever shares expenses with the user: their parts of
- * shared bills, what they paid back, what's still owed. Hidden until the
- * first shared expense. */
+/** Who owes whom with each person the user shares expenses or lends money
+ * with, plus the movements behind it. Hidden until there's someone or
+ * something shared. */
 export default function SharedExpensesCard() {
   const { data } = useSharedSummary();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState<TransactionOut | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [preset, setPreset] = useState<PersonMovementPreset | null>(null);
 
-  if (!data || (Number(data.covered_for_others) === 0 && Number(data.reimbursed) === 0)) {
-    return null;
+  const people = data?.people ?? [];
+  const legacyPending = Number(data?.pending ?? 0);
+  const hasLegacy = Number(data?.covered_for_others ?? 0) > 0 || Number(data?.reimbursed ?? 0) > 0;
+  if (!data || (people.length === 0 && !hasLegacy)) return null;
+
+  const person = people.find((p) => p.contact_id === selected) ?? null;
+  const filtered = person ? data.items.filter((t) => t.contact_id === person.contact_id) : data.items;
+  const items = expanded ? filtered : filtered.slice(0, COLLAPSED);
+
+  function settle(balance: number, contactId: string) {
+    setPreset(
+      balance > 0
+        ? { kind: "received", contactId, amount: balance }
+        : { kind: "sent", contactId, amount: -balance },
+    );
   }
-  const items = expanded ? data.items : data.items.slice(0, COLLAPSED);
-  const pending = Number(data.pending);
 
   return (
     <View>
       <View style={styles.header}>
         <Text style={styles.label}>Compartido</Text>
-        {data.items.length > COLLAPSED ? (
-          <Pressable onPress={() => setExpanded((e) => !e)} hitSlop={8}>
-            <Text style={styles.link}>{expanded ? "Ver menos" : "Ver todo"}</Text>
-          </Pressable>
-        ) : null}
+        <Pressable
+          onPress={() => setPreset({ kind: "received", contactId: selected })}
+          hitSlop={8}
+        >
+          <Text style={styles.link}>+ Registrar</Text>
+        </Pressable>
       </View>
 
       <View style={styles.summary}>
-        <Text style={styles.summaryLabel}>{pending > 0 ? "Te deben" : "Están al día"}</Text>
-        <MoneyText value={pending} size="lg" positive={pending > 0} />
-        <Text style={styles.summaryMeta}>
-          Pusiste por otros <MoneyText value={data.covered_for_others} size="sm" /> · te
-          devolvieron <MoneyText value={data.reimbursed} size="sm" />
-        </Text>
+        {people.map((p) => {
+          const balance = Number(p.balance);
+          const isSel = selected === p.contact_id;
+          return (
+            <View key={p.contact_id}>
+              <Pressable
+                style={({ pressed }) => [styles.person, isSel && styles.personSel, pressed && styles.pressed]}
+                onPress={() => setSelected(isSel ? null : p.contact_id)}
+              >
+                <Text style={styles.personName}>{p.name}</Text>
+                {balance === 0 ? (
+                  <Text style={styles.even}>Están al día</Text>
+                ) : (
+                  <Text style={styles.balanceText}>
+                    {balance > 0 ? "te debe " : "le debés "}
+                    <MoneyText
+                      value={Math.abs(balance)}
+                      size="md"
+                      positive={balance > 0}
+                      negative={balance < 0}
+                    />
+                  </Text>
+                )}
+              </Pressable>
+              {isSel ? (
+                <View style={styles.actions}>
+                  {balance !== 0 ? (
+                    <Pressable style={styles.actionBtn} onPress={() => settle(balance, p.contact_id)}>
+                      <Text style={styles.actionText}>
+                        {balance > 0 ? "Me pagó todo" : "Le pagué todo"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    style={[styles.actionBtn, styles.actionGhost]}
+                    onPress={() => setPreset({ kind: "theyPaid", contactId: p.contact_id })}
+                  >
+                    <Text style={[styles.actionText, styles.actionGhostText]}>Pagó un gasto</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.actionBtn, styles.actionGhost]}
+                    onPress={() => setPreset({ kind: "received", contactId: p.contact_id })}
+                  >
+                    <Text style={[styles.actionText, styles.actionGhostText]}>Otro movimiento</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
+        {hasLegacy ? (
+          <View style={styles.person}>
+            <Text style={styles.personName}>Sin persona asignada</Text>
+            {legacyPending > 0 ? (
+              <Text style={styles.balanceText}>
+                te deben <MoneyText value={legacyPending} size="md" positive />
+              </Text>
+            ) : (
+              <Text style={styles.even}>Están al día</Text>
+            )}
+          </View>
+        ) : null}
         <Text style={styles.hint}>
-          Cuando te devuelvan, marcá esa entrada como Reembolso para descontarla.
+          {people.length === 0
+            ? "Tocá + Registrar para agregar a alguien (Jesús, un amigo) y llevar la cuenta con cada uno."
+            : "Tocá a una persona para ver sus movimientos y saldar. Para asignar un movimiento, abrilo y elegí la persona."}
         </Text>
       </View>
 
@@ -60,12 +133,18 @@ export default function SharedExpensesCard() {
           />
         </Pressable>
       ))}
+      {filtered.length > COLLAPSED ? (
+        <Pressable onPress={() => setExpanded((e) => !e)} hitSlop={8} style={styles.more}>
+          <Text style={styles.link}>{expanded ? "Ver menos" : `Ver todo (${filtered.length})`}</Text>
+        </Pressable>
+      ) : null}
 
       <CategoryPickerSheet
         isVisible={editing !== null}
         transaction={editing}
         onClose={() => setEditing(null)}
       />
+      <PersonMovementSheet preset={preset} onClose={() => setPreset(null)} />
     </View>
   );
 }
@@ -92,16 +171,39 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   link: { color: colors.primary, fontSize: 12, fontWeight: "600" },
+  more: { paddingVertical: 8, alignItems: "center" },
   summary: {
     backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
+    padding: 10,
     marginBottom: 8,
-    gap: 4,
+    gap: 2,
   },
-  summaryLabel: { color: colors.textSecondary, fontSize: 12 },
-  summaryMeta: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
-  hint: { color: colors.textSecondary, fontSize: 11, fontStyle: "italic", marginTop: 4 },
+  person: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    gap: 8,
+  },
+  personSel: { backgroundColor: colors.primarySoft },
+  pressed: { opacity: 0.6 },
+  personName: { color: colors.textPrimary, fontSize: 14, fontWeight: "600", flexShrink: 1 },
+  balanceText: { color: colors.textSecondary, fontSize: 13 },
+  even: { color: colors.textSecondary, fontSize: 13 },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 6, paddingBottom: 8 },
+  actionBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  actionGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border },
+  actionText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  actionGhostText: { color: colors.textPrimary },
+  hint: { color: colors.textSecondary, fontSize: 11, fontStyle: "italic", marginTop: 6, paddingHorizontal: 6 },
 });

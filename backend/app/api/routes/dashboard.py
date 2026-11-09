@@ -35,7 +35,7 @@ from app.schemas.dashboard import (
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
-_EXCLUDED = ("transfer", "cash_withdrawal", "debt_payment")
+_EXCLUDED = ("transfer", "cash_withdrawal", "debt_payment", "reimbursement")
 _EXCLUDED_FROM_RECEIVED = ("transfer", "debt_payment", "reimbursement")
 
 

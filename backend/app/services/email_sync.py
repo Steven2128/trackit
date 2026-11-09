@@ -27,7 +27,7 @@ import asyncio
 import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -216,6 +216,16 @@ async def _process_message(
     # Savepoint per insert: a concurrent sync (manual + cron overlap) can win
     # the race after our dedupe SELECT; the unique index is the source of truth.
     source = parsed.source or parser.name
+    twin = await find_manual_twin(db, connection.user_id, source, parsed)
+    if twin is not None:
+        # The user typed this one in while the email was missing: the email
+        # backs that row now instead of becoming a second copy. The typed
+        # date stays, so the reconciliation that absorbed it still holds.
+        twin.provider_connection_id = connection.id
+        twin.raw_email_reference = parsed.raw_email_reference or message_id
+        await db.flush()
+        result.skipped_duplicate += 1
+        return
     try:
         async with db.begin_nested():
             tx = _to_transaction(
@@ -237,6 +247,42 @@ async def _process_message(
         result.skipped_duplicate += 1
         return
     result.created += 1
+
+
+# A bank email that shows up late (or the user typed it in first) lands within
+# a few days of the date the user picked.
+MANUAL_TWIN_WINDOW = timedelta(days=3)
+_MANUAL_BANK_SOURCES = ("davivienda", "nequi")
+
+
+async def find_manual_twin(
+    db: AsyncSession, user_id, source: str, parsed: ParsedTransaction
+) -> Transaction | None:
+    """A typed-in row of the same account, direction and amount near the
+    email's date, not yet backed by any email — the closest one."""
+    if source not in _MANUAL_BANK_SOURCES:
+        return None
+    candidates = (
+        (
+            await db.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user_id,
+                    Transaction.source == source,
+                    Transaction.provider_connection_id.is_(None),
+                    Transaction.raw_email_reference.is_(None),
+                    Transaction.transaction_type == parsed.transaction_type,
+                    Transaction.amount == parsed.amount,
+                    Transaction.occurred_at >= parsed.occurred_at - MANUAL_TWIN_WINDOW,
+                    Transaction.occurred_at <= parsed.occurred_at + MANUAL_TWIN_WINDOW,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not candidates:
+        return None
+    return min(candidates, key=lambda t: abs(t.occurred_at - parsed.occurred_at))
 
 
 async def _process_card_email(

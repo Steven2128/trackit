@@ -34,7 +34,7 @@ export const INTERNAL_CATEGORIES = ["transfer", "cash_withdrawal", "debt_payment
 
 // Mirror of the backend's totals (transactions.py) so client-side sums match
 // /transactions/summary.
-export const EXCLUDED_FROM_SPENT = ["transfer", "cash_withdrawal", "debt_payment"];
+export const EXCLUDED_FROM_SPENT = ["transfer", "cash_withdrawal", "debt_payment", "reimbursement"];
 export const EXCLUDED_FROM_RECEIVED = ["transfer", "debt_payment", "reimbursement"];
 
 /** The user's own part of a movement: the amount minus what someone else

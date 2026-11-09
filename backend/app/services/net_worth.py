@@ -125,12 +125,26 @@ def reconciled_delta(
 async def keep_cash_reconciled(
     db: AsyncSession, user_id: uuid.UUID, before: CashExpense, after: CashExpense
 ) -> None:
-    """Apply ``reconciled_delta`` to the cash account's latest adjustment.
-    Only the latest one matters: the current balance has to match the last
+    """``keep_reconciled`` for the cash account (typed-in cash expenses)."""
+    await keep_reconciled(db, user_id, AccountKind.cash, before, after)
+
+
+async def keep_reconciled(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    kind: AccountKind,
+    before: CashExpense,
+    after: CashExpense,
+) -> None:
+    """Apply ``reconciled_delta`` to the account's latest adjustment, so a
+    movement typed in after the last count (a payback by "llave" whose email
+    never came) doesn't move the balance the user already checked. Amounts
+    are outflows: pass a credit as its negative (see ``outflow``). Only the
+    latest adjustment matters: the current balance has to match the last
     count. The caller commits."""
     account = (
         await db.execute(
-            select(Account).where(Account.user_id == user_id, Account.kind == AccountKind.cash)
+            select(Account).where(Account.user_id == user_id, Account.kind == kind)
         )
     ).scalar_one_or_none()
     if account is None:
@@ -148,6 +162,19 @@ async def keep_cash_reconciled(
     delta = reconciled_delta(account.opening_at, latest.created_at, before, after)
     if delta:
         latest.amount += delta
+
+
+# Typed-in rows: the account their ``source`` moves directly.
+MANUAL_ACCOUNT_SOURCES: dict[str, AccountKind] = {
+    "cash": AccountKind.cash,
+    "davivienda": AccountKind.davivienda,
+    "nequi": AccountKind.nequi,
+}
+
+
+def outflow(transaction_type: TransactionType, amount: Decimal, occurred_at: datetime) -> CashExpense:
+    """A movement as ``reconciled_delta`` expects it: money out is positive."""
+    return (amount if transaction_type == TransactionType.debit else -amount, occurred_at)
 
 
 @dataclass

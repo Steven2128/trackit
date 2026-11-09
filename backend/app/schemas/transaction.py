@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -41,6 +42,10 @@ class TransactionOut(BaseModel):
     source: str | None = None
     # Part of a debit someone else covers; spending counts amount - this.
     shared_amount: Decimal | None = None
+    # Who it's shared with / paid back by (services/contact_balance.py).
+    contact_id: uuid.UUID | None = None
+    # Typed in by the user (no email): amount, date and deletion editable.
+    manual: bool = False
 
 
 class TransactionUpdate(BaseModel):
@@ -59,8 +64,39 @@ class TransactionUpdate(BaseModel):
     # Debits only: the hand-entered debt this paid (a family loan, a bank
     # loan without emails). Lowers that debt's balance; None unlinks it.
     debt_id: uuid.UUID | None = None
+    # Who it's shared with or paid back by; None clears it.
+    contact_id: uuid.UUID | None = None
 
     _occurred_at = field_validator("occurred_at")(check_expense_date)
+
+
+class ManualMovementIn(BaseModel):
+    """A movement with no email behind it: a payback by "llave", money lent,
+    or an expense a contact paid.
+
+    ``account`` is where the money moved ("davivienda", "nequi", "cash"), or
+    "contact" for an expense the contact paid — then it must be a debit,
+    ``contact_id`` is required and ``shared_amount`` is their part (the rest
+    is the user's spending)."""
+
+    account: Literal["davivienda", "nequi", "cash", "contact"]
+    transaction_type: TransactionType
+    amount: Decimal = Field(..., gt=0, le=MAX_NUMERIC_12_2)
+    merchant: str = Field(..., min_length=1, max_length=255)
+    category: str | None = Field(default=None, max_length=64)
+    contact_id: uuid.UUID | None = None
+    shared_amount: Decimal | None = Field(default=None, ge=0, le=MAX_NUMERIC_12_2)
+    note: str | None = Field(default=None, max_length=500)
+    occurred_at: datetime | None = None
+
+    _occurred_at = field_validator("occurred_at")(check_expense_date)
+
+
+class ContactBalance(BaseModel):
+    contact_id: uuid.UUID
+    name: str
+    # > 0: they owe the user; < 0: the user owes them.
+    balance: Decimal
 
 
 class SharedSummary(BaseModel):
@@ -70,6 +106,8 @@ class SharedSummary(BaseModel):
     covered_for_others: Decimal
     reimbursed: Decimal
     pending: Decimal
+    # Per contact; the three totals above are what isn't assigned to anyone.
+    people: list[ContactBalance] = []
     # Latest shared debits and reimbursement credits, newest first.
     items: list[TransactionOut]
 

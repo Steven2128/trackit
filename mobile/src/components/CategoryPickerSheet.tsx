@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { useBudgetStatus } from "../services/queries/budgets";
+import { useContacts } from "../services/queries/contacts";
 import { useDebts } from "../services/queries/debts";
 import { useRuleSuggestion, useSaveCategoryRule } from "../services/queries/categoryRules";
 import {
@@ -26,6 +27,7 @@ import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import { daysAgo as daysAgoOf, expenseInstant } from "../utils/dates";
 import CategoryIcon from "./CategoryIcon";
+import ContactPicker from "./ContactPicker";
 import ExpenseDayPicker from "./ExpenseDayPicker";
 import MoneyText from "./MoneyText";
 import { useWebSheet } from "./useWebSheet";
@@ -66,8 +68,15 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   const [shared, setShared] = useState("");
   // Typed-in cash expenses: amount and day editable, and deletable. Bank rows mirror
   // their notification email, so their amount stays read-only.
-  const isCash = transaction?.source === "cash";
+  // Typed-in rows (cash, paybacks by "llave", what someone else paid) have no
+  // email to diverge from: amount, day and deletion are editable.
+  const isCash = transaction?.source === "cash" || !!transaction?.manual;
   const isDebit = transaction?.transaction_type === "debit";
+  // An expense the person paid: their part is always set.
+  const theyPaid = transaction?.source === "contact";
+  const [contactId, setContactId] = useState<string | null>(null);
+  const { data: contacts } = useContacts();
+  const contactName = contacts?.find((c) => c.id === contactId)?.name ?? "la otra persona";
   // Which hand-entered debt a payment went to (a loan from mom, a bank loan
   // without emails). Cards read by email are left out: their own payment
   // email already lowers them. Card purchases keep their card.
@@ -76,6 +85,8 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   const manualDebts = useMemo(() => (debts ?? []).filter((d) => !d.email_sender), [debts]);
   const canPickDebt =
     isDebit && transaction?.source !== "card" && selected === "debt_payment";
+  // Who it's with: for a shared expense, money between people, or what they paid.
+  const pickContact = (isDebit && isShared) || selected === "reimbursement" || theyPaid;
 
   useEffect(() => {
     if (transaction) {
@@ -88,6 +99,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       setIsShared(!!transaction.shared_amount);
       setShared(transaction.shared_amount ? toCOPInput(transaction.shared_amount) : "");
       setDebtId(transaction.debt_id);
+      setContactId(transaction.contact_id);
     }
   }, [transaction]);
 
@@ -135,8 +147,12 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       Alert.alert("Monto inválido", "Escribí un monto en pesos mayor a 0.");
       return;
     }
-    const sharedValue = isDebit && isShared ? parseCOP(shared) : 0;
-    if (isDebit && isShared && (sharedValue <= 0 || sharedValue > total)) {
+    const sharedValue = isDebit && (isShared || theyPaid) ? parseCOP(shared) : 0;
+    if (theyPaid && sharedValue > total) {
+      Alert.alert("Parte inválida", "La parte de la otra persona no puede pasar del total.");
+      return;
+    }
+    if (!theyPaid && isDebit && isShared && (sharedValue <= 0 || sharedValue > total)) {
       Alert.alert(
         "Parte compartida inválida",
         "Lo que pone la otra persona tiene que ser mayor a 0 y no pasar del monto.",
@@ -163,6 +179,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
           : {}),
         ...(isDebit && sharedValue !== previousShared ? { shared_amount: sharedValue } : {}),
         ...(debtChanged ? { debt_id: nextDebtId } : {}),
+        ...(pickContact && contactId !== transaction.contact_id ? { contact_id: contactId } : {}),
       },
       {
         onSuccess: () => {
@@ -202,8 +219,9 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   function handleDelete() {
     if (!transaction || removal.isPending) return;
     Alert.alert(
-      "Eliminar gasto",
-      `¿Eliminar "${transaction.merchant ?? "este gasto"}"? Vuelve a sumar al efectivo.`,
+      "Eliminar movimiento",
+      `¿Eliminar "${transaction.merchant ?? "este movimiento"}"?` +
+        (theyPaid ? "" : " La cuenta vuelve a como estaba."),
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -371,7 +389,25 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
           multiline
         />
 
-        {isDebit ? (
+        {theyPaid ? (
+          <>
+            <Text style={styles.label}>Parte de {contactName} (COP)</Text>
+            <BottomSheetTextInput
+              style={styles.input}
+              placeholder="0"
+              placeholderTextColor={colors.textSecondary}
+              value={shared}
+              onChangeText={(v) => setShared(formatCOPInput(v))}
+              keyboardType="number-pad"
+              inputMode="numeric"
+            />
+            <Text style={styles.sharedHint}>
+              Lo pagó {contactName}. Tu parte:{" "}
+              <MoneyText value={String(Math.max(0, total - parseCOP(shared)))} size="sm" /> — cuenta
+              como gasto tuyo y es lo que le debés.
+            </Text>
+          </>
+        ) : isDebit ? (
           <>
             <Pressable
               style={({ pressed }) => [styles.sharedToggle, pressed && styles.pressed]}
@@ -407,6 +443,19 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
                 </Text>
               </>
             ) : null}
+          </>
+        ) : null}
+
+        {pickContact ? (
+          <>
+            <Text style={styles.label}>
+              {theyPaid
+                ? "¿Quién lo pagó?"
+                : selected === "reimbursement"
+                  ? "¿Con quién fue?"
+                  : "¿Con quién lo compartís?"}
+            </Text>
+            <ContactPicker value={contactId} onChange={setContactId} allowNone={!theyPaid} />
           </>
         ) : null}
 
