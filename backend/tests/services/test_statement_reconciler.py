@@ -86,3 +86,12 @@ class TestCategoryFor:
 
     def test_unmatched_description_falls_back_to_categorizer(self) -> None:
         assert category_for("COMPRA RAPPI COLOMBIA*DL A") is not None
+
+
+def test_wider_tolerance_for_card_statements_that_post_days_later() -> None:
+    # Bought Saturday night, posted Monday: two days apart.
+    rows = [_row(0, date(2026, 10, 26), "8700", TransactionType.debit)]
+    db_rows = [(date(2026, 10, 24), Decimal("8700"), TransactionType.debit)]
+
+    assert match_statement_rows(rows, db_rows)[0] == 0
+    assert match_statement_rows(rows, db_rows, tolerance_days=3) == (1, [])

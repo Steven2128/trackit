@@ -33,6 +33,8 @@ services:
         sync: false
       - key: ITAU_STATEMENT_PDF_PASSWORD
         sync: false
+      - key: RAPPICARD_STATEMENT_PDF_PASSWORD
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: MOBILE_RETURN_SCHEME

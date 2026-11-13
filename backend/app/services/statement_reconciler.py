@@ -78,6 +78,7 @@ def _bucket_key(local_date: date, amount: Decimal, tx_type: TransactionType) -> 
 def match_statement_rows(
     statement: list[StatementRow],
     db_rows: list[tuple[date, Decimal, TransactionType]],
+    tolerance_days: int = 1,
 ) -> tuple[int, list[StatementRow]]:
     """Pure matching core — no DB access, fully unit-testable.
 
@@ -91,8 +92,8 @@ def match_statement_rows(
 
     matched = 0
     pending = list(statement)
-    # Pass 1: exact date. Pass 2: ±1 day.
-    for offsets in ((0,), (-1, 1)):
+    # Pass 1: exact date. Then one pass per day of tolerance, nearest first.
+    for offsets in ((0,), *((-d, d) for d in range(1, tolerance_days + 1))):
         still_pending: list[StatementRow] = []
         for row in pending:
             for off in offsets:

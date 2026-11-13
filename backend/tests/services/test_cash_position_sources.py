@@ -4,7 +4,7 @@ deposit pattern (two quincenas + a separate bonus); the rest is fictitious."""
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -12,6 +12,7 @@ import pytest
 
 from app.services.cash_position import PositionStatus, compute_position
 from app.services.cash_position_sources import (
+    CardPurchase,
     Credit,
     DebtPayment,
     PaymentRecord,
@@ -146,6 +147,56 @@ def test_statement_minimum_minus_payments_made_against_it() -> None:
         Decimal("402708.83"),
         Decimal("200000"),
     )
+
+
+def test_payment_on_the_previous_due_date_belongs_to_the_previous_statement() -> None:
+    # Paid October's minimum on its due date; November's is still owed in full.
+    debt = _debt("757430.83", date(2026, 11, 20))
+    payments = [DebtPayment(debt.id, date(2026, 10, 20), Decimal("402708.83"))]
+    (ob,) = debt_obligations([debt], payments, date(2026, 11, 12), date(2026, 12, 4))
+    assert (ob.amount, ob.paid) == (Decimal("757430.83"), Decimal("0"))
+
+
+def test_payment_before_the_statement_was_issued_does_not_count() -> None:
+    # Late payment of the previous statement (21-Oct), before this one came.
+    debt = _debt("757430.83", date(2026, 11, 20))
+    debt.statement_at = datetime(2026, 11, 11, 5, tzinfo=timezone.utc)
+    payments = [
+        DebtPayment(debt.id, date(2026, 10, 21), Decimal("100000")),
+        DebtPayment(debt.id, date(2026, 11, 15), Decimal("300000")),
+    ]
+    (ob,) = debt_obligations([debt], payments, date(2026, 11, 16), date(2026, 12, 4))
+    assert ob.paid == Decimal("300000")
+
+
+def test_next_statement_is_one_estimated_payment_from_purchases_since_the_cut() -> None:
+    debt = _debt("757430.83", date(2026, 11, 20))
+    debt.statement_at = datetime(2026, 11, 11, 5, tzinfo=timezone.utc)
+    debt.next_installments = Decimal("69358.84")
+    purchases = [
+        CardPurchase(debt.id, datetime(2026, 10, 30, 18, tzinfo=timezone.utc), Decimal("10000")),
+        CardPurchase(debt.id, datetime(2026, 11, 12, 18, tzinfo=timezone.utc), Decimal("25000")),
+        CardPurchase(debt.id, datetime(2026, 11, 14, 1, tzinfo=timezone.utc), Decimal("15000")),
+        CardPurchase(uuid.uuid4(), datetime(2026, 11, 14, 1, tzinfo=timezone.utc), Decimal("999")),
+    ]
+    obs = debt_obligations(
+        [debt], [], date(2026, 11, 14), date(2026, 12, 20), purchases=purchases
+    )
+    assert [(o.name, o.due, o.amount, o.status) for o in obs] == [
+        ("Próximo extracto RappiCard", date(2026, 12, 20), Decimal("109358.84"),
+         AmountStatus.estimated),
+        ("Mínimo RappiCard", date(2026, 11, 20), Decimal("757430.83"), AmountStatus.confirmed),
+    ]
+    # Past this statement's date and the next one hasn't arrived: only the estimate.
+    (only,) = debt_obligations(
+        [debt], [], date(2026, 11, 25), date(2026, 12, 20), purchases=purchases
+    )
+    assert only.due == date(2026, 12, 20)
+    # Beyond the horizon, or nothing bought and no installments: nothing.
+    assert len(debt_obligations([debt], [], date(2026, 11, 14), date(2026, 12, 4),
+                                purchases=purchases)) == 1
+    debt.next_installments = None
+    assert len(debt_obligations([debt], [], date(2026, 11, 14), date(2026, 12, 20))) == 1
 
 
 def test_old_statement_and_debts_without_minimum_are_skipped() -> None:

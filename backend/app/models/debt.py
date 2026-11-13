@@ -34,6 +34,14 @@ class Debt(Base):
     # Purchases on other cards from the same sender are ignored when set.
     card_last_digits: Mapped[str | None] = mapped_column(String(4), nullable=True)
     payment_due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # When the last statement email arrived: card purchases after it belong
+    # to the next statement (estimated in the cash position until it comes).
+    statement_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Installments of older purchases that the next statement will bill
+    # (read off the last one). Cleared when that statement arrives.
+    next_installments: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     # What the user plans to pay each due date when it's more than the
     # minimum ("700.000 cada 5"). The cash position uses the larger one.
     planned_payment: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)

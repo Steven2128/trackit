@@ -119,7 +119,7 @@ Pushing to `master` deploys automatically once CI passes. Rationale in
    - `DATABASE_URL` — the Neon string.
    - `SECRET_KEY`, `FERNET_KEY` — reuse your local ones if you migrate data
      (step 5), otherwise generate new ones.
-   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ITAU_STATEMENT_PDF_PASSWORD`, `RESEND_API_KEY` — same as `.env`.
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ITAU_STATEMENT_PDF_PASSWORD`, `RAPPICARD_STATEMENT_PDF_PASSWORD`, `RESEND_API_KEY` — same as `.env`.
    - `API_BASE_URL` — the service URL, e.g. `https://trackit-api.onrender.com`.
    - `CRON_SECRET` — `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 3. **Google Cloud Console** → OAuth Web client → add redirect URIs

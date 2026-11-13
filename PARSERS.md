@@ -189,6 +189,13 @@ A diferencia de los bancos de arriba, **el remitente no está en el código**: d
 - "Resumen de transacción" → compra (monto colombiano `$23.350`, hora local en el cuerpo, tarjeta `*NNNN`).
 - "Comprobante de pago" → pago. **La hora del cuerpo va ~5 h atrasada** respecto del débito del banco, así que `occurred_at` = hora de llegada del email. Los dígitos de "Destino de pago" no son los de la tarjeta.
 - "Llegó el extracto" → pago mínimo y fecha límite (`20 sept 2026`). Acá los montos vienen en formato gringo (`$ 92,392.00`).
+- **PDF adjunto al extracto** (`app/parsers/cards/rappicard_statement.py` → `app/services/card_statement.py`): trae lo que el cuerpo no. Está protegido con contraseña: `RAPPICARD_STATEMENT_PDF_PASSWORD`, y si está vacía se usa `ITAU_STATEMENT_PDF_PASSWORD` (hoy la misma abre los dos). De ahí salen:
+  - el **corte** ("Hasta 10 nov 2026", cae alrededor del 10; observados: 10-sep, 8-oct, 10-nov) → `debts.statement_at` = primer instante del día siguiente. Las compras posteriores son del próximo extracto;
+  - las **cuotas** de compras viejas que cobra el próximo extracto (capital pendiente ÷ cuotas que faltan) → `debts.next_installments`;
+  - las **compras del periodo** que no llegaron por correo (o anteriores a vincular la tarjeta): se insertan como movimientos de la tarjeta. El extracto fecha la compra cuando se asienta, hasta 2 días después del correo, así que el cruce tolera ±3 días;
+  - el **saldo**: "Pago total" (incluye las cuotas sin facturar) + compras − pagos posteriores al corte.
+  - Sin PDF o sin contraseña, quedan el mínimo y la fecha del cuerpo, y la llegada del correo hace de corte.
+- **Flujo de caja**: cada tarjeta es **un solo pago por vencimiento**: el mínimo del último extracto y, antes de que llegue el siguiente, "Próximo extracto <tarjeta>" (estimado) = compras desde el corte + `next_installments`, un mes después del último vencimiento.
 
 ---
 

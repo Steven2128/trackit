@@ -44,6 +44,7 @@ from app.services.cash_flow import IncomeLike, PaymentLike, compute_cash_flow
 from app.services.cash_position import compute_position
 from app.services.cash_position_sources import (
     STATEMENT_WINDOW_DAYS,
+    CardPurchase,
     Credit,
     DebtPayment,
     PaymentRecord,
@@ -320,6 +321,25 @@ async def cash_position(
         if r.debt_id is not None and r.category == "debt_payment"
     ]
 
+    # Purchases on each card since its last statement: the next one's estimate.
+    statement_ats = [d.statement_at for d in debts if d.statement_at is not None]
+    card_purchases: list[CardPurchase] = []
+    if statement_ats:
+        card_purchases = [
+            CardPurchase(r.debt_id, r.occurred_at, r.amount)
+            for r in (
+                await db.execute(
+                    select(Transaction.debt_id, Transaction.occurred_at, Transaction.amount).where(
+                        Transaction.user_id == current_user.id,
+                        Transaction.transaction_type == TransactionType.debit,
+                        Transaction.source == "card",
+                        Transaction.debt_id.is_not(None),
+                        Transaction.occurred_at >= min(statement_ats),
+                    )
+                )
+            ).all()
+        ]
+
     inputs = build_inputs(
         today=today,
         horizon_end=horizon_end,
@@ -332,6 +352,7 @@ async def cash_position(
         pay_due_on_payday=pay_due_on_payday,
         fund_holds=fund_holds,
         records=records,
+        card_purchases=card_purchases,
     )
     pos = compute_position(inputs)
     shared_pct = {f"planned:{p.id}": p.shared_pct for p in payments if p.shared_pct}

@@ -33,6 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import decrypt_token, encrypt_token
 from app.integrations.gmail import (
     GmailClient,
@@ -45,6 +46,8 @@ from app.models.provider_connection import ProviderConnection
 from app.models.transaction import Transaction, TransactionType
 from app.parsers import REGISTERED_PARSERS
 from app.parsers.cards import CARD_FORMATS, CardEvent, CardEventKind
+from app.parsers.cards.rappicard_statement import extract_statement
+from app.services.card_statement import apply_card_statement
 from app.services.categorizer import UserRule, categorize
 from app.services.net_worth import CASH_SOURCE, keep_cash_reconciled
 from app.services.transfer_matcher import (
@@ -192,7 +195,7 @@ async def _process_message(
     linked = [d for d in card_debts if d.email_sender and d.email_sender.lower() in sender]
     if linked:
         await _process_card_email(
-            db, connection, envelope, message_id, linked, result, user_rules
+            db, connection, envelope, message_id, linked, result, user_rules, client
         )
         return
 
@@ -293,6 +296,7 @@ async def _process_card_email(
     linked: list[Debt],
     result: SyncResult,
     user_rules: Sequence[UserRule] = (),
+    client: GmailClient | None = None,
 ) -> None:
     event = CARD_FORMATS[linked[0].email_format].parse(envelope)
     if event is None:
@@ -310,6 +314,13 @@ async def _process_card_email(
         if debt.payment_due_date is None or event.payment_due_date >= debt.payment_due_date:
             debt.minimum_payment = event.minimum_payment
             debt.payment_due_date = event.payment_due_date
+            # Until the PDF is read: the email's arrival stands in for the cut-off.
+            debt.statement_at = event.occurred_at
+            debt.next_installments = None
+            if client is not None:
+                await _apply_statement_pdf(
+                    db, client, connection, debt, envelope, message_id, user_rules
+                )
         result.card_statements += 1
         return
 
@@ -323,6 +334,46 @@ async def _process_card_email(
         return
     apply_card_event_to_balance(debt, event)
     result.created += 1
+
+
+async def _apply_statement_pdf(
+    db: AsyncSession,
+    client: GmailClient,
+    connection: ProviderConnection,
+    debt: Debt,
+    envelope: EmailEnvelope,
+    message_id: str,
+    user_rules: Sequence[UserRule],
+) -> None:
+    """Read the statement PDF attached to the email (cut-off, installments,
+    missed purchases, balance). Best effort: without the PDF or its password
+    the email's minimum and due date are still applied."""
+    if debt.email_format != "rappicard" or not envelope.attachments:
+        return
+    attachment = next(
+        (a for a in envelope.attachments if "statement" in a.filename.lower()),
+        envelope.attachments[0],
+    )
+    try:
+        pdf_bytes = await asyncio.to_thread(
+            client.get_attachment, message_id, attachment.attachment_id
+        )
+        statement = await asyncio.to_thread(
+            extract_statement, pdf_bytes, _statement_pdf_password()
+        )
+    except Exception:  # noqa: BLE001 — wrong/missing password, not a PDF, layout change
+        log.warning("gmail_sync card_statement_pdf_unreadable message_id=%s", message_id)
+        return
+    if statement is None:
+        log.warning("gmail_sync card_statement_pdf_no_period message_id=%s", message_id)
+        return
+    await apply_card_statement(db, connection, debt, statement, user_rules)
+
+
+def _statement_pdf_password() -> str:
+    """Davivienda issues the card and locks its PDFs like Itaú's statements
+    (the holder's ID): one configured password opens both."""
+    return settings.rappicard_statement_pdf_password or settings.itau_statement_pdf_password
 
 
 def pick_card_debt(linked: list[Debt], event: CardEvent) -> Debt | None:

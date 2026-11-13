@@ -15,13 +15,15 @@ Pure: the route (``GET /cashflow/position``) loads rows and passes them in.
   What's already paid toward a due date = ``obligation_payments`` for it
   (partial or ahead); the old monthly check-off still counts as paid in
   full, and card payments read from email count when nothing was recorded.
+  A card read by email also gets an estimate of its *next* statement: what
+  was bought on it since the last one, due a month after that one's date.
 """
 
 from __future__ import annotations
 
 import calendar
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Protocol, Sequence
 
@@ -43,7 +45,7 @@ RECEIVED_DAYS_AFTER = 4
 RECEIVED_MIN_SHARE = Decimal("0.90")
 # Only deposits expected this far back are still awaited (late), not lost.
 LATE_LOOKBACK_DAYS = 5
-# Card payments this long before a due date count against that statement.
+# How far back the route loads card payments and payment records.
 STATEMENT_WINDOW_DAYS = 35
 
 
@@ -71,6 +73,8 @@ class DebtLike(Protocol):
     planned_payment: Decimal | None
     payment_due_date: date | None
     email_format: str | None
+    # Optional: ``statement_at``, when the last statement email arrived, and
+    # ``next_installments``, installments already known for the next one.
 
 
 class FundHoldLike(Protocol):
@@ -92,6 +96,15 @@ class DebtPayment:
 
     debt_id: object
     on: date
+    amount: Decimal
+
+
+@dataclass(frozen=True)
+class CardPurchase:
+    """A purchase on a card read from email."""
+
+    debt_id: object
+    at: datetime
     amount: Decimal
 
 
@@ -264,23 +277,66 @@ def _add_month(d: date) -> date:
     return date(y, m, min(d.day, calendar.monthrange(y, m)[1]))
 
 
+def _sub_month(d: date) -> date:
+    y, m = (d.year - 1, 12) if d.month == 1 else (d.year, d.month - 1)
+    return date(y, m, min(d.day, calendar.monthrange(y, m)[1]))
+
+
+def _next_statement(
+    d: DebtLike,
+    purchases: Sequence[CardPurchase],
+    today: date,
+    horizon_end: date,
+    records: Sequence[PaymentRecord],
+) -> Obligation | None:
+    """What the next statement of a card read by email will ask for, before
+    it arrives, as one payment: everything bought since the last one, in
+    full (the conservative guess — purchases split in installments bill
+    less), plus the installments of older purchases that fall in it."""
+    statement_at = getattr(d, "statement_at", None)
+    if d.email_format is None or statement_at is None or d.payment_due_date is None:
+        return None
+    due = _add_month(d.payment_due_date)
+    if not today <= due <= horizon_end:
+        return None
+    spent = sum(
+        (p.amount for p in purchases if p.debt_id == d.id and p.at >= statement_at), ZERO
+    )
+    amount = spent + (getattr(d, "next_installments", None) or ZERO)
+    if amount == 0:
+        return None
+    return Obligation(
+        f"Próximo extracto {d.bank_name}",
+        due,
+        amount,
+        status=AmountStatus.estimated,
+        paid=_recorded(records, due, debt=d.id),
+        ref=f"debt:{d.id}:{due}",
+    )
+
+
 def debt_obligations(
     debts: Sequence[DebtLike],
     payments: Sequence[DebtPayment],
     today: date,
     horizon_end: date | None = None,
     records: Sequence[PaymentRecord] = (),
+    purchases: Sequence[CardPurchase] = (),
 ) -> list[Obligation]:
     """Each debt's due dates in the horizon, for max(minimum, planned).
 
-    Cards read by email: only the latest statement's date (an old one means
-    the next statement hasn't arrived). Debts typed by hand (no email): the
+    Cards read by email: the latest statement's date (an old one means the
+    next statement hasn't arrived) plus an estimate of the next statement
+    from the purchases made since. Debts typed by hand (no email): the
     date repeats monthly — rolled past dates are flagged as estimated, the
     user should confirm them against the statement.
     """
     horizon_end = horizon_end or today
     out = []
     for d in debts:
+        upcoming = _next_statement(d, purchases, today, horizon_end, records)
+        if upcoming is not None:
+            out.append(upcoming)
         amount = max(d.minimum_payment or ZERO, d.planned_payment or ZERO)
         if amount == 0:
             continue
@@ -305,7 +361,13 @@ def debt_obligations(
             if recorded:
                 paid = recorded
             else:
-                since = when - timedelta(days=STATEMENT_WINDOW_DAYS)
+                # Only what was paid for *this* statement: after the previous
+                # due date (a payment on that day settled the previous one)
+                # and not before this statement was issued.
+                since = _sub_month(when) + timedelta(days=1)
+                statement_at = getattr(d, "statement_at", None)
+                if statement_at is not None and i == 0:
+                    since = max(since, statement_at.date())
                 paid = sum(
                     (p.amount for p in payments if p.debt_id == d.id and since <= p.on <= when),
                     ZERO,
@@ -340,6 +402,7 @@ def build_inputs(
     pay_due_on_payday: bool,
     fund_holds: Sequence[FundHoldLike] = (),
     records: Sequence[PaymentRecord] = (),
+    card_purchases: Sequence[CardPurchase] = (),
 ) -> PositionInputs:
     return PositionInputs(
         today=today,
@@ -349,7 +412,9 @@ def build_inputs(
         incomes=tuple(expected_incomes(income_sources, credits, today, horizon_end)),
         obligations=(
             *planned_obligations(planned_payments, today, horizon_end, records),
-            *debt_obligations(debts, debt_payments, today, horizon_end, records),
+            *debt_obligations(
+                debts, debt_payments, today, horizon_end, records, card_purchases
+            ),
         ),
         pay_due_on_payday=pay_due_on_payday,
     )

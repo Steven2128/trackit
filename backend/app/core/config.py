@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     gmail_sync_max_messages: int = 200
 
     itau_statement_pdf_password: str = Field(default="")
+    # The RappiCard statement PDF attached to its email is password-protected.
+    rappicard_statement_pdf_password: str = Field(default="")
 
     sync_interval_hours: int = Field(default=6)
     sync_scheduler_enabled: bool = Field(default=True)
