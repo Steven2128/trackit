@@ -1,4 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,6 +16,7 @@ import DebtCard from "../components/DebtCard";
 import DebtFormSheet from "../components/DebtFormSheet";
 import MoneyText from "../components/MoneyText";
 import StrategySheet from "../components/StrategySheet";
+import type { AppStackParamList } from "../navigation/AppStack";
 import { useDebts, type DebtOut } from "../services/queries/debts";
 import { colors } from "../theme/colors";
 import { pageStyle, useIsWide } from "../theme/layout";
@@ -24,6 +27,8 @@ export default function DebtTrackerScreen() {
   const [strategyOpen, setStrategyOpen] = useState(false);
   const [editing, setEditing] = useState<DebtOut | undefined>(undefined);
   const isWide = useIsWide();
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const hasCards = (data ?? []).some((d) => d.email_format);
 
   const { totalDebt, totalMin, count } = useMemo(() => {
     const list = data ?? [];
@@ -98,6 +103,16 @@ export default function DebtTrackerScreen() {
                 /mes
               </Text>
             </View>
+            {hasCards ? (
+              <Pressable
+                style={({ pressed }) => [styles.strategyBtn, styles.linkBtn, pressed && styles.pressed]}
+                onPress={() => navigation.navigate("Cards")}
+              >
+                <Ionicons name="card" size={18} color={colors.primary} />
+                <Text style={styles.strategyText}>Mis tarjetas: extractos y cuotas</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+              </Pressable>
+            ) : null}
             {debts.length > 0 ? (
               <Pressable
                 style={({ pressed }) => [styles.strategyBtn, pressed && styles.pressed]}
@@ -209,6 +224,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 16,
   },
+  linkBtn: { marginBottom: 8 },
   strategyText: { color: colors.textPrimary, fontSize: 14, fontWeight: "600", flex: 1 },
   emptyBox: { alignItems: "center", paddingVertical: 40, gap: 12 },
   emptyText: { color: colors.textSecondary, fontSize: 14 },

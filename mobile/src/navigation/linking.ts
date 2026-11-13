@@ -9,7 +9,7 @@ type AnyLinking = LinkingOptions<any>;
  * Browser URLs for each screen (web only): makes the back button, reloads and
  * shared links work instead of always landing on Inicio.
  *
- * Plan / Goals / NetWorth / Profile are tabs on wide screens and stack screens on
+ * Cards / Plan / Goals / NetWorth / Profile are tabs on wide screens and stack screens on
  * phones (see AppStack), so the same path maps to whichever exists.
  * Static hosting rewrites every path to index.html (render.yaml).
  */
@@ -20,7 +20,7 @@ export function buildLinking(signedIn: boolean, isWide: boolean): AnyLinking | u
     return { prefixes: [], config: { screens: { Login: "*" } } };
   }
 
-  const planning = { Plan: "plan", Goals: "metas", NetWorth: "patrimonio", Profile: "perfil" };
+  const planning = { Cards: "tarjetas", Plan: "plan", Goals: "metas", NetWorth: "patrimonio", Profile: "perfil" };
   return {
     prefixes: [],
     config: {

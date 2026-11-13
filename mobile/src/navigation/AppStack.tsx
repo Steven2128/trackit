@@ -11,6 +11,7 @@ import {
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import BudgetsScreen from "../screens/BudgetsScreen";
+import CardsScreen from "../screens/CardsScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import DebtTrackerScreen from "../screens/DebtTrackerScreen";
 import GoalsScreen from "../screens/GoalsScreen";
@@ -22,12 +23,13 @@ import TransactionsScreen from "../screens/TransactionsScreen";
 import { colors } from "../theme/colors";
 import { SIDEBAR_WIDTH, useIsWide } from "../theme/layout";
 
-// Profile, Goals, Plan and NetWorth live outside the tab bar (header avatar /
-// dashboard shortcuts) to keep bottom nav at 5 items. On wide screens the
-// tab bar becomes a sidebar with room for Plan/Goals/NetWorth as tabs too, so
-// `navigate("Plan")` resolves to the tab there and to the stack on phones.
+// Profile, Goals, Plan, NetWorth and Cards live outside the tab bar (header
+// avatar / dashboard and Deudas shortcuts) to keep bottom nav at 5 items. On
+// wide screens the tab bar becomes a sidebar with room for them as tabs too,
+// so `navigate("Plan")` resolves to the tab there and to the stack on phones.
 export type AppStackParamList = {
   Tabs: undefined;
+  Cards: undefined;
   Profile: undefined;
   Goals: undefined;
   Plan: undefined;
@@ -42,6 +44,7 @@ export type AppTabParamList = {
   Subscriptions: undefined;
   DebtTracker: undefined;
   // Wide screens only (sidebar).
+  Cards: undefined;
   Plan: undefined;
   Goals: undefined;
   NetWorth: undefined;
@@ -55,7 +58,8 @@ const TAB_ICONS: Record<keyof AppTabParamList, { active: IconName; inactive: Ico
   Transactions: { active: "receipt", inactive: "receipt-outline" },
   Budgets: { active: "pie-chart", inactive: "pie-chart-outline" },
   Subscriptions: { active: "repeat", inactive: "repeat-outline" },
-  DebtTracker: { active: "card", inactive: "card-outline" },
+  DebtTracker: { active: "trending-down", inactive: "trending-down-outline" },
+  Cards: { active: "card", inactive: "card-outline" },
   Plan: { active: "map", inactive: "map-outline" },
   Goals: { active: "flag", inactive: "flag-outline" },
   NetWorth: { active: "wallet", inactive: "wallet-outline" },
@@ -244,6 +248,7 @@ function Tabs() {
       />
       {isWide ? (
         <>
+          <Tab.Screen name="Cards" component={CardsScreen} options={{ title: "Tarjetas" }} />
           <Tab.Screen name="Plan" component={PlanScreen} options={{ title: "Plan del mes" }} />
           <Tab.Screen name="Goals" component={GoalsScreen} options={{ title: "Metas de ahorro" }} />
           <Tab.Screen name="NetWorth" component={NetWorthScreen} options={{ title: "Patrimonio" }} />
@@ -269,6 +274,11 @@ export default function AppStack() {
         name="Profile"
         component={ProfileScreen}
         options={{ title: "Perfil", presentation: "modal", ...stackHeader }}
+      />
+      <Stack.Screen
+        name="Cards"
+        component={CardsScreen}
+        options={{ title: "Tarjetas", ...stackHeader }}
       />
       <Stack.Screen
         name="Goals"

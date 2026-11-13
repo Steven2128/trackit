@@ -8,7 +8,9 @@ authority, the per-purchase emails are only the running estimate.
 - purchases the emails missed (or made before the card was linked) are
   added as card movements;
 - balance: the statement's total plus what was bought and minus what was
-  paid after the cut-off.
+  paid after the cut-off;
+- the statement itself, with every movement, is saved (card_statements)
+  for the cards view.
 """
 
 from __future__ import annotations
@@ -18,10 +20,11 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 from typing import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time_utils import user_tz
+from app.models.card_statement import SavedStatement, SavedStatementLine
 from app.models.debt import Debt
 from app.models.provider_connection import ProviderConnection
 from app.models.transaction import Transaction, TransactionType
@@ -52,6 +55,47 @@ def balance_after(
     return max(balance, Decimal("0"))
 
 
+async def save_statement(db: AsyncSession, debt: Debt, statement: CardStatement) -> SavedStatement:
+    """Store the statement and its movements; reading the same statement
+    again replaces what was stored. Caller commits."""
+    saved = (
+        await db.execute(
+            select(SavedStatement).where(
+                SavedStatement.debt_id == debt.id,
+                SavedStatement.period_end == statement.period_end,
+            )
+        )
+    ).scalar_one_or_none()
+    if saved is None:
+        saved = SavedStatement(user_id=debt.user_id, debt_id=debt.id, period_end=statement.period_end)
+        db.add(saved)
+    else:
+        await db.execute(
+            delete(SavedStatementLine).where(SavedStatementLine.statement_id == saved.id)
+        )
+    saved.period_start = statement.period_start
+    saved.due_date = statement.due_date
+    saved.minimum_payment = statement.minimum_payment
+    saved.total_payment = statement.total_payment
+    saved.credit_limit = statement.credit_limit
+    await db.flush()
+    for line in statement.lines:
+        db.add(
+            SavedStatementLine(
+                statement_id=saved.id,
+                position=line.index,
+                posted_on=line.on,
+                description=line.description[:255],
+                amount=line.amount,
+                billed=line.billed,
+                installment=line.installment,
+                installments=line.installments,
+                pending=line.pending,
+            )
+        )
+    return saved
+
+
 async def apply_card_statement(
     db: AsyncSession,
     connection: ProviderConnection,
@@ -64,6 +108,7 @@ async def apply_card_statement(
     cutoff = cutoff_instant(statement)
     debt.statement_at = cutoff
     debt.next_installments = statement.next_installments or None
+    await save_statement(db, debt, statement)
 
     purchases = statement.purchases
     inserted = 0

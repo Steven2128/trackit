@@ -1,5 +1,6 @@
 from app.models.account import Account, AccountAdjustment, AccountKind
 from app.models.budget import Budget
+from app.models.card_statement import SavedStatement, SavedStatementLine
 from app.models.contact import Contact
 from app.models.debt import Debt
 from app.models.fund_hold import FundHold
@@ -30,6 +31,8 @@ __all__ = [
     "ProviderConnection",
     "ProviderType",
     "PushToken",
+    "SavedStatement",
+    "SavedStatementLine",
     "SavingsGoal",
     "Transaction",
     "TransactionType",

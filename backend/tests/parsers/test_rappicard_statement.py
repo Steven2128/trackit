@@ -54,6 +54,8 @@ def test_header_period_minimum_and_total() -> None:
     assert (st.period_start, st.period_end) == (date(2026, 10, 9), date(2026, 11, 10))
     assert st.minimum_payment == Decimal("757430.83")
     assert st.total_payment == Decimal("915066.17")
+    assert st.due_date == date(2026, 11, 20)
+    assert st.credit_limit == Decimal("3300000.00")
 
 
 def test_rows_with_wrapped_descriptions_payments_and_installments() -> None:
