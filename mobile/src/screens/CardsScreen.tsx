@@ -184,6 +184,9 @@ function ToPay({ card }: { card: CardOut }) {
 
 function NextStatement({ card }: { card: CardOut }) {
   const n = card.purchases_since_cutoff.length;
+  // Which purchases the installments line is made of (tap to see them).
+  const [open, setOpen] = useState(false);
+  const running = card.installment_plans.filter((p) => p.remaining > 0);
   return (
     <View style={styles.panel}>
       <View style={styles.panelHead}>
@@ -200,9 +203,44 @@ function NextStatement({ card }: { card: CardOut }) {
       <Row label={`Compras desde el corte${n ? ` (${n})` : ""}`}>
         <MoneyText value={card.purchases_since_cutoff_total} size="md" />
       </Row>
-      <Row label="Cuotas de compras anteriores">
-        <MoneyText value={card.next_installments} size="md" />
-      </Row>
+      {running.length ? (
+        <>
+          <Pressable
+            onPress={() => setOpen((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: open }}
+            style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={styles.rowLabel}>
+              Cuotas de {running.length === 1 ? "1 compra diferida" : `${running.length} compras diferidas`}
+            </Text>
+            <MoneyText value={card.next_installments} size="md" />
+            <Ionicons
+              name={open ? "chevron-up" : "chevron-down"}
+              size={16}
+              color={colors.textSecondary}
+            />
+          </Pressable>
+          {open
+            ? running.map((p) => (
+                <View key={`${p.description}-${p.purchased_on}-${p.amount}`} style={styles.subRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.subRowTitle} numberOfLines={1}>{p.description}</Text>
+                    <Text style={styles.meta}>
+                      Compra de {formatCOP(p.amount)} del {shortDay(p.purchased_on)} · cuota{" "}
+                      {p.installment + 1} de {p.installments}
+                    </Text>
+                  </View>
+                  <MoneyText value={p.next_amount} size="sm" style={{ color: colors.textSecondary }} />
+                </View>
+              ))
+            : null}
+        </>
+      ) : (
+        <Row label="Cuotas de compras diferidas">
+          <MoneyText value={card.next_installments} size="md" />
+        </Row>
+      )}
     </View>
   );
 }
@@ -624,6 +662,17 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   rowLabel: { color: colors.textSecondary, fontSize: 14, flex: 1 },
+  subRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: 6,
+    paddingLeft: spacing.md,
+    marginLeft: 2,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.border,
+  },
+  subRowTitle: { color: colors.textPrimary, fontSize: 13, fontWeight: "600" },
   rowValue: { color: colors.textPrimary, fontSize: 14, fontWeight: "600" },
 
   barTrack: { height: 8, borderRadius: 4, backgroundColor: colors.surfaceMuted, overflow: "hidden" },
