@@ -101,7 +101,13 @@ export function useCreateCashExpense() {
 }
 
 /** Money in your accounts that isn't yours to spend (GET /fund-holds). */
-export type FundHoldOut = { id: string; name: string; amount: string; created_at: string };
+export type FundHoldOut = {
+  id: string;
+  name: string;
+  amount: string;
+  planned_payment_id: string | null; // the payment this money is for
+  created_at: string;
+};
 
 export const fundHoldsQueryKey = ["fund-holds"] as const;
 
@@ -120,7 +126,11 @@ export function useFundHolds() {
 export function useCreateFundHold() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { name: string; amount: string }) => {
+    mutationFn: async (payload: {
+      name: string;
+      amount: string;
+      planned_payment_id?: string | null;
+    }) => {
       await api.post("/fund-holds", payload);
     },
     onSuccess: () => invalidateHolds(qc),

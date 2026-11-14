@@ -50,6 +50,7 @@ from app.services.cash_position_sources import (
     PaymentRecord,
     build_inputs,
     default_horizon,
+    held_by_line,
     is_due_month,
 )
 from app.services.net_worth import keep_cash_reconciled, net_worth
@@ -356,6 +357,7 @@ async def cash_position(
     )
     pos = compute_position(inputs)
     shared_pct = {f"planned:{p.id}": p.shared_pct for p in payments if p.shared_pct}
+    held = held_by_line(fund_holds, [o.ref for w in pos.windows for o in w.obligations])
     notes: list[str] = []
     if not snap.accounts:
         notes.insert(0, "No hay cuentas cargadas en Patrimonio: el saldo es 0.")
@@ -388,6 +390,7 @@ async def cash_position(
                         total=o.total,
                         ref=o.ref,
                         shared_pct=shared_pct.get(":".join((o.ref or "").split(":")[:2])),
+                        held=held.get(o.ref) if o.ref else None,
                     )
                     for o in w.obligations
                 ],
@@ -436,6 +439,8 @@ async def list_fund_holds(current_user: CurrentUser, db: DbSession) -> list[Fund
 async def create_fund_hold(
     payload: FundHoldIn, current_user: CurrentUser, db: DbSession
 ) -> FundHoldOut:
+    if payload.planned_payment_id is not None:
+        await _get_own(PlannedPayment, payload.planned_payment_id, current_user.id, db)
     hold = FundHold(user_id=current_user.id, **payload.model_dump())
     db.add(hold)
     await db.commit()

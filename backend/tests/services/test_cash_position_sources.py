@@ -402,3 +402,26 @@ def test_early_window_starts_on_its_day() -> None:
     credits = [Credit(date(2026, 10, 20), Decimal("1050905"))]  # the day before the 21st
     out = expected_incomes([EARLY_BONUS], credits, date(2026, 11, 7), date(2026, 12, 5))
     assert [i.name for i in out] == ["Bonificación (6/11)"]
+
+
+# --- someone else's money kept for a payment ---
+
+
+def test_held_money_shows_on_the_nearest_due_date_of_its_payment():
+    from app.services.cash_position_sources import held_by_line
+
+    rent, other = uuid.uuid4(), uuid.uuid4()
+    refs = [
+        f"planned:{rent}:2026-12-24",
+        f"planned:{rent}:2026-11-24",
+        f"planned:{other}:2026-11-21",
+        f"debt:{rent}:2026-11-20",
+        None,
+    ]
+    holds = [
+        SimpleNamespace(name="Jesús", amount=Decimal("550000"), planned_payment_id=rent),
+        SimpleNamespace(name="Suelto", amount=Decimal("10000"), planned_payment_id=None),
+        SimpleNamespace(name="Viejo", amount=Decimal("5000")),  # row without the column
+        SimpleNamespace(name="Sin línea", amount=Decimal("7000"), planned_payment_id=uuid.uuid4()),
+    ]
+    assert held_by_line(holds, refs) == {f"planned:{rent}:2026-11-24": Decimal("550000")}

@@ -389,6 +389,23 @@ def holds(rows: Sequence[FundHoldLike]) -> tuple[Hold, ...]:
     return tuple(Hold(r.name, r.amount) for r in rows)
 
 
+def held_by_line(
+    fund_holds: Sequence[object], refs: Sequence[str | None]
+) -> dict[str, Decimal]:
+    """Someone else's money kept for a planned payment, by the line it shows
+    on: the nearest due date of that payment (the brother's part of this
+    month's rent goes with this month's rent). Display only."""
+    out: dict[str, Decimal] = {}
+    for h in fund_holds:
+        target = getattr(h, "planned_payment_id", None)
+        if target is None:
+            continue
+        lines = sorted(r for r in refs if r and r.startswith(f"planned:{target}:"))
+        if lines:
+            out[lines[0]] = out.get(lines[0], ZERO) + h.amount
+    return out
+
+
 def build_inputs(
     *,
     today: date,

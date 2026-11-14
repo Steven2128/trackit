@@ -18,6 +18,9 @@ export type PositionLine = {
   total: string; // what the due date asks for; paid = total − amount
   ref: string | null; // "planned:<id>:<due>" | "debt:<id>:<due>"
   shared_pct: number | null; // part someone else pays back after
+  // Someone else's money kept for this payment: amount + held is what
+  // leaves on the due date. Not part of the sums.
+  held?: string | null;
 };
 
 export type PositionWindow = {

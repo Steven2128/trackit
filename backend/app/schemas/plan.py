@@ -121,6 +121,9 @@ class PositionLineOut(BaseModel):
     # Share someone else pays back (planned payments only): the user pays
     # the whole total, then collects this part.
     shared_pct: int | None = None
+    # Someone else's money kept for this payment (fund hold linked to it):
+    # what leaves on the due date is amount + held. Not part of the sums.
+    held: Decimal | None = None
 
 
 class PositionWindowOut(BaseModel):
@@ -174,6 +177,8 @@ class CashPositionResponse(BaseModel):
 class FundHoldIn(BaseModel):
     name: str = Field(..., min_length=1, max_length=128)
     amount: Decimal = Field(..., gt=0, le=MAX_NUMERIC_14_2)
+    # The planned payment this money is for, if any.
+    planned_payment_id: uuid.UUID | None = None
 
 
 class FundHoldUpdate(BaseModel):

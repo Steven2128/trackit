@@ -109,8 +109,10 @@ function Header({ data }: { data: CashPosition }) {
 function Progress({ data }: { data: CashPosition }) {
   const lines = data.windows.flatMap((w) => w.obligations);
   if (lines.length === 0) return null;
-  const total = lines.reduce((s, l) => s + Number(l.total), 0);
-  const left = lines.reduce((s, l) => s + Number(l.amount), 0);
+  // Money kept for a payment leaves with it, so it's part of what's left.
+  const held = lines.reduce((s, l) => s + Number(l.held ?? 0), 0);
+  const total = lines.reduce((s, l) => s + Number(l.total), 0) + held;
+  const left = lines.reduce((s, l) => s + Number(l.amount), 0) + held;
   const pct = total > 0 ? Math.min(100, ((total - left) / total) * 100) : 0;
   return (
     <View style={styles.progress}>
@@ -170,6 +172,7 @@ function WindowBlock({
 function LineRow({ line, onPay }: { line: PositionLine; onPay: (l: PositionLine) => void }) {
   const done = Number(line.amount) === 0;
   const paid = Number(line.total) - Number(line.amount);
+  const held = Number(line.held ?? 0);
   // Paid lines open the sheet too, to undo a payment marked by mistake.
   const payable = parseRef(line.ref) !== null;
   return (
@@ -191,6 +194,12 @@ function LineRow({ line, onPay }: { line: PositionLine; onPay: (l: PositionLine)
               {" "}· pagaste <MoneyText value={paid} size="sm" style={styles.lineMetaMoney} />
             </>
           ) : null}
+          {held > 0 ? (
+            <>
+              {" "}· incluye{" "}
+              <MoneyText value={held} size="sm" style={styles.lineMetaMoney} /> que no es tuyo
+            </>
+          ) : null}
           {line.shared_pct ? (
             <>
               {" "}· te devuelven{" "}
@@ -204,7 +213,7 @@ function LineRow({ line, onPay }: { line: PositionLine; onPay: (l: PositionLine)
         </Text>
       </View>
       <MoneyText
-        value={done ? line.total : line.amount}
+        value={Number(done ? line.total : line.amount) + held}
         size="sm"
         style={done ? styles.lineDone : undefined}
       />

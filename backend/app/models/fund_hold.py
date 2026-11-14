@@ -27,6 +27,14 @@ class FundHold(Base):
     )
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    # The payment this money is for (the brother's part of the rent): the
+    # fortnight shows that payment with it added — what really has to be
+    # handed over. Display only; the sums don't change.
+    planned_payment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("planned_payments.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

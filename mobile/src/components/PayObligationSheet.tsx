@@ -96,6 +96,7 @@ export default function PayObligationSheet({ line, onClose }: Props) {
   const paid = line ? Number(line.total) - Number(line.amount) : 0;
   const done = line !== null && Number(line.amount) === 0;
   const payments = recorded.data ?? [];
+  const held = Number(line?.held ?? 0);
 
   return (
     <BottomSheet
@@ -121,6 +122,9 @@ export default function PayObligationSheet({ line, onClose }: Props) {
                 ? `Ya pagaste ${formatCOP(paid)} de ${formatCOP(line.total)}; faltan ${formatCOP(line.amount)}.`
                 : `Son ${formatCOP(line.total)}.`}
             {done ? "" : " Si pagás una parte, lo que falte sigue apartado."}
+            {!done && held > 0
+              ? ` Acá va solo tu parte: con los ${formatCOP(held)} que no son tuyos, en total salen ${formatCOP(Number(line.amount) + held)}.`
+              : ""}
           </Text>
         ) : null}
 
