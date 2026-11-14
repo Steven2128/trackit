@@ -83,6 +83,7 @@ export type ObligationPaymentPayload = {
   amount: string;
   paid_on?: string;
   from_cash: boolean;
+  use_held?: boolean; // the money held for it leaves with this payment
 };
 
 export type ObligationPayment = {

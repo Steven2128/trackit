@@ -45,6 +45,8 @@ export default function PayObligationSheet({ line, onClose }: Props) {
     else sheetRef.current?.close();
   }, [line]);
 
+  const held = Number(line?.held ?? 0);
+
   function handleSave() {
     const target = parseRef(line?.ref ?? null);
     if (!line || !target) return;
@@ -63,6 +65,8 @@ export default function PayObligationSheet({ line, onClose }: Props) {
         amount: value.toString(),
         paid_on: localIsoDate(daysAgo),
         from_cash: fromCash,
+        // Finishing the payment: the money held for it leaves too.
+        use_held: held > 0 && value >= Number(line.amount),
       },
       {
         onSuccess: onClose,
@@ -96,7 +100,6 @@ export default function PayObligationSheet({ line, onClose }: Props) {
   const paid = line ? Number(line.total) - Number(line.amount) : 0;
   const done = line !== null && Number(line.amount) === 0;
   const payments = recorded.data ?? [];
-  const held = Number(line?.held ?? 0);
 
   return (
     <BottomSheet
@@ -123,7 +126,7 @@ export default function PayObligationSheet({ line, onClose }: Props) {
                 : `Son ${formatCOP(line.total)}.`}
             {done ? "" : " Si pagás una parte, lo que falte sigue apartado."}
             {!done && held > 0
-              ? ` Acá va solo tu parte: con los ${formatCOP(held)} que no son tuyos, en total salen ${formatCOP(Number(line.amount) + held)}.`
+              ? ` Acá va solo tu parte: al completarla también salen los ${formatCOP(held)} que no son tuyos (${formatCOP(Number(line.amount) + held)} en total) y dejo de guardarlos.`
               : ""}
           </Text>
         ) : null}
@@ -195,7 +198,9 @@ export default function PayObligationSheet({ line, onClose }: Props) {
             </View>
             <Text style={styles.small}>
               {fromCash
-                ? "También lo resto de tu efectivo."
+                ? held > 0
+                  ? "También lo resto de tu efectivo, junto con la parte que no es tuya si completás el pago."
+                  : "También lo resto de tu efectivo."
                 : "El movimiento del banco llega solo por email; acá solo lo marcás como pagado."}
             </Text>
 

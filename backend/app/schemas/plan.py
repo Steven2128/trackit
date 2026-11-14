@@ -53,6 +53,8 @@ class PlannedPaymentBase(BaseModel):
     amount_varies: bool = False
     # Share someone else pays back (50 = half).
     shared_pct: int | None = Field(default=None, ge=1, le=100)
+    # What someone else hands over before it's due (not part of ``amount``).
+    partner_amount: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_14_2)
 
 
 class PlannedPaymentCreate(PlannedPaymentBase):
@@ -70,6 +72,7 @@ class PlannedPaymentUpdate(BaseModel):
     first_month: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
     amount_varies: bool | None = None
     shared_pct: int | None = Field(default=None, ge=1, le=100)
+    partner_amount: Decimal | None = Field(default=None, gt=0, le=MAX_NUMERIC_14_2)
     # "YYYY-MM" to check off for that month; null to un-check.
     paid_month: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
 
@@ -204,6 +207,10 @@ class ObligationPaymentIn(BaseModel):
     # Paid in cash: also logs the cash expense, so the balance drops with it.
     # Bank payments arrive by email on their own.
     from_cash: bool = False
+    # This payment finishes the due date: the money held for it (someone
+    # else's part) leaves too. In cash, the expense covers both and the
+    # held part is marked as theirs; the holds are removed.
+    use_held: bool = False
 
 
 class ObligationPaymentOut(BaseModel):

@@ -47,6 +47,8 @@ type FormState = {
   varies: boolean; // amount is an estimate
   shared: boolean;
   sharedPct: string;
+  partner: boolean; // someone hands over their part beforehand
+  partnerAmount: string;
   early: boolean; // income that can arrive the previous month
   earlyDay: string;
 };
@@ -68,6 +70,8 @@ const EMPTY_EXTRA = {
   varies: false,
   shared: false,
   sharedPct: "50",
+  partner: false,
+  partnerAmount: "",
   early: false,
   earlyDay: "21",
 };
@@ -114,6 +118,8 @@ function fromEditing(editing: PlanItemEditing | null): FormState {
     varies: p.amount_varies,
     shared: p.shared_pct !== null,
     sharedPct: String(p.shared_pct ?? 50),
+    partner: p.partner_amount !== null,
+    partnerAmount: p.partner_amount ? toCOPInput(p.partner_amount) : "",
   };
 }
 
@@ -205,6 +211,10 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
         return null;
       }
     }
+    if (form.partner && parseCOP(form.partnerAmount) <= 0) {
+      Alert.alert("Monto inválido", "Escribí cuánto te pasa la otra persona.");
+      return null;
+    }
     const grace = form.grace.trim() === "" ? 0 : Number(form.grace);
     if (!Number.isInteger(grace) || grace < 0 || grace > 60) {
       Alert.alert("Plazo inválido", "Los días de plazo deben estar entre 0 y 60.");
@@ -250,6 +260,7 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
             : null,
         amount_varies: form.varies,
         shared_pct: form.shared ? Number(form.sharedPct) : null,
+        partner_amount: form.partner ? parseCOP(form.partnerAmount).toString() : null,
       };
       if (editing.item) {
         updatePayment.mutate({ id: editing.item.id, payload }, { onSuccess: onClose, onError });
@@ -464,6 +475,29 @@ export default function PlanItemSheet({ editing, onClose }: Props) {
                   onChangeText={(v) => setForm((f) => ({ ...f, sharedPct: v.replace(/\D/g, "") }))}
                   keyboardType="numeric"
                   maxLength={3}
+                />
+              </Field>
+            ) : null}
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Otra persona me pasa su parte antes</Text>
+              <Switch
+                value={form.partner}
+                onValueChange={(v) => setForm((f) => ({ ...f, partner: v }))}
+                trackColor={{ false: colors.surfaceMuted, true: colors.primaryDim }}
+                thumbColor={form.partner ? colors.primary : colors.textSecondary}
+              />
+            </View>
+            {form.partner ? (
+              <Field label="Cuánto te pasa (COP, aparte de tu monto)">
+                <BottomSheetTextInput
+                  style={styles.input}
+                  placeholder="0"
+                  placeholderTextColor={colors.textSecondary}
+                  value={form.partnerAmount}
+                  onChangeText={(v) =>
+                    setForm((f) => ({ ...f, partnerAmount: formatCOPInput(v) }))
+                  }
+                  keyboardType="numeric"
                 />
               </Field>
             ) : null}

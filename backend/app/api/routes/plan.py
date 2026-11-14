@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
@@ -54,6 +55,7 @@ from app.services.cash_position_sources import (
     is_due_month,
 )
 from app.services.net_worth import keep_cash_reconciled, net_worth
+from app.services.partner_money import hold_name
 
 router = APIRouter(tags=["plan"])
 
@@ -517,6 +519,25 @@ async def create_obligation_payment(
     if paid_on > today:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="future_paid_on")
 
+    # Someone else's part kept for this payment goes out with it.
+    held = Decimal("0")
+    if payload.use_held and payload.planned_payment_id is not None:
+        held_rows = (
+            (
+                await db.execute(
+                    select(FundHold).where(
+                        FundHold.user_id == current_user.id,
+                        FundHold.planned_payment_id == parent.id,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for h in held_rows:
+            held += h.amount
+            await db.delete(h)
+
     tx_id = None
     if payload.from_cash:
         occurred_at = (
@@ -527,7 +548,10 @@ async def create_obligation_payment(
         tx = Transaction(
             user_id=current_user.id,
             provider_connection_id=None,
-            amount=payload.amount,
+            # The cash that left: the user's part plus what was held. Only
+            # the user's part is their spending.
+            amount=payload.amount + held,
+            shared_amount=held or None,
             merchant=merchant,
             category=category,
             transaction_type=TransactionType.debit,
@@ -572,6 +596,16 @@ async def delete_obligation_payment(
         ).scalar_one_or_none()
         if tx is not None:
             await keep_cash_reconciled(db, current_user.id, (tx.amount, tx.occurred_at), None)
+            if tx.shared_amount and record.planned_payment_id is not None:
+                # The held money that left with it is back in the user's hands.
+                db.add(
+                    FundHold(
+                        user_id=current_user.id,
+                        name=hold_name(tx.merchant or "Pago"),
+                        amount=tx.shared_amount,
+                        planned_payment_id=record.planned_payment_id,
+                    )
+                )
             await db.delete(tx)
     await db.delete(record)
     await db.commit()

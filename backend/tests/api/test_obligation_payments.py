@@ -22,6 +22,12 @@ class _Result:
     def scalar_one_or_none(self):
         return self._row
 
+    def scalars(self):
+        return self
+
+    def all(self):
+        return self._row
+
 
 class _FakeSession:
     """Answers each SELECT with the next queued row."""
@@ -156,9 +162,67 @@ def test_payment_in_the_future_is_rejected() -> None:
 
 
 def test_deleting_a_cash_payment_removes_its_expense(reconcile_calls) -> None:
-    tx = SimpleNamespace(id=uuid.uuid4(), amount=Decimal("550000"), occurred_at="t")
+    tx = SimpleNamespace(
+        id=uuid.uuid4(), amount=Decimal("550000"), occurred_at="t", shared_amount=None
+    )
     record = SimpleNamespace(id=uuid.uuid4(), transaction_id=tx.id)
     session = _FakeSession(record, tx)
     assert _client(session).delete(f"/obligation-payments/{record.id}").status_code == 204
     assert session.deleted == [tx, record]
+    assert session.added == []  # nothing was held for it
     assert reconcile_calls == [((Decimal("550000"), "t"), None)]
+
+
+# --- someone else's part held for the payment ---
+
+
+def test_paying_in_cash_takes_the_held_money_along(reconcile_calls) -> None:
+    hold = SimpleNamespace(amount=Decimal("550000"))
+    session = _FakeSession(RENT, [hold])
+    resp = _client(session).post(
+        "/obligation-payments",
+        json={
+            "planned_payment_id": str(RENT.id),
+            "due_date": "2026-11-24",
+            "amount": "652000",
+            "from_cash": True,
+            "use_held": True,
+        },
+    )
+    assert resp.status_code == 201
+    tx, record = session.added
+    # 1.202.000 left the cash; only 652.000 is the user's rent.
+    assert (tx.amount, tx.shared_amount) == (Decimal("1202000"), Decimal("550000"))
+    assert record.amount == Decimal("652000")
+    assert session.deleted == [hold]
+
+
+def test_a_partial_payment_leaves_the_held_money_alone() -> None:
+    session = _FakeSession(RENT)
+    _client(session).post(
+        "/obligation-payments",
+        json={"planned_payment_id": str(RENT.id), "due_date": "2026-11-24",
+              "amount": "198000", "from_cash": True},
+    )
+    tx = session.added[0]
+    assert (tx.amount, tx.shared_amount) == (Decimal("198000"), None)
+    assert session.deleted == []
+
+
+def test_undo_puts_the_held_money_back(reconcile_calls) -> None:
+    from app.models.fund_hold import FundHold
+
+    tx = SimpleNamespace(
+        id=uuid.uuid4(), amount=Decimal("1202000"), shared_amount=Decimal("550000"),
+        merchant="Arriendo", occurred_at="2026-11-29T12:00:00+00:00",
+    )
+    record = SimpleNamespace(
+        id=uuid.uuid4(), transaction_id=tx.id, planned_payment_id=RENT.id
+    )
+    session = _FakeSession(record, tx)
+    resp = _client(session).delete(f"/obligation-payments/{record.id}")
+    assert resp.status_code == 204
+    (hold,) = session.added
+    assert isinstance(hold, FundHold)
+    assert (hold.amount, hold.planned_payment_id) == (Decimal("550000"), RENT.id)
+    assert session.deleted == [tx, record]

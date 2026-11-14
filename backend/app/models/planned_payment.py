@@ -60,6 +60,10 @@ class PlannedPayment(Base):
     # Share of the bill someone else pays back (50 = half). The user still
     # pays it all on the due date; it only tells them what to collect.
     shared_pct: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # What someone else hands over *before* it's due (the brother's part of
+    # the rent, around the 5th). ``amount`` stays the user's own part. A
+    # deposit of exactly this becomes a fund hold — services/partner_money.py.
+    partner_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

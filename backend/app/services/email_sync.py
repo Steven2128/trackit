@@ -49,6 +49,7 @@ from app.parsers.cards import CARD_FORMATS, CardEvent, CardEventKind
 from app.parsers.cards.rappicard_statement import extract_statement
 from app.services.card_statement import apply_card_statement
 from app.services.categorizer import UserRule, categorize
+from app.services.partner_money import hold_partner_money
 from app.services.net_worth import CASH_SOURCE, keep_cash_reconciled
 from app.services.transfer_matcher import (
     match_debt_payments,
@@ -139,6 +140,8 @@ async def sync_provider_connection(
         await reconcile_receipts(db, connection.user_id)
         await match_transfers(db, connection.user_id)
         await match_debt_payments(db, connection.user_id)
+        # After pairing: an own transfer of the same amount is already tagged.
+        await hold_partner_money(db, connection.user_id)
     except Exception:  # noqa: BLE001 — pairing is best-effort, never fail the sync
         log.exception("transfer_matcher failed user_id=%s", connection.user_id)
 

@@ -31,6 +31,7 @@ export type PlannedPaymentOut = {
   first_month: string | null; // YYYY-MM the every-N count starts from
   amount_varies: boolean; // amount is an estimate (utilities)
   shared_pct: number | null; // share someone else pays back (50 = half)
+  partner_amount: string | null; // what someone else hands over beforehand
   created_at: string;
 };
 
@@ -45,6 +46,7 @@ export type PlannedPaymentPayload = {
   first_month?: string | null;
   amount_varies?: boolean;
   shared_pct?: number | null;
+  partner_amount?: string | null;
 };
 
 export type UpcomingPaymentOut = {
