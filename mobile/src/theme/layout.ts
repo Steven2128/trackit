@@ -5,6 +5,8 @@ import { useWindowDimensions, type ViewStyle } from "react-native";
 // floating sheets. Below the breakpoint everything stays as on the phone.
 export const WIDE_BREAKPOINT = 900;
 export const SIDEBAR_WIDTH = 232;
+// Sidebar folded to icons only.
+export const SIDEBAR_RAIL_WIDTH = 64;
 export const PAGE_MAX_WIDTH = 1180;
 
 export function useIsWide(): boolean {

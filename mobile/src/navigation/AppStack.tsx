@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
+  BottomTabBar,
   createBottomTabNavigator,
   type BottomTabBarProps,
   type BottomTabNavigationOptions,
@@ -21,7 +22,7 @@ import SubscriptionsScreen from "../screens/SubscriptionsScreen";
 import TransactionsScreen from "../screens/TransactionsScreen";
 import { useNavSections } from "../store/navSections";
 import { colors } from "../theme/colors";
-import { SIDEBAR_WIDTH, useIsWide } from "../theme/layout";
+import { SIDEBAR_RAIL_WIDTH, SIDEBAR_WIDTH, useIsWide } from "../theme/layout";
 
 // One tab navigator for every section. Wide screens list them all in the
 // sidebar. Phones show Inicio / Movimientos / Presupuesto / Deudas / Más in the
@@ -65,7 +66,15 @@ const SECONDARY_TABS = new Set<string>(["Subscriptions", "Cards", "Plan", "Goals
 // Not in the sidebar's main list (Profile is pinned at its bottom instead).
 const SIDEBAR_SKIP = new Set<string>(["More", "Profile"]);
 
+// Key in the navSections store for the whole bar (sidebar / bottom bar).
+const NAVBAR = "navbar";
+
 function Sidebar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const collapsed = useNavSections((s) => s.collapsed);
+  const toggle = useNavSections((s) => s.toggle);
+  // Rail: the whole sidebar folded down to a strip of icons.
+  const rail = !!collapsed[NAVBAR];
+
   const renderItem = (index: number) => {
     const route = state.routes[index];
     const focused = state.index === index;
@@ -75,6 +84,7 @@ function Sidebar({ state, descriptors, navigation }: BottomTabBarProps) {
       <Pressable
         key={route.key}
         accessibilityRole="tab"
+        accessibilityLabel={descriptors[route.key].options.title}
         accessibilityState={{ selected: focused }}
         onPress={() => {
           const event = navigation.emit({
@@ -86,6 +96,7 @@ function Sidebar({ state, descriptors, navigation }: BottomTabBarProps) {
         }}
         style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
           sidebar.item,
+          rail && sidebar.itemRail,
           focused && sidebar.itemActive,
           !focused && (hovered || pressed) && sidebar.itemHover,
         ]}
@@ -95,16 +106,53 @@ function Sidebar({ state, descriptors, navigation }: BottomTabBarProps) {
           size={20}
           color={color}
         />
-        <Text style={[sidebar.label, { color: focused ? colors.textPrimary : colors.textSecondary }]}>
-          {descriptors[route.key].options.title}
-        </Text>
+        {rail ? null : (
+          <Text style={[sidebar.label, { color: focused ? colors.textPrimary : colors.textSecondary }]}>
+            {descriptors[route.key].options.title}
+          </Text>
+        )}
       </Pressable>
     );
   };
 
-  const collapsed = useNavSections((s) => s.collapsed);
-  const toggle = useNavSections((s) => s.toggle);
   const indexes = state.routes.map((_, i) => i);
+  const mainGroup = indexes.filter(
+    (i) => !PLANNING_TABS.has(state.routes[i].name) && !SIDEBAR_SKIP.has(state.routes[i].name),
+  );
+  const planningGroup = indexes.filter((i) => PLANNING_TABS.has(state.routes[i].name));
+  const profile = indexes.filter((i) => state.routes[i].name === "Profile");
+
+  const toggleButton = (
+    <Pressable
+      onPress={() => toggle(NAVBAR)}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={rail ? "Expandir menú" : "Colapsar menú"}
+      accessibilityState={{ expanded: !rail }}
+      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+        sidebar.toggle,
+        (hovered || pressed) && sidebar.itemHover,
+      ]}
+    >
+      <Ionicons name={rail ? "menu" : "chevron-back"} size={20} color={colors.textSecondary} />
+    </Pressable>
+  );
+
+  if (rail) {
+    return (
+      <ScrollView
+        style={[sidebar.root, sidebar.rootRail]}
+        contentContainerStyle={[sidebar.content, sidebar.contentRail]}
+      >
+        {toggleButton}
+        {mainGroup.map(renderItem)}
+        <View style={sidebar.railDivider} />
+        {planningGroup.map(renderItem)}
+        <View style={sidebar.spacer} />
+        {profile.map(renderItem)}
+      </ScrollView>
+    );
+  }
 
   // Accordion group. Folded, it still shows the current section so you can
   // see where you are.
@@ -136,21 +184,14 @@ function Sidebar({ state, descriptors, navigation }: BottomTabBarProps) {
   return (
     // Scrolls: a phone in landscape is "wide" but too short for ten items.
     <ScrollView style={sidebar.root} contentContainerStyle={sidebar.content}>
-      <Text style={sidebar.brand}>TrackIt</Text>
-      {renderGroup(
-        "main",
-        "Tu plata",
-        indexes.filter(
-          (i) => !PLANNING_TABS.has(state.routes[i].name) && !SIDEBAR_SKIP.has(state.routes[i].name),
-        ),
-      )}
-      {renderGroup(
-        "planning",
-        "Planificación",
-        indexes.filter((i) => PLANNING_TABS.has(state.routes[i].name)),
-      )}
+      <View style={sidebar.brandRow}>
+        <Text style={sidebar.brand}>TrackIt</Text>
+        {toggleButton}
+      </View>
+      {renderGroup("main", "Tu plata", mainGroup)}
+      {renderGroup("planning", "Planificación", planningGroup)}
       <View style={sidebar.spacer} />
-      {indexes.filter((i) => state.routes[i].name === "Profile").map(renderItem)}
+      {profile.map(renderItem)}
     </ScrollView>
   );
 }
@@ -167,13 +208,25 @@ const sidebar = StyleSheet.create({
   // flexGrow keeps Perfil pinned to the bottom when everything fits.
   content: { flexGrow: 1, paddingHorizontal: 12, paddingVertical: 20, gap: 2 },
   spacer: { flex: 1, minHeight: 12 },
-  brand: {
-    color: colors.textPrimary,
-    fontSize: 22,
-    fontWeight: "800",
-    paddingHorizontal: 12,
+  rootRail: { width: SIDEBAR_RAIL_WIDTH },
+  contentRail: { paddingHorizontal: 8, alignItems: "center", gap: 4 },
+  railDivider: { height: 1, alignSelf: "stretch", backgroundColor: colors.border, marginVertical: 8 },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingLeft: 12,
     marginBottom: 12,
   },
+  brand: { color: colors.textPrimary, fontSize: 22, fontWeight: "800" },
+  toggle: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  itemRail: { width: 44, height: 44, paddingHorizontal: 0, paddingVertical: 0, justifyContent: "center" },
   group: { gap: 2, marginBottom: 10 },
   sectionRow: {
     flexDirection: "row",
@@ -201,6 +254,60 @@ const sidebar = StyleSheet.create({
   itemActive: { backgroundColor: colors.primarySoft },
   itemHover: { backgroundColor: colors.surfaceMuted },
   label: { fontSize: 14, fontWeight: "600" },
+});
+
+/** Phone bottom bar that can be tucked away to give the page the full height;
+ *  a small tab stays at the bottom edge to bring it back. */
+function PhoneBar(props: BottomTabBarProps) {
+  const hiddenBar = useNavSections((s) => !!s.collapsed[NAVBAR]);
+  const toggle = useNavSections((s) => s.toggle);
+
+  const handle = (
+    <Pressable
+      onPress={() => toggle(NAVBAR)}
+      hitSlop={{ top: 12, bottom: 8, left: 16, right: 16 }}
+      accessibilityRole="button"
+      accessibilityLabel={hiddenBar ? "Mostrar menú" : "Ocultar menú"}
+      accessibilityState={{ expanded: !hiddenBar }}
+      style={({ pressed }) => [phoneBar.handle, pressed && { opacity: 0.6 }]}
+    >
+      <Ionicons name={hiddenBar ? "chevron-up" : "chevron-down"} size={16} color={colors.textSecondary} />
+    </Pressable>
+  );
+
+  if (hiddenBar) {
+    return (
+      <View style={[phoneBar.floating, { bottom: props.insets.bottom }]} pointerEvents="box-none">
+        {handle}
+      </View>
+    );
+  }
+  return (
+    <View>
+      <View style={phoneBar.above} pointerEvents="box-none">
+        {handle}
+      </View>
+      <BottomTabBar {...props} />
+    </View>
+  );
+}
+
+const phoneBar = StyleSheet.create({
+  // Sits on the bar's top edge, like a drawer pull.
+  above: { position: "absolute", top: -22, left: 0, right: 0, alignItems: "center", zIndex: 1 },
+  floating: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+  handle: {
+    width: 64,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: colors.border,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
 });
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
@@ -263,7 +370,7 @@ export default function AppStack() {
       // Every tab switch is a history entry, so the browser back button
       // returns to the previous section instead of skipping it.
       backBehavior="history"
-      tabBar={isWide ? (props) => <Sidebar {...props} /> : undefined}
+      tabBar={(props) => (isWide ? <Sidebar {...props} /> : <PhoneBar {...props} />)}
       screenOptions={({ route, navigation }) => {
         const hidden = !isWide && SECONDARY_TABS.has(route.name);
         return {
