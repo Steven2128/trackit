@@ -6,6 +6,9 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import RootNavigator from "./src/navigation/RootNavigator";
 import { colors } from "./src/theme/colors";
+import { installTooltips } from "./src/utils/tooltips";
+
+installTooltips();
 
 const queryClient = new QueryClient({
   defaultOptions: {
