@@ -9,36 +9,32 @@ type AnyLinking = LinkingOptions<any>;
  * Browser URLs for each screen (web only): makes the back button, reloads and
  * shared links work instead of always landing on Inicio.
  *
- * Cards / Plan / Goals / NetWorth / Profile are tabs on wide screens and stack screens on
- * phones (see AppStack), so the same path maps to whichever exists.
- * Static hosting rewrites every path to index.html (render.yaml).
+ * Every section is a tab (see AppStack), so the map is the same on phones and
+ * on wide screens. Static hosting rewrites every path to index.html
+ * (render.yaml).
  */
-export function buildLinking(signedIn: boolean, isWide: boolean): AnyLinking | undefined {
+export function buildLinking(signedIn: boolean): AnyLinking | undefined {
   if (Platform.OS !== "web") return undefined;
 
   if (!signedIn) {
     return { prefixes: [], config: { screens: { Login: "*" } } };
   }
 
-  const planning = { Cards: "tarjetas", Plan: "plan", Goals: "metas", NetWorth: "patrimonio", Profile: "perfil" };
   return {
     prefixes: [],
     config: {
-      // A deep link to a stack screen (e.g. /plan on a phone) still gets the
-      // tabs underneath, so its header shows a back arrow.
-      initialRouteName: "Tabs",
       screens: {
-        Tabs: {
-          screens: {
-            Dashboard: "",
-            Transactions: "movimientos",
-            Budgets: "presupuesto",
-            Subscriptions: "suscripciones",
-            DebtTracker: "deudas",
-            ...(isWide ? planning : {}),
-          },
-        },
-        ...(isWide ? {} : planning),
+        Dashboard: "",
+        Transactions: "movimientos",
+        Budgets: "presupuesto",
+        Subscriptions: "suscripciones",
+        DebtTracker: "deudas",
+        More: "mas",
+        Cards: "tarjetas",
+        Plan: "plan",
+        Goals: "metas",
+        NetWorth: "patrimonio",
+        Profile: "perfil",
       },
     },
   };

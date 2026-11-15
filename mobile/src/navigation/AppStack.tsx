@@ -2,40 +2,31 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   createBottomTabNavigator,
   type BottomTabBarProps,
+  type BottomTabNavigationOptions,
+  type BottomTabNavigationProp,
 } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
-import {
-  createNativeStackNavigator,
-  type NativeStackNavigationProp,
-} from "@react-navigation/native-stack";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import BudgetsScreen from "../screens/BudgetsScreen";
 import CardsScreen from "../screens/CardsScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import DebtTrackerScreen from "../screens/DebtTrackerScreen";
 import GoalsScreen from "../screens/GoalsScreen";
+import MoreScreen from "../screens/MoreScreen";
 import NetWorthScreen from "../screens/NetWorthScreen";
 import PlanScreen from "../screens/PlanScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import SubscriptionsScreen from "../screens/SubscriptionsScreen";
 import TransactionsScreen from "../screens/TransactionsScreen";
+import { useNavSections } from "../store/navSections";
 import { colors } from "../theme/colors";
 import { SIDEBAR_WIDTH, useIsWide } from "../theme/layout";
 
-// Profile, Goals, Plan, NetWorth and Cards live outside the tab bar (header
-// avatar / dashboard and Deudas shortcuts) to keep bottom nav at 5 items. On
-// wide screens the tab bar becomes a sidebar with room for them as tabs too,
-// so `navigate("Plan")` resolves to the tab there and to the stack on phones.
-export type AppStackParamList = {
-  Tabs: undefined;
-  Cards: undefined;
-  Profile: undefined;
-  Goals: undefined;
-  Plan: undefined;
-  NetWorth: undefined;
-};
-
+// One tab navigator for every section. Wide screens list them all in the
+// sidebar. Phones show Inicio / Movimientos / Presupuesto / Deudas / Más in the
+// bottom bar; the rest are tabs with a hidden button, reached from "Más" (and
+// from shortcuts in other screens), so the bottom bar never disappears.
 export type AppTabParamList = {
   Dashboard: undefined;
   // category preselects the filter chip (used by Dashboard's category rows).
@@ -43,7 +34,8 @@ export type AppTabParamList = {
   Budgets: undefined;
   Subscriptions: undefined;
   DebtTracker: undefined;
-  // Wide screens only (sidebar).
+  // Phone hub listing the sections below; hidden from the sidebar.
+  More: undefined;
   Cards: undefined;
   Plan: undefined;
   Goals: undefined;
@@ -59,6 +51,7 @@ const TAB_ICONS: Record<keyof AppTabParamList, { active: IconName; inactive: Ico
   Budgets: { active: "pie-chart", inactive: "pie-chart-outline" },
   Subscriptions: { active: "repeat", inactive: "repeat-outline" },
   DebtTracker: { active: "trending-down", inactive: "trending-down-outline" },
+  More: { active: "grid", inactive: "grid-outline" },
   Cards: { active: "card", inactive: "card-outline" },
   Plan: { active: "map", inactive: "map-outline" },
   Goals: { active: "flag", inactive: "flag-outline" },
@@ -67,6 +60,10 @@ const TAB_ICONS: Record<keyof AppTabParamList, { active: IconName; inactive: Ico
 };
 
 const PLANNING_TABS = new Set<string>(["Plan", "Goals", "NetWorth"]);
+// No button in the phone bottom bar: reached through "Más".
+const SECONDARY_TABS = new Set<string>(["Subscriptions", "Cards", "Plan", "Goals", "NetWorth", "Profile"]);
+// Not in the sidebar's main list (Profile is pinned at its bottom instead).
+const SIDEBAR_SKIP = new Set<string>(["More", "Profile"]);
 
 function Sidebar({ state, descriptors, navigation }: BottomTabBarProps) {
   const renderItem = (index: number) => {
@@ -105,38 +102,86 @@ function Sidebar({ state, descriptors, navigation }: BottomTabBarProps) {
     );
   };
 
+  const collapsed = useNavSections((s) => s.collapsed);
+  const toggle = useNavSections((s) => s.toggle);
   const indexes = state.routes.map((_, i) => i);
+
+  // Accordion group. Folded, it still shows the current section so you can
+  // see where you are.
+  const renderGroup = (key: string, title: string, group: number[]) => {
+    const folded = !!collapsed[key];
+    return (
+      <View style={sidebar.group}>
+        <Pressable
+          onPress={() => toggle(key)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: !folded }}
+          style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+            sidebar.sectionRow,
+            (hovered || pressed) && sidebar.itemHover,
+          ]}
+        >
+          <Text style={sidebar.section}>{title}</Text>
+          <Ionicons
+            name={folded ? "chevron-forward" : "chevron-down"}
+            size={14}
+            color={colors.textSecondary}
+          />
+        </Pressable>
+        {group.filter((i) => !folded || state.index === i).map(renderItem)}
+      </View>
+    );
+  };
+
   return (
-    <View style={sidebar.root}>
+    // Scrolls: a phone in landscape is "wide" but too short for ten items.
+    <ScrollView style={sidebar.root} contentContainerStyle={sidebar.content}>
       <Text style={sidebar.brand}>TrackIt</Text>
-      {indexes
-        .filter((i) => !PLANNING_TABS.has(state.routes[i].name) && state.routes[i].name !== "Profile")
-        .map(renderItem)}
-      <Text style={sidebar.section}>Planificación</Text>
-      {indexes.filter((i) => PLANNING_TABS.has(state.routes[i].name)).map(renderItem)}
-      <View style={{ flex: 1 }} />
+      {renderGroup(
+        "main",
+        "Tu plata",
+        indexes.filter(
+          (i) => !PLANNING_TABS.has(state.routes[i].name) && !SIDEBAR_SKIP.has(state.routes[i].name),
+        ),
+      )}
+      {renderGroup(
+        "planning",
+        "Planificación",
+        indexes.filter((i) => PLANNING_TABS.has(state.routes[i].name)),
+      )}
+      <View style={sidebar.spacer} />
       {indexes.filter((i) => state.routes[i].name === "Profile").map(renderItem)}
-    </View>
+    </ScrollView>
   );
 }
 
 const sidebar = StyleSheet.create({
   root: {
     width: SIDEBAR_WIDTH,
+    flexGrow: 0,
     height: "100%",
     backgroundColor: colors.surface,
     borderRightWidth: 1,
     borderRightColor: colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 20,
-    gap: 2,
   },
+  // flexGrow keeps Perfil pinned to the bottom when everything fits.
+  content: { flexGrow: 1, paddingHorizontal: 12, paddingVertical: 20, gap: 2 },
+  spacer: { flex: 1, minHeight: 12 },
   brand: {
     color: colors.textPrimary,
     fontSize: 22,
     fontWeight: "800",
     paddingHorizontal: 12,
-    marginBottom: 20,
+    marginBottom: 12,
+  },
+  group: { gap: 2, marginBottom: 10 },
+  sectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
   section: {
     color: colors.textSecondary,
@@ -144,9 +189,6 @@ const sidebar = StyleSheet.create({
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.6,
-    paddingHorizontal: 12,
-    marginTop: 18,
-    marginBottom: 6,
   },
   item: {
     flexDirection: "row",
@@ -162,10 +204,11 @@ const sidebar = StyleSheet.create({
 });
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
-const Stack = createNativeStackNavigator<AppStackParamList>();
+
+type TabNavigation = BottomTabNavigationProp<AppTabParamList>;
 
 export function HeaderAvatarButton() {
-  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const navigation = useNavigation<TabNavigation>();
   return (
     <Pressable
       onPress={() => navigation.navigate("Profile")}
@@ -178,7 +221,42 @@ export function HeaderAvatarButton() {
   );
 }
 
-function Tabs() {
+/** Phones: sections opened from "Más" (or a shortcut) get a way back. */
+function HeaderBackButton() {
+  const navigation = useNavigation<TabNavigation>();
+  return (
+    <Pressable
+      onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("More"))}
+      hitSlop={8}
+      accessibilityLabel="Volver"
+      style={({ pressed }) => [{ paddingHorizontal: 12 }, pressed && { opacity: 0.6 }]}
+    >
+      <Ionicons name="chevron-back" size={26} color={colors.primary} />
+    </Pressable>
+  );
+}
+
+/** "Más" stays lit while one of the sections it lists is open. */
+function moreTabOptions(state: { index: number; routes: { name: string }[] }): BottomTabNavigationOptions {
+  const inside = SECONDARY_TABS.has(state.routes[state.index].name);
+  const tint = (color: string) => (inside ? colors.primary : color);
+  return {
+    tabBarIcon: ({ focused, color, size }) => (
+      <Ionicons
+        name={focused || inside ? TAB_ICONS.More.active : TAB_ICONS.More.inactive}
+        size={size}
+        color={tint(color)}
+      />
+    ),
+    tabBarLabel: ({ color }) => (
+      <Text allowFontScaling={false} style={{ fontSize: 10, fontWeight: "600", color: tint(color) }}>
+        Más
+      </Text>
+    ),
+  };
+}
+
+export default function AppStack() {
   const isWide = useIsWide();
   return (
     <Tab.Navigator
@@ -186,39 +264,45 @@ function Tabs() {
       // returns to the previous section instead of skipping it.
       backBehavior="history"
       tabBar={isWide ? (props) => <Sidebar {...props} /> : undefined}
-      screenOptions={({ route }) => ({
-        headerStyle: { backgroundColor: colors.background },
-        headerTitleStyle: { color: colors.textPrimary, fontWeight: "700" },
-        headerShadowVisible: false,
-        // The sidebar already links to Perfil.
-        headerRight: isWide ? undefined : () => <HeaderAvatarButton />,
-        tabBarPosition: isWide ? "left" : "bottom",
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          paddingTop: 6,
-          // Native gets its height from the bottom safe-area inset; the
-          // browser has none, which clips the labels under the icons.
-          ...(Platform.OS === "web" ? { height: 72, paddingBottom: 10 } : null),
-        },
-        // 10px + no per-item padding so long Spanish labels
-        // ("Suscripciones") fit in a 5-tab bar without truncating.
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
-        tabBarItemStyle: { paddingHorizontal: 0 },
-        // React Navigation switches to "beside-icon" on wide (browser)
-        // windows, which hides the labels in our narrow centered column.
-        tabBarLabelPosition: "below-icon",
-        tabBarAllowFontScaling: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
-        tabBarIcon: ({ focused, color, size }) => (
-          <Ionicons
-            name={focused ? TAB_ICONS[route.name].active : TAB_ICONS[route.name].inactive}
-            size={size}
-            color={color}
-          />
-        ),
-      })}
+      screenOptions={({ route, navigation }) => {
+        const hidden = !isWide && SECONDARY_TABS.has(route.name);
+        return {
+          headerStyle: { backgroundColor: colors.background },
+          headerTitleStyle: { color: colors.textPrimary, fontWeight: "700" },
+          headerShadowVisible: false,
+          headerLeft: hidden ? () => <HeaderBackButton /> : undefined,
+          // The sidebar already links to Perfil.
+          headerRight:
+            isWide || route.name === "Profile" ? undefined : () => <HeaderAvatarButton />,
+          tabBarPosition: isWide ? "left" : "bottom",
+          tabBarStyle: {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+            paddingTop: 6,
+            // Native gets its height from the bottom safe-area inset; the
+            // browser has none, which clips the labels under the icons.
+            ...(Platform.OS === "web" ? { height: 72, paddingBottom: 10 } : null),
+          },
+          // 10px + no per-item padding so long Spanish labels
+          // ("Presupuesto") fit in a 5-tab bar without truncating.
+          tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
+          tabBarItemStyle: hidden ? { display: "none" } : { paddingHorizontal: 0 },
+          // React Navigation switches to "beside-icon" on wide (browser)
+          // windows, which hides the labels in our narrow centered column.
+          tabBarLabelPosition: "below-icon",
+          tabBarAllowFontScaling: false,
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.textSecondary,
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons
+              name={focused ? TAB_ICONS[route.name].active : TAB_ICONS[route.name].inactive}
+              size={size}
+              color={color}
+            />
+          ),
+          ...(route.name === "More" ? moreTabOptions(navigation.getState()) : null),
+        };
+      }}
     >
       <Tab.Screen
         name="Dashboard"
@@ -239,62 +323,19 @@ function Tabs() {
       <Tab.Screen
         name="Subscriptions"
         component={SubscriptionsScreen}
-        options={{ title: "Suscripciones", tabBarLabel: "Suscripciones" }}
+        options={{ title: "Suscripciones" }}
       />
       <Tab.Screen
         name="DebtTracker"
         component={DebtTrackerScreen}
         options={{ title: "Deudas", tabBarLabel: "Deudas" }}
       />
-      {isWide ? (
-        <>
-          <Tab.Screen name="Cards" component={CardsScreen} options={{ title: "Tarjetas" }} />
-          <Tab.Screen name="Plan" component={PlanScreen} options={{ title: "Plan del mes" }} />
-          <Tab.Screen name="Goals" component={GoalsScreen} options={{ title: "Metas de ahorro" }} />
-          <Tab.Screen name="NetWorth" component={NetWorthScreen} options={{ title: "Patrimonio" }} />
-          <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Perfil" }} />
-        </>
-      ) : null}
+      <Tab.Screen name="More" component={MoreScreen} options={{ title: "Más" }} />
+      <Tab.Screen name="Cards" component={CardsScreen} options={{ title: "Tarjetas" }} />
+      <Tab.Screen name="Plan" component={PlanScreen} options={{ title: "Plan del mes" }} />
+      <Tab.Screen name="Goals" component={GoalsScreen} options={{ title: "Metas de ahorro" }} />
+      <Tab.Screen name="NetWorth" component={NetWorthScreen} options={{ title: "Patrimonio" }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Perfil" }} />
     </Tab.Navigator>
-  );
-}
-
-const stackHeader = {
-  headerStyle: { backgroundColor: colors.background },
-  headerTitleStyle: { color: colors.textPrimary, fontWeight: "700" as const },
-  headerTintColor: colors.primary,
-  headerShadowVisible: false,
-};
-
-export default function AppStack() {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
-      <Stack.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ title: "Perfil", presentation: "modal", ...stackHeader }}
-      />
-      <Stack.Screen
-        name="Cards"
-        component={CardsScreen}
-        options={{ title: "Tarjetas", ...stackHeader }}
-      />
-      <Stack.Screen
-        name="Goals"
-        component={GoalsScreen}
-        options={{ title: "Metas de ahorro", ...stackHeader }}
-      />
-      <Stack.Screen
-        name="Plan"
-        component={PlanScreen}
-        options={{ title: "Plan del mes", ...stackHeader }}
-      />
-      <Stack.Screen
-        name="NetWorth"
-        component={NetWorthScreen}
-        options={{ title: "Patrimonio", ...stackHeader }}
-      />
-    </Stack.Navigator>
   );
 }

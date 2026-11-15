@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -16,7 +16,7 @@ import DebtCard from "../components/DebtCard";
 import DebtFormSheet from "../components/DebtFormSheet";
 import MoneyText from "../components/MoneyText";
 import StrategySheet from "../components/StrategySheet";
-import type { AppStackParamList } from "../navigation/AppStack";
+import type { AppTabParamList } from "../navigation/AppStack";
 import { useDebts, type DebtOut } from "../services/queries/debts";
 import { colors } from "../theme/colors";
 import { pageStyle, useIsWide } from "../theme/layout";
@@ -27,7 +27,7 @@ export default function DebtTrackerScreen() {
   const [strategyOpen, setStrategyOpen] = useState(false);
   const [editing, setEditing] = useState<DebtOut | undefined>(undefined);
   const isWide = useIsWide();
-  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const navigation = useNavigation<BottomTabNavigationProp<AppTabParamList>>();
   const hasCards = (data ?? []).some((d) => d.email_format);
 
   const { totalDebt, totalMin, count } = useMemo(() => {

@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMemo } from "react";
 import {
   ActivityIndicator,
@@ -25,7 +24,7 @@ import HealthScoreCard from "../components/HealthScoreCard";
 import MoneyText from "../components/MoneyText";
 import RecentMovements from "../components/RecentMovements";
 import SharedExpensesCard from "../components/SharedExpensesCard";
-import type { AppStackParamList, AppTabParamList } from "../navigation/AppStack";
+import type { AppTabParamList } from "../navigation/AppStack";
 import { useBudgetStatus, type BudgetAlertStatus } from "../services/queries/budgets";
 import { useDashboard, type DashboardResponse } from "../services/queries/dashboard";
 import { useHealthScore, useUnusualSpending } from "../services/queries/insights";
@@ -87,9 +86,8 @@ function DashboardContent({
   const { data: netWorth, refetch: refetchNetWorth } = useNetWorth();
   const user = useAuthStore((s) => s.user);
   const firstName = user?.name?.split(" ")[0];
-  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
-  // Closest navigator is the tab bar — used to jump to the Budgets tab.
-  const tabNavigation = useNavigation<BottomTabNavigationProp<AppTabParamList>>();
+  const navigation = useNavigation<BottomTabNavigationProp<AppTabParamList>>();
+  const tabNavigation = navigation;
   // Screen hides the navigator header, so it must clear the notch itself.
   const insets = useSafeAreaInsets();
   // Wide screens: overview on the left, budget + categories on the right.
@@ -236,7 +234,7 @@ function DashboardContent({
     </>
   ) : null;
 
-  // Phones have no sidebar: Plan is only reachable from here.
+  // Phone shortcut; the sidebar (wide) and "Más" (phones) also link to it.
   const planLink = (
     <Pressable
       style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}

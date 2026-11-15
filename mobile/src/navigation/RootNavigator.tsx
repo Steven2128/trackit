@@ -7,7 +7,6 @@ import { registerForPushNotifications } from "../services/notifications";
 import { takeOAuthFragment } from "../services/webAuth";
 import { AuthUser, useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
-import { useIsWide } from "../theme/layout";
 import { Alert } from "../utils/alert";
 import AppStack from "./AppStack";
 import AuthStack from "./AuthStack";
@@ -61,7 +60,6 @@ export default function RootNavigator() {
   const hydrated = useAuthStore((s) => s.hydrated);
   const accessToken = useAuthStore((s) => s.accessToken);
   const hydrate = useAuthStore((s) => s.hydrate);
-  const isWide = useIsWide();
 
   useEffect(() => {
     if (hydrated) return;
@@ -83,12 +81,12 @@ export default function RootNavigator() {
   }
 
   return (
-    // Remount when the URL map changes (login/logout, crossing the wide
-    // breakpoint) — linking config is only read on mount.
+    // Remount when the URL map changes (login/logout) — linking config is
+    // only read on mount.
     <NavigationContainer
-      key={`${accessToken ? "app" : "auth"}-${isWide ? "wide" : "narrow"}`}
+      key={accessToken ? "app" : "auth"}
       theme={navTheme}
-      linking={buildLinking(!!accessToken, isWide)}
+      linking={buildLinking(!!accessToken)}
       documentTitle={{ formatter: (options) => (options?.title ? `${options.title} · TrackIt` : "TrackIt") }}
     >
       {accessToken ? <AppStack /> : <AuthStack />}
