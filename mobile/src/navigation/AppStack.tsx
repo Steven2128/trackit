@@ -154,33 +154,6 @@ function Sidebar({ state, descriptors, navigation }: BottomTabBarProps) {
     );
   }
 
-  // Accordion group. Folded, it still shows the current section so you can
-  // see where you are.
-  const renderGroup = (key: string, title: string, group: number[]) => {
-    const folded = !!collapsed[key];
-    return (
-      <View style={sidebar.group}>
-        <Pressable
-          onPress={() => toggle(key)}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: !folded }}
-          style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
-            sidebar.sectionRow,
-            (hovered || pressed) && sidebar.itemHover,
-          ]}
-        >
-          <Text style={sidebar.section}>{title}</Text>
-          <Ionicons
-            name={folded ? "chevron-forward" : "chevron-down"}
-            size={14}
-            color={colors.textSecondary}
-          />
-        </Pressable>
-        {group.filter((i) => !folded || state.index === i).map(renderItem)}
-      </View>
-    );
-  };
-
   return (
     // Scrolls: a phone in landscape is "wide" but too short for ten items.
     <ScrollView style={sidebar.root} contentContainerStyle={sidebar.content}>
@@ -188,8 +161,9 @@ function Sidebar({ state, descriptors, navigation }: BottomTabBarProps) {
         <Text style={sidebar.brand}>TrackIt</Text>
         {toggleButton}
       </View>
-      {renderGroup("main", "Tu plata", mainGroup)}
-      {renderGroup("planning", "Planificación", planningGroup)}
+      {mainGroup.map(renderItem)}
+      <Text style={sidebar.section}>Planificación</Text>
+      {planningGroup.map(renderItem)}
       <View style={sidebar.spacer} />
       {profile.map(renderItem)}
     </ScrollView>
@@ -227,21 +201,15 @@ const sidebar = StyleSheet.create({
     justifyContent: "center",
   },
   itemRail: { width: 44, height: 44, paddingHorizontal: 0, paddingVertical: 0, justifyContent: "center" },
-  group: { gap: 2, marginBottom: 10 },
-  sectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
   section: {
     color: colors.textSecondary,
     fontSize: 11,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.6,
+    paddingHorizontal: 12,
+    marginTop: 18,
+    marginBottom: 6,
   },
   item: {
     flexDirection: "row",

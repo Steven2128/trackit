@@ -4,7 +4,6 @@ import { useNavigation } from "@react-navigation/native";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { AppTabParamList } from "../navigation/AppStack";
-import { useNavSections } from "../store/navSections";
 import { colors } from "../theme/colors";
 import { pageStyle } from "../theme/layout";
 
@@ -76,8 +75,6 @@ const SECTIONS: {
 /** Phone hub for every section that doesn't fit in the bottom bar. */
 export default function MoreScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<AppTabParamList>>();
-  const collapsed = useNavSections((s) => s.collapsed);
-  const toggle = useNavSections((s) => s.toggle);
 
   return (
     <ScrollView
@@ -85,60 +82,42 @@ export default function MoreScreen() {
       contentContainerStyle={[styles.content, pageStyle]}
     >
       {SECTIONS.map((section) => {
-        const folded = !!collapsed[section.key];
         return (
           <View key={section.key}>
-            <Pressable
-              onPress={() => toggle(section.key)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: !folded }}
-              style={({ pressed }) => [
-                styles.sectionRow,
-                pressed && { opacity: 0.6 },
-              ]}
-            >
-              <Text style={styles.sectionLabel}>{section.title}</Text>
-              <Ionicons
-                name={folded ? "chevron-forward" : "chevron-down"}
-                size={16}
-                color={colors.textSecondary}
-              />
-            </Pressable>
-            {folded ? null : (
-              <View style={styles.group}>
-                {section.items.map((item, i) => (
-                  <Pressable
-                    key={item.to}
-                    accessibilityRole="link"
-                    onPress={() => navigation.navigate(item.to)}
-                    style={({ pressed }) => [
-                      styles.row,
-                      i > 0 && styles.rowDivider,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <View style={styles.iconBox}>
-                      <Ionicons
-                        name={item.icon}
-                        size={20}
-                        color={colors.primary}
-                      />
-                    </View>
-                    <View style={styles.body}>
-                      <Text style={styles.label}>{item.label}</Text>
-                      <Text style={styles.hint} numberOfLines={1}>
-                        {item.hint}
-                      </Text>
-                    </View>
+            <Text style={styles.sectionLabel}>{section.title}</Text>
+            <View style={styles.group}>
+              {section.items.map((item, i) => (
+                <Pressable
+                  key={item.to}
+                  accessibilityRole="link"
+                  onPress={() => navigation.navigate(item.to)}
+                  style={({ pressed }) => [
+                    styles.row,
+                    i > 0 && styles.rowDivider,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <View style={styles.iconBox}>
                     <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color={colors.textSecondary}
+                      name={item.icon}
+                      size={20}
+                      color={colors.primary}
                     />
-                  </Pressable>
-                ))}
-              </View>
-            )}
+                  </View>
+                  <View style={styles.body}>
+                    <Text style={styles.label}>{item.label}</Text>
+                    <Text style={styles.hint} numberOfLines={1}>
+                      {item.hint}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={colors.textSecondary}
+                  />
+                </Pressable>
+              ))}
+            </View>
           </View>
         );
       })}
@@ -149,20 +128,15 @@ export default function MoreScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 32 },
-  sectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    // Whole header row is the tap target.
-    minHeight: 44,
-    paddingHorizontal: 4,
-  },
   sectionLabel: {
     color: colors.textSecondary,
     fontSize: 12,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.6,
+    paddingHorizontal: 4,
+    marginTop: 12,
+    marginBottom: 8,
   },
   group: {
     backgroundColor: colors.surface,
