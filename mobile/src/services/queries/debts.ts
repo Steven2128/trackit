@@ -16,6 +16,12 @@ export type DebtOut = {
   payment_due_date: string | null;
   planned_payment: string | null;
   email_linked_at: string | null;
+  // Email-linked cards: what to pay now. After the statement's minimum is
+  // covered it's the next one building up (is_estimate), growing with each
+  // purchase. minimum_payment / payment_due_date stay the last statement's.
+  current_minimum_payment?: string | null;
+  current_due_date?: string | null;
+  current_is_estimate?: boolean;
   created_at: string;
 };
 

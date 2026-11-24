@@ -78,3 +78,47 @@ def statement_totals(lines: Sequence[LineLike], period_start: date | None) -> tu
     )
     payments = sum((-line.amount for line in lines if line.amount < 0), ZERO)
     return purchases, payments
+
+
+@dataclass(frozen=True)
+class CurrentPayment:
+    """What the card asks for right now and by when."""
+
+    amount: Decimal
+    due_date: date
+    # True once the last statement is covered: the amount is the next
+    # statement building up (installments + purchases), not a billed one.
+    accruing: bool
+
+
+def current_card_payment(
+    *,
+    statement_minimum: Decimal | None,
+    statement_due: date | None,
+    cutoff: date | None,
+    paid_since_cutoff: Decimal,
+    purchases_since_cutoff: Sequence[tuple[date, Decimal]],
+    next_installments: Decimal | None,
+    balance: Decimal,
+) -> CurrentPayment | None:
+    """The minimum to show on a card debt.
+
+    While the last statement's minimum isn't covered, it's what's left of it
+    by that statement's due date. Once it is, the next statement accrues: the
+    installments it already carries plus every purchase up to the next
+    cut-off (single-installment, billed whole), due a month after the last
+    due date — the card keeps the same payment day every month. Never more
+    than the balance."""
+    if statement_due is None:
+        return None
+    pending = max((statement_minimum or ZERO) - paid_since_cutoff, ZERO)
+    if pending > 0:
+        return CurrentPayment(pending, statement_due, accruing=False)
+    next_cutoff = add_month(cutoff) if cutoff is not None else None
+    bought = sum(
+        (amount for day, amount in purchases_since_cutoff
+         if next_cutoff is None or day <= next_cutoff),
+        ZERO,
+    )
+    amount = min(bought + (next_installments or ZERO), max(balance, ZERO))
+    return CurrentPayment(amount, add_month(statement_due), accruing=True)

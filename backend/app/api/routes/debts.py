@@ -6,7 +6,10 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
+from app.core.time_utils import user_tz
+from app.models.card_statement import SavedStatement
 from app.models.debt import Debt
+from app.models.transaction import Transaction, TransactionType
 from app.parsers.cards import CARD_FORMATS
 from app.schemas.debt import (
     CardFormatOut,
@@ -17,6 +20,7 @@ from app.schemas.debt import (
     StrategyComparisonOut,
     StrategyResultOut,
 )
+from app.services.cards import current_card_payment
 from app.services.debt_strategy import DebtLike, StrategyResult, compare_strategies
 
 router = APIRouter(prefix="/debts", tags=["debts"])
@@ -29,7 +33,83 @@ async def list_debts(current_user: CurrentUser, db: DbSession) -> list[DebtOut]:
         .where(Debt.user_id == current_user.id)
         .order_by(Debt.created_at.desc())
     )
-    return [DebtOut.model_validate(d) for d in result.scalars().all()]
+    debts = result.scalars().all()
+    current = await _current_card_payments(db, current_user.id, debts)
+    out = []
+    for d in debts:
+        item = DebtOut.model_validate(d)
+        payment = current.get(d.id)
+        if payment is not None:
+            item = item.model_copy(
+                update={
+                    "current_minimum_payment": payment.amount,
+                    "current_due_date": payment.due_date,
+                    "current_is_estimate": payment.accruing,
+                }
+            )
+        out.append(item)
+    return out
+
+
+async def _current_card_payments(db, user_id: uuid.UUID, debts) -> dict:
+    """Current minimum and due date of the email-linked cards with a
+    statement; due dates come from the saved statements when there are."""
+    cards = [d for d in debts if d.email_format is not None and d.statement_at is not None]
+    if not cards:
+        return {}
+    ids = [d.id for d in cards]
+    latest: dict[uuid.UUID, SavedStatement] = {}
+    for st in (
+        await db.execute(
+            select(SavedStatement)
+            .where(SavedStatement.debt_id.in_(ids))
+            .order_by(SavedStatement.period_end.desc())
+        )
+    ).scalars():
+        latest.setdefault(st.debt_id, st)
+    movements = (
+        await db.execute(
+            select(
+                Transaction.debt_id,
+                Transaction.occurred_at,
+                Transaction.amount,
+                Transaction.transaction_type,
+            ).where(
+                Transaction.user_id == user_id,
+                Transaction.debt_id.in_(ids),
+                Transaction.source == "card",
+                Transaction.occurred_at >= min(d.statement_at for d in cards),
+            )
+        )
+    ).all()
+    tz = user_tz()
+    out = {}
+    for d in cards:
+        st = latest.get(d.id)
+        since = [m for m in movements if m.debt_id == d.id and m.occurred_at >= d.statement_at]
+        # A statement newer than the saved PDF (email only) wins.
+        use_saved = st is not None and st.due_date is not None and (
+            d.payment_due_date is None or st.due_date >= d.payment_due_date
+        )
+        payment = current_card_payment(
+            statement_minimum=st.minimum_payment if use_saved else d.minimum_payment,
+            statement_due=st.due_date if use_saved else d.payment_due_date,
+            cutoff=st.period_end if use_saved else None,
+            paid_since_cutoff=sum(
+                (m.amount for m in since if m.transaction_type is TransactionType.credit),
+                Decimal("0"),
+            ),
+            purchases_since_cutoff=[
+                (m.occurred_at.astimezone(tz).date(), m.amount)
+                for m in since
+                if m.transaction_type is TransactionType.debit
+            ],
+            next_installments=d.next_installments,
+            balance=d.total_amount,
+        )
+        if payment is not None:
+            out[d.id] = payment
+    return out
 
 
 @router.get("/card-formats", response_model=list[CardFormatOut])

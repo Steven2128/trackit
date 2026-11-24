@@ -34,7 +34,10 @@ export default function DebtTrackerScreen() {
     const list = data ?? [];
     return {
       totalDebt: list.reduce((s, d) => s + Number(d.total_amount || 0), 0),
-      totalMin: list.reduce((s, d) => s + Number(d.minimum_payment || 0), 0),
+      totalMin: list.reduce(
+        (s, d) => s + Number(d.current_minimum_payment ?? d.minimum_payment ?? 0),
+        0,
+      ),
       count: list.length,
     };
   }, [data]);

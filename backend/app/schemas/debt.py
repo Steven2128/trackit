@@ -57,6 +57,12 @@ class DebtOut(DebtBase):
     id: uuid.UUID
     email_linked_at: datetime | None = None
     created_at: datetime
+    # Email-linked cards: what to pay now, recomputed on read
+    # (services/cards.py::current_card_payment). minimum_payment /
+    # payment_due_date stay the last statement's.
+    current_minimum_payment: Decimal | None = None
+    current_due_date: date | None = None
+    current_is_estimate: bool = False
 
 
 class CardFormatOut(BaseModel):

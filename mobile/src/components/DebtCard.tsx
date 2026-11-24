@@ -12,9 +12,15 @@ type Props = {
 
 export default function DebtCard({ debt, onPress }: Props) {
   const rate = debt.interest_rate ? `${Number(debt.interest_rate)}% EA` : null;
-  const min = debt.minimum_payment ? `Pago mín ${Number(debt.minimum_payment).toLocaleString("es-CO")}` : null;
-  const due = debt.payment_due_date
-    ? `vence ${new Date(`${debt.payment_due_date}T12:00:00`).toLocaleDateString("es-CO", {
+  // Cards linked by email carry the live figure; the rest show what was typed.
+  const minValue = debt.current_minimum_payment ?? debt.minimum_payment;
+  const dueValue = debt.current_due_date ?? debt.payment_due_date;
+  const estimate = debt.current_is_estimate === true;
+  const min = Number(minValue)
+    ? `${estimate ? "Próx. mín" : "Pago mín"} ${Number(minValue).toLocaleString("es-CO")}`
+    : null;
+  const due = dueValue
+    ? `vence ${new Date(`${dueValue}T12:00:00`).toLocaleDateString("es-CO", {
         day: "numeric",
         month: "short",
       })}`
@@ -38,6 +44,9 @@ export default function DebtCard({ debt, onPress }: Props) {
           ) : null}
         </View>
         {meta ? <Text style={styles.meta}>{meta}</Text> : null}
+        {estimate ? (
+          <Text style={styles.hint}>Suma con cada compra hasta el corte</Text>
+        ) : null}
       </View>
       <MoneyText value={debt.total_amount} size="md" />
     </Pressable>
@@ -68,4 +77,5 @@ const styles = StyleSheet.create({
   },
   pillText: { color: colors.textSecondary, fontSize: 10 },
   meta: { color: colors.textSecondary, fontSize: 11, marginTop: 3 },
+  hint: { color: colors.textSecondary, fontSize: 10, marginTop: 2, fontStyle: "italic" },
 });
