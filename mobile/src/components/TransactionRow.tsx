@@ -19,6 +19,8 @@ type Props = {
   /** Part someone else covers on a shared expense. */
   sharedAmount?: string | null;
   showChevron?: boolean;
+  /** Full-page lists: bigger type and a category-colored accent edge. */
+  prominent?: boolean;
 };
 
 function formatTime(iso: string): string {
@@ -38,14 +40,24 @@ export default function TransactionRow({
   note,
   sharedAmount,
   showChevron = false,
+  prominent = false,
 }: Props) {
   const cat = getCategory(category);
   const isIncome = type === "credit";
   return (
-    <View style={styles.row}>
-      <CategoryIcon categoryKey={category} />
+    <View
+      style={[
+        styles.row,
+        prominent && styles.rowProminent,
+        prominent && { borderLeftColor: cat.color },
+      ]}
+    >
+      <CategoryIcon categoryKey={category} size={prominent ? 42 : 36} />
       <View style={styles.body}>
-        <Text style={styles.merchant} numberOfLines={1}>
+        <Text
+          style={[styles.merchant, prominent && styles.merchantProminent]}
+          numberOfLines={1}
+        >
           {merchant ?? (isIncome ? "Ingreso" : "Movimiento")}
         </Text>
         <View style={styles.metaRow}>
@@ -69,7 +81,9 @@ export default function TransactionRow({
       </View>
       {/* Income stands out in green; expenses stay neutral — red is reserved
           for alerts and debt so every purchase doesn't read as a warning. */}
-      <MoneyText value={amount} signed={isIncome} positive={isIncome} size="md" />
+      <MoneyText value={amount} signed={isIncome} positive={isIncome}
+        size={prominent ? "lg" : "md"}
+      />
       {showChevron ? (
         <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
       ) : null}
@@ -89,8 +103,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 12,
   },
+  rowProminent: {
+    backgroundColor: colors.surfaceMuted,
+    borderLeftWidth: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 14,
+  },
   body: { flex: 1, gap: 5 },
   merchant: { color: colors.textPrimary, fontSize: 15, fontWeight: "600" },
+  merchantProminent: { fontSize: 16, fontWeight: "700" },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   catPill: {
     paddingHorizontal: 8,
