@@ -32,6 +32,7 @@ from app.schemas.dashboard import (
     MonthCategoryItem,
     MonthTrendEntry,
 )
+from app.services.card_payments import current_card_payments, effective_minimum
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -48,7 +49,7 @@ async def get_dashboard(current_user: CurrentUser, db: DbSession) -> DashboardRe
     trend_rows = await _fetch_trend(db, current_user.id, trend_start)
     received_rows = await _fetch_received(db, current_user.id, trend_start)
     tx_count = await _fetch_count(db, current_user.id, current_month)
-    debt_row = await _fetch_debts(db, current_user.id)
+    debts = await _fetch_debts(db, current_user.id)
 
     monthly_trend = _build_trend(trend_rows, trend_months, received_rows)
     last = monthly_trend[-1]
@@ -62,11 +63,7 @@ async def get_dashboard(current_user: CurrentUser, db: DbSession) -> DashboardRe
             by_category=last.by_category,
             transaction_count=tx_count,
         ),
-        debts=DebtSnapshot(
-            total_debt=Decimal(str(debt_row.total_debt)),
-            total_minimum_payment=Decimal(str(debt_row.total_min)),
-            debt_count=debt_row.debt_count,
-        ),
+        debts=debts,
     )
 
 
@@ -132,17 +129,18 @@ async def _fetch_count(db: AsyncSession, user_id: UUID, current_month: str) -> i
     return result.scalar_one()
 
 
-async def _fetch_debts(db: AsyncSession, user_id: UUID):
-    result = await db.execute(
-        select(
-            func.count().label("debt_count"),
-            func.coalesce(func.sum(Debt.total_amount), 0).label("total_debt"),
-            func.coalesce(func.sum(Debt.minimum_payment), 0).label("total_min"),
-        )
-        .select_from(Debt)
-        .where(Debt.user_id == user_id)
+async def _fetch_debts(db: AsyncSession, user_id: UUID) -> DebtSnapshot:
+    """Totals of the user's debts. Linked cards count their live minimum
+    (services/card_payments.py), same figure the Deudas screen shows."""
+    debts = (await db.execute(select(Debt).where(Debt.user_id == user_id))).scalars().all()
+    current = await current_card_payments(db, user_id, debts)
+    return DebtSnapshot(
+        total_debt=sum((d.total_amount for d in debts), Decimal("0")),
+        total_minimum_payment=sum(
+            (effective_minimum(d, current) for d in debts), Decimal("0")
+        ),
+        debt_count=len(debts),
     )
-    return result.one()
 
 
 def _six_months(current: str) -> list[str]:
