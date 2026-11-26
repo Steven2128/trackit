@@ -491,7 +491,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
         ))}
         <OptionRow
           categoryKey={null}
-          label="Otros (sin categoría)"
+          label="Sin categoría"
           selected={selected === null}
           onPress={() => setSelected(null)}
         />

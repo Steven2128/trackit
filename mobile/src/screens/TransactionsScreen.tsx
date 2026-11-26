@@ -190,9 +190,7 @@ export default function TransactionsScreen() {
             >
               <View style={styles.summaryLabelRow}>
                 <Text style={styles.summaryLabel}>Gastado</Text>
-                {needle
-                ? `Nada coincide con "${search.trim()}".`
-                : typeFilter === "debit" ? (
+                {typeFilter === "debit" ? (
                   <Ionicons name="funnel" size={11} color={colors.primary} />
                 ) : null}
               </View>
@@ -354,7 +352,9 @@ export default function TransactionsScreen() {
             <Ionicons name="receipt-outline" size={40} color={colors.textSecondary} />
             <Text style={styles.emptyTitle}>Sin movimientos</Text>
             <Text style={styles.emptyText}>
-              {typeFilter === "debit"
+              {needle
+                ? `Nada coincide con "${search.trim()}".`
+                : typeFilter === "debit"
                 ? "No hay gastos con estos filtros en el período."
                 : typeFilter === "credit"
                   ? "No hay ingresos con estos filtros en el período."

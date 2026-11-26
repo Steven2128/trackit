@@ -38,8 +38,9 @@ from app.schemas.transaction import (
     TransactionSummary,
     TransactionUpdate,
 )
-from app.services.categorizer import RULES
+from app.services.categorizer import RULES, match_user_rule
 from app.services.contact_balance import CONTACT_SOURCE, balance_effects
+from app.services.email_sync import load_user_rules
 from app.services.net_worth import (
     MANUAL_ACCOUNT_SOURCES,
     CashExpense,
@@ -203,7 +204,8 @@ async def create_cash_expense(
         provider_connection_id=None,
         amount=payload.amount,
         merchant=payload.merchant.strip(),
-        category=payload.category,
+        category=payload.category
+        or await _user_rule_category(db, current_user.id, payload.merchant),
         transaction_type=TransactionType.debit,
         currency="COP",
         occurred_at=payload.occurred_at or datetime.now(timezone.utc),
@@ -253,7 +255,12 @@ async def create_manual_movement(
         provider_connection_id=None,
         amount=payload.amount,
         merchant=payload.merchant.strip(),
-        category=payload.category,
+        category=payload.category
+        or (
+            await _user_rule_category(db, current_user.id, payload.merchant)
+            if payload.transaction_type == TransactionType.debit
+            else None
+        ),
         transaction_type=payload.transaction_type,
         currency="COP",
         occurred_at=payload.occurred_at or datetime.now(timezone.utc),
@@ -317,6 +324,12 @@ async def _reconcile(
         await keep_cash_reconciled(db, user_id, before, after)
     elif kind is not None:
         await keep_reconciled(db, user_id, kind, before, after)
+
+
+async def _user_rule_category(db: DbSession, user_id: uuid.UUID, merchant: str) -> str | None:
+    """A typed-in expense with no category picked follows the user's merchant
+    rules, like synced ones do ("Wanda" → otros)."""
+    return match_user_rule(merchant, await load_user_rules(db, user_id))
 
 
 async def _set_shares(db: DbSession, user_id: uuid.UUID, tx: Transaction, shares) -> None:

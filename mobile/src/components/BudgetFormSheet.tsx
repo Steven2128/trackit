@@ -116,7 +116,7 @@ export default function BudgetFormSheet({
     Alert.alert(
       isCustomCategory ? "Eliminar categoría" : "Quitar presupuesto",
       isCustomCategory
-        ? `¿Eliminar "${cat.label}"? Sus transacciones pasan a "Otros".`
+        ? `¿Eliminar "${cat.label}"? Sus transacciones pasan a "Sin categoría".`
         : `¿Quitar el límite de ${cat.label}?`,
       [
         { text: "Cancelar", style: "cancel" },

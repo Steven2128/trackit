@@ -43,7 +43,7 @@ export function ownAmount(tx: { amount: string; shared_amount?: string | null })
   return Number(tx.amount) - Number(tx.shared_amount ?? 0);
 }
 
-const FALLBACK: CategoryDef = { key: "other", label: "Otros", icon: "cube", color: "#A3A8B3" };
+const FALLBACK: CategoryDef = { key: "other", label: "Sin categoría", icon: "cube", color: "#A3A8B3" };
 
 // Money between the user and a person keeps one category, "reimbursement",
 // but reads by direction: money that left the user's account (they lent or

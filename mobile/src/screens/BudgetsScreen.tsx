@@ -72,7 +72,7 @@ export default function BudgetsScreen() {
     Alert.alert(
       isCustom ? "Eliminar categoría" : "Quitar presupuesto",
       isCustom
-        ? `¿Eliminar "${label}"? Sus transacciones pasan a "Otros".`
+        ? `¿Eliminar "${label}"? Sus transacciones pasan a "Sin categoría".`
         : `¿Quitar el límite de ${label}?`,
       [
         { text: "Cancelar", style: "cancel" },

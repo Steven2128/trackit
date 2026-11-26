@@ -259,3 +259,32 @@ def test_reimbursement_is_an_allowed_category() -> None:
 
     assert resp.status_code == 200
     assert row.category == "reimbursement"
+
+
+def test_cash_expense_without_category_follows_the_users_rules(
+    monkeypatch, reconcile_calls
+) -> None:
+    from app.services.categorizer import UserRule
+
+    async def _rules(_db, _user_id):
+        return [UserRule(pattern="wanda", category="otros")]
+
+    monkeypatch.setattr(transactions, "load_user_rules", _rules)
+    client, session = _client(None)
+    resp = client.post("/transactions/cash", json={"amount": "50000", "merchant": "Wanda"})
+    assert resp.status_code == 201
+    assert resp.json()["category"] == "otros"
+
+
+def test_picked_category_wins_over_rules(monkeypatch, reconcile_calls) -> None:
+    from app.services.categorizer import UserRule
+
+    async def _rules(_db, _user_id):
+        return [UserRule(pattern="wanda", category="otros")]
+
+    monkeypatch.setattr(transactions, "load_user_rules", _rules)
+    client, _ = _client(None)
+    resp = client.post(
+        "/transactions/cash", json={"amount": "50000", "merchant": "Wanda", "category": "food"}
+    )
+    assert resp.json()["category"] == "food"
