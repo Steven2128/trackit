@@ -42,7 +42,7 @@ export default function TransactionRow({
   showChevron = false,
   prominent = false,
 }: Props) {
-  const cat = getCategory(category);
+  const cat = getCategory(category, type);
   const isIncome = type === "credit";
   return (
     <View
@@ -52,7 +52,7 @@ export default function TransactionRow({
         prominent && { borderLeftColor: cat.color },
       ]}
     >
-      <CategoryIcon categoryKey={category} size={prominent ? 42 : 36} />
+      <CategoryIcon categoryKey={category} type={type} size={prominent ? 42 : 36} />
       <View style={styles.body}>
         <Text
           style={[styles.merchant, prominent && styles.merchantProminent]}

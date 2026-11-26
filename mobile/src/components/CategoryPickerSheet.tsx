@@ -464,7 +464,8 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
           <OptionRow
             key={cat.key}
             categoryKey={cat.key}
-            label={cat.label}
+            type={transaction?.transaction_type}
+            label={getCategory(cat.key, transaction?.transaction_type).label}
             selected={selected === cat.key}
             onPress={() => setSelected(cat.key)}
           />
@@ -491,11 +492,13 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
 
 function OptionRow({
   categoryKey,
+  type,
   label,
   selected,
   onPress,
 }: {
   categoryKey: string | null;
+  type?: "debit" | "credit";
   label: string;
   selected: boolean;
   onPress: () => void;
@@ -509,7 +512,7 @@ function OptionRow({
       ]}
       onPress={onPress}
     >
-      <CategoryIcon categoryKey={categoryKey} />
+      <CategoryIcon categoryKey={categoryKey} type={type} />
       <Text style={[styles.optionLabel, selected && styles.optionLabelSelected]}>
         {label}
       </Text>

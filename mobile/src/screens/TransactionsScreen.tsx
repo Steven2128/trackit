@@ -82,7 +82,7 @@ export default function TransactionsScreen() {
       [
         tx.merchant,
         tx.note,
-        getCategory(tx.category).label,
+        getCategory(tx.category, tx.transaction_type).label,
         String(Math.round(Number(tx.amount))),
       ]
         .filter(Boolean)

@@ -6,10 +6,12 @@ import { getCategory } from "../utils/categories";
 type Props = {
   categoryKey: string | null | undefined;
   size?: number;
+  /** Movement direction; changes how some categories read (see getCategory). */
+  type?: "debit" | "credit";
 };
 
-export default function CategoryIcon({ categoryKey, size = 36 }: Props) {
-  const cat = getCategory(categoryKey);
+export default function CategoryIcon({ categoryKey, size = 36, type }: Props) {
+  const cat = getCategory(categoryKey, type);
   return (
     <View
       accessibilityLabel={cat.label}

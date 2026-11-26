@@ -45,8 +45,24 @@ export function ownAmount(tx: { amount: string; shared_amount?: string | null })
 
 const FALLBACK: CategoryDef = { key: "other", label: "Otros", icon: "cube", color: "#A3A8B3" };
 
-export function getCategory(key: string | null | undefined): CategoryDef {
+// Money between the user and a person keeps one category, "reimbursement",
+// but reads by direction: money that left the user's account (they lent or
+// paid for someone) is a loan; money that came in is a reimbursement.
+const LOAN: CategoryDef = {
+  key: "reimbursement",
+  label: "Préstamo",
+  icon: "return-up-forward",
+  color: "#F0A35E",
+};
+
+/** Display info for a category. Pass the movement's type so a debit
+ * "reimbursement" reads as "Préstamo". */
+export function getCategory(
+  key: string | null | undefined,
+  type?: "debit" | "credit",
+): CategoryDef {
   if (!key) return FALLBACK;
+  if (key === "reimbursement" && type === "debit") return LOAN;
   const found = CATEGORIES.find((c) => c.key === key);
   if (found) return found;
   // User-defined category: prettify the slug ("gastos_mascota" → "Gastos mascota").
