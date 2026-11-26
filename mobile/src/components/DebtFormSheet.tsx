@@ -21,6 +21,7 @@ import { formatCOPInput, parseCOP, toCOPInput } from "../utils/currency";
 import { Alert } from "../utils/alert";
 import { dmyToIso, isoToDmy } from "../utils/dates";
 import MoneyText from "./MoneyText";
+import UploadStatementButton from "./UploadStatementButton";
 import { useWebSheet } from "./useWebSheet";
 
 type Props = {
@@ -131,7 +132,8 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
       payment_due_date: due,
       planned_payment: form.planned.trim() === "" ? null : parseCOP(form.planned).toString(),
       email_sender: form.format ? sender : null,
-      email_format: form.format,
+      // A card read only from uploaded statements (no emails) keeps its format.
+      email_format: form.format ?? (debt && !debt.email_sender ? debt.email_format : null),
       card_last_digits: form.format && digits !== "" ? digits : null,
     };
   }
@@ -320,6 +322,17 @@ export default function DebtFormSheet({ isVisible, debt, onClose }: Props) {
           <Text style={styles.saveText}>{busy ? "Guardando..." : "Guardar"}</Text>
         </Pressable>
 
+        {isEdit && debt && !debt.email_sender ? (
+          <View style={styles.uploadBlock}>
+            <UploadStatementButton debtId={debt.id} />
+            <Text style={styles.hint}>
+              ¿Es una tarjeta de crédito cuyo extracto no llega por correo (Banco de Bogotá)?
+              Subí el PDF: actualiza saldo, pago mínimo y fecha límite, y la tarjeta aparece en
+              Tarjetas.
+            </Text>
+          </View>
+        ) : null}
+
         {isEdit && debt?.email_sender ? <DebtMovements debtId={debt.id} /> : null}
 
         {isEdit ? (
@@ -403,6 +416,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const styles = StyleSheet.create({
+  uploadBlock: { marginTop: 16, gap: 6 },
   bg: { backgroundColor: colors.surface },
   handle: { backgroundColor: colors.border },
   body: { padding: 16, gap: 4, paddingBottom: 48 },

@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.time_utils import user_tz
 from app.models.card_statement import SavedStatement
 from app.models.debt import Debt
-from app.models.transaction import Transaction, TransactionType
+from app.models.transaction import Transaction
+from app.services.card_statement import card_movement_clause, is_card_payment
 from app.services.cards import CurrentPayment, current_card_payment
 
 
@@ -51,10 +52,11 @@ async def current_card_payments(
                 Transaction.occurred_at,
                 Transaction.amount,
                 Transaction.transaction_type,
+                Transaction.category,
             ).where(
                 Transaction.user_id == user_id,
                 Transaction.debt_id.in_(ids),
-                Transaction.source == "card",
+                card_movement_clause(cards),
                 Transaction.occurred_at >= min(d.statement_at for d in cards),
             )
         )
@@ -73,13 +75,13 @@ async def current_card_payments(
             statement_due=st.due_date if use_saved else d.payment_due_date,
             cutoff=st.period_end if use_saved else None,
             paid_since_cutoff=sum(
-                (m.amount for m in since if m.transaction_type is TransactionType.credit),
+                (m.amount for m in since if is_card_payment(m.transaction_type, m.category)),
                 Decimal("0"),
             ),
             purchases_since_cutoff=[
                 (m.occurred_at.astimezone(tz).date(), m.amount)
                 for m in since
-                if m.transaction_type is TransactionType.debit
+                if not is_card_payment(m.transaction_type, m.category)
             ],
             next_installments=d.next_installments,
             balance=d.total_amount,

@@ -12,6 +12,7 @@ import {
 
 import CategoryIcon from "../components/CategoryIcon";
 import MoneyText from "../components/MoneyText";
+import UploadStatementButton from "../components/UploadStatementButton";
 import {
   useCardStatement,
   useCards,
@@ -479,8 +480,8 @@ export default function CardsScreen() {
         <Ionicons name="card-outline" size={44} color={colors.textSecondary} />
         <Text style={styles.emptyTitle}>Sin tarjetas vinculadas</Text>
         <Text style={[styles.empty, { textAlign: "center" }]}>
-          En Deudas, abrí tu tarjeta y conectala con los correos del banco. Desde ahí se leen las
-          compras, los pagos y el extracto.
+          En Deudas, abrí tu tarjeta y conectala con los correos del banco, o subí el PDF del
+          extracto si el banco no lo manda por correo (Banco de Bogotá).
         </Text>
       </View>
     );
@@ -491,6 +492,9 @@ export default function CardsScreen() {
       <CardVisual card={card} />
       <ToPay card={card} />
       <NextStatement card={card} />
+      <View style={{ marginBottom: spacing.md }}>
+        <UploadStatementButton debtId={card.debt_id} label="Subir extracto nuevo (PDF)" />
+      </View>
     </>
   );
   const detail = (

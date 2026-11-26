@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../api";
 
@@ -92,5 +92,34 @@ export function useCardStatement(debtId: string | undefined, statementId: string
     enabled: Boolean(debtId && statementId),
     // A statement never changes once issued.
     staleTime: Infinity,
+  });
+}
+
+export type StatementUploadResult = {
+  card_format: string;
+  period_end: string;
+  due_date: string | null;
+  minimum_payment: string | null;
+  total_payment: string | null;
+  balance: string;
+  purchases_added: number;
+  lines: number;
+};
+
+/** POST /cards/{debtId}/statement — a statement PDF the user downloaded
+ * (Banco de Bogotá doesn't email it). Updates balance, minimum, due date,
+ * installments and adds missing purchases, so most screens change. */
+export function useUploadStatement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ debtId, file }: { debtId: string; file: File }) => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      const res = await api.post<StatementUploadResult>(`/cards/${debtId}/statement`, form, {
+        timeout: 60000,
+      });
+      return res.data;
+    },
+    onSuccess: () => queryClient.invalidateQueries(),
   });
 }

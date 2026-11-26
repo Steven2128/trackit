@@ -59,6 +59,9 @@ class StatementLine:
     installment: int | None = None
     installments: int | None = None
     pending: Decimal | None = None  # capital left for later statements
+    # False for lines that only carry an installment of something older (a
+    # deferred balance): never inserted as a purchase.
+    purchase: bool = True
 
     @property
     def next_installment(self) -> Decimal:
@@ -92,6 +95,7 @@ class CardStatement:
             line
             for line in self.lines
             if line.amount > 0
+            and line.purchase
             and (self.period_start is None or line.on >= self.period_start)
             and line.on <= self.period_end
         ]

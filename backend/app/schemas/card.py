@@ -74,3 +74,14 @@ class CardOut(BaseModel):
     next_statement_estimate: Decimal
     installment_plans: list[InstallmentPlanOut]
     statements: list[StatementSummaryOut]
+
+
+class StatementUploadOut(BaseModel):
+    card_format: str
+    period_end: date
+    due_date: date | None
+    minimum_payment: Decimal | None
+    total_payment: Decimal | None
+    balance: Decimal  # the card's balance after applying it
+    purchases_added: int
+    lines: int

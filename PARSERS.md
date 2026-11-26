@@ -197,6 +197,13 @@ A diferencia de los bancos de arriba, **el remitente no está en el código**: d
   - Sin PDF o sin contraseña, quedan el mínimo y la fecha del cuerpo, y la llegada del correo hace de corte.
 - **Flujo de caja**: cada tarjeta es **un solo pago por vencimiento**: el mínimo del último extracto y, antes de que llegue el siguiente, "Próximo extracto <tarjeta>" (estimado) = compras desde el corte + `next_installments`, un mes después del último vencimiento.
 
+
+### Banco de Bogotá (`bancodebogota`, solo extracto subido)
+
+- **No llega por correo**: el usuario baja el PDF ("Extracto Tarjeta Crédito", sin contraseña) y lo sube desde Deudas (editar la deuda) o Tarjetas → `POST /cards/{debt_id}/statement` (multipart `file`). La subida prueba los lectores en orden (`_STATEMENT_READERS` en `app/api/routes/cards.py`); el que lo lee fija `debts.email_format` si estaba vacío, y la deuda pasa a ser tarjeta (`email_sender` sigue vacío). Además del `apply_card_statement` de siempre, la subida guarda `minimum_payment` y `payment_due_date` del PDF.
+- **Lector**: `app/parsers/cards/bancodebogota_statement.py`. "Fecha Facturación / Fecha Límite de Pago" = corte y vencimiento (`dd/mm/aaaa`); filas `comprobante descripción fecha proceso plazo valor tasa cuota_mes cuotas_pendientes saldo`; montos con coma de miles y sin centavos. Plazo 00 + cuota 0 + "PAGO…" = pago; plazo 00 con cuota = cargo (seguro). "= Pago Minimo" ≠ "= Pago Minimo Alterno".
+- **Compras del periodo**: el PDF no imprime el periodo. Es compra la fila que factura su primera cuota, salvo "Compras diferidas" (el saldo viejo pasado a cuotas, que solo aporta su cuota a `next_installments`). `period_start` = la primera compra (o el corte de un mes antes si no hubo).
+- **Pagos**: no hay correos de la tarjeta, así que los pagos son los débitos del banco que el usuario asigna a la deuda (`debt_payment` + `debt_id`). Para tarjetas sin remitente cuentan como pagos de la tarjeta en el saldo posterior al corte, en Tarjetas y en el mínimo vivo (`card_movement_clause` / `is_card_payment` en `services/card_statement.py`).
 ---
 
 ## Pareo de transferencias (Itaú → Nequi/Daviplata/Falabella)

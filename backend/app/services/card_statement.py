@@ -20,7 +20,7 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 from typing import Sequence
 
-from sqlalchemy import delete, select
+from sqlalchemy import ColumnElement, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time_utils import user_tz
@@ -39,6 +39,26 @@ log = logging.getLogger(__name__)
 POSTING_TOLERANCE_DAYS = 3
 
 
+def card_movement_clause(debts: Sequence[Debt]) -> ColumnElement[bool]:
+    """Movements that change a card's balance: what came by the card's own
+    emails or statements (source "card"), plus, for cards with no emails
+    (Banco de Bogotá, read only from uploaded statements), the bank debits
+    the user linked as payments to it."""
+    clause = Transaction.source == "card"
+    no_email = [d.id for d in debts if not d.email_sender]
+    if no_email:
+        clause = clause | (
+            Transaction.debt_id.in_(no_email) & (Transaction.category == "debt_payment")
+        )
+    return clause
+
+
+def is_card_payment(tx_type: TransactionType, category: str | None) -> bool:
+    """A card's payments: credits read from its emails, or a bank debit
+    linked to it as a debt payment."""
+    return tx_type is TransactionType.credit or category == "debt_payment"
+
+
 def cutoff_instant(statement: CardStatement) -> datetime:
     """The first instant of the day after the cut-off day, local time."""
     return datetime.combine(statement.period_end + timedelta(days=1), time.min, user_tz())
@@ -46,12 +66,14 @@ def cutoff_instant(statement: CardStatement) -> datetime:
 
 def balance_after(
     total_payment: Decimal,
-    later: Sequence[tuple[TransactionType, Decimal]],
+    later: Sequence[tuple[TransactionType, Decimal] | tuple[TransactionType, Decimal, str | None]],
 ) -> Decimal:
     """Statement total + purchases − payments made after the cut-off."""
     balance = total_payment
-    for tx_type, amount in later:
-        balance += amount if tx_type is TransactionType.debit else -amount
+    for row in later:
+        tx_type, amount = row[0], row[1]
+        category = row[2] if len(row) > 2 else None
+        balance += -amount if is_card_payment(tx_type, category) else amount
     return max(balance, Decimal("0"))
 
 
@@ -98,7 +120,7 @@ async def save_statement(db: AsyncSession, debt: Debt, statement: CardStatement)
 
 async def apply_card_statement(
     db: AsyncSession,
-    connection: ProviderConnection,
+    connection: ProviderConnection | None,
     debt: Debt,
     statement: CardStatement,
     user_rules: Sequence[UserRule] = (),
@@ -139,7 +161,7 @@ async def apply_card_statement(
             db.add(
                 Transaction(
                     user_id=debt.user_id,
-                    provider_connection_id=connection.id,
+                    provider_connection_id=connection.id if connection else None,
                     amount=row.amount,
                     merchant=row.description,
                     category=categorize(row.description, user_rules),
@@ -160,16 +182,19 @@ async def apply_card_statement(
     if statement.total_payment is not None:
         later = (
             await db.execute(
-                select(Transaction.transaction_type, Transaction.amount).where(
+                select(
+                    Transaction.transaction_type, Transaction.amount, Transaction.category
+                ).where(
                     Transaction.user_id == debt.user_id,
                     Transaction.debt_id == debt.id,
-                    Transaction.source == "card",
+                    card_movement_clause([debt]),
                     Transaction.occurred_at >= cutoff,
                 )
             )
         ).all()
         debt.total_amount = balance_after(
-            statement.total_payment, [(r.transaction_type, r.amount) for r in later]
+            statement.total_payment,
+            [(r.transaction_type, r.amount, r.category) for r in later],
         )
 
     log.info(
