@@ -13,6 +13,7 @@ from app.models.provider_connection import ProviderConnection, ProviderType
 from app.models.push_token import PushToken
 from app.models.savings_goal import SavingsGoal
 from app.models.transaction import Transaction, TransactionType
+from app.models.transaction_share import TransactionShare
 from app.models.user import User
 
 __all__ = [
@@ -35,6 +36,7 @@ __all__ = [
     "SavedStatementLine",
     "SavingsGoal",
     "Transaction",
+    "TransactionShare",
     "TransactionType",
     "User",
 ]

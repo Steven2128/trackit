@@ -26,6 +26,7 @@ from app.models.account import AccountKind
 from app.models.contact import Contact
 from app.models.debt import Debt
 from app.models.transaction import OWN_AMOUNT, Transaction, TransactionType
+from app.models.transaction_share import TransactionShare
 from app.schemas.account import CashExpenseIn
 from app.schemas.transaction import (
     CategorySummaryItem,
@@ -38,7 +39,7 @@ from app.schemas.transaction import (
     TransactionUpdate,
 )
 from app.services.categorizer import RULES
-from app.services.contact_balance import CONTACT_SOURCE, balance_effect
+from app.services.contact_balance import CONTACT_SOURCE, balance_effects
 from app.services.net_worth import (
     MANUAL_ACCOUNT_SOURCES,
     CashExpense,
@@ -110,7 +111,7 @@ async def shared_summary(current_user: CurrentUser, db: DbSession) -> SharedSumm
     what came back as reimbursements. All time — it's a running balance,
     like a tab with the brother."""
     # The three totals cover what isn't assigned to anyone yet.
-    unassigned = Transaction.contact_id.is_(None)
+    unassigned = Transaction.contact_id.is_(None) & ~Transaction.shares.any()
     covered = await _sum_shared(
         db,
         [
@@ -138,7 +139,7 @@ async def shared_summary(current_user: CurrentUser, db: DbSession) -> SharedSumm
             await db.execute(
                 select(Transaction).where(
                     Transaction.user_id == current_user.id,
-                    Transaction.contact_id.is_not(None),
+                    Transaction.contact_id.is_not(None) | Transaction.shares.any(),
                 )
             )
         )
@@ -171,8 +172,9 @@ def contact_balances(contacts, rows) -> list[ContactBalance]:
     biggest debts first."""
     totals = {c.id: Decimal("0") for c in contacts}
     for row in rows:
-        if row.contact_id in totals:
-            totals[row.contact_id] += balance_effect(row)
+        for contact_id, effect in balance_effects(row, row.contact_id):
+            if contact_id in totals:
+                totals[contact_id] += effect
     people = [ContactBalance(contact_id=c.id, name=c.name, balance=totals[c.id]) for c in contacts]
     return sorted(people, key=lambda p: (-abs(p.balance), p.name.lower()))
 
@@ -315,6 +317,26 @@ async def _reconcile(
         await keep_cash_reconciled(db, user_id, before, after)
     elif kind is not None:
         await keep_reconciled(db, user_id, kind, before, after)
+
+
+async def _set_shares(db: DbSession, user_id: uuid.UUID, tx: Transaction, shares) -> None:
+    """Split a debit the user paid among several people. shared_amount
+    becomes the sum; contact_id names the person when there's just one, so
+    the one-person reads keep working."""
+    if shares and (tx.transaction_type != TransactionType.debit or tx.source == CONTACT_SOURCE):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="shares_need_own_debit"
+        )
+    ids = [s.contact_id for s in shares]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="duplicate_share_contact"
+        )
+    for contact_id in set(ids):
+        await _own_contact(db, user_id, contact_id)
+    tx.shares = [TransactionShare(contact_id=s.contact_id, amount=s.amount) for s in shares]
+    tx.shared_amount = sum((s.amount for s in shares), Decimal("0")) or None
+    tx.contact_id = ids[0] if len(ids) == 1 else None
 
 
 async def _own_contact(db: DbSession, user_id: uuid.UUID, contact_id: uuid.UUID) -> None:
@@ -462,6 +484,11 @@ async def update_transaction(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="shared_needs_debit"
             )
         tx.shared_amount = shared
+        if "shares" not in provided:
+            # The one-person form: any split it had is replaced.
+            tx.shares = []
+    if "shares" in provided:
+        await _set_shares(db, current_user.id, tx, payload.shares or [])
     if "debt_id" in provided:
         await _relink_debt(db, current_user.id, tx, payload.debt_id)
     if "contact_id" in provided:
@@ -472,7 +499,8 @@ async def update_transaction(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="contact_required"
             )
-        tx.contact_id = payload.contact_id
+        if not tx.shares:
+            tx.contact_id = payload.contact_id
     if tx.shared_amount is not None and tx.shared_amount > tx.amount:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="shared_exceeds_amount"

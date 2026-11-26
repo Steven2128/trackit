@@ -7,7 +7,8 @@ import { Alert } from "../utils/alert";
 import { BottomSheetTextInput } from "./sheet";
 
 type Props = {
-  value: string | null;
+  // One id, or several when picking many people (onChange then toggles).
+  value: string | null | string[];
   onChange: (id: string | null) => void;
   // Offer "Nadie" (unassign); off when a person is required.
   allowNone?: boolean;
@@ -16,6 +17,8 @@ type Props = {
 /** Chips with the user's contacts plus "+ Nueva" to add one inline. Lives
  * inside bottom sheets, hence BottomSheetTextInput. */
 export default function ContactPicker({ value, onChange, allowNone = true }: Props) {
+  const multi = Array.isArray(value);
+  const isActive = (id: string) => (multi ? value.includes(id) : value === id);
   const { data: contacts } = useContacts();
   const create = useCreateContact();
   const [adding, setAdding] = useState(false);
@@ -45,11 +48,11 @@ export default function ContactPicker({ value, onChange, allowNone = true }: Pro
   return (
     <View style={styles.wrap}>
       <View style={styles.chips}>
-        {allowNone ? (
+        {allowNone && !multi ? (
           <Chip label="Nadie" active={value === null} onPress={() => onChange(null)} />
         ) : null}
         {(contacts ?? []).map((c) => (
-          <Chip key={c.id} label={c.name} active={value === c.id} onPress={() => onChange(c.id)} />
+          <Chip key={c.id} label={c.name} active={isActive(c.id)} onPress={() => onChange(c.id)} />
         ))}
         {!adding ? <Chip label="+ Nueva" active={false} onPress={() => setAdding(true)} /> : null}
       </View>

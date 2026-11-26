@@ -27,7 +27,13 @@ export default function SharedExpensesCard() {
   if (!data || (people.length === 0 && !hasLegacy)) return null;
 
   const person = people.find((p) => p.contact_id === selected) ?? null;
-  const filtered = person ? data.items.filter((t) => t.contact_id === person.contact_id) : data.items;
+  const filtered = person
+    ? data.items.filter(
+        (t) =>
+          t.contact_id === person.contact_id ||
+          t.shares?.some((sh) => sh.contact_id === person.contact_id),
+      )
+    : data.items;
   const items = expanded ? filtered : filtered.slice(0, COLLAPSED);
 
   function settle(balance: number, contactId: string) {

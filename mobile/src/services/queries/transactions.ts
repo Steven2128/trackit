@@ -8,6 +8,9 @@ import { debtsQueryKey } from "./debts";
 
 export type TransactionType = "debit" | "credit";
 
+// One person's part of a debit split with several people.
+export type TransactionShare = { contact_id: string; amount: string };
+
 export type TransactionOut = {
   id: string;
   amount: string;
@@ -25,6 +28,8 @@ export type TransactionOut = {
   shared_amount: string | null;
   // Who it's shared with / paid back by. source "contact" = they paid it.
   contact_id: string | null;
+  // Split with several people: each one's part (sums to shared_amount).
+  shares?: TransactionShare[];
   // Typed in by the user: amount, day and deletion are editable.
   manual: boolean;
 };
@@ -96,6 +101,9 @@ export type TransactionPatch = {
   // Debits only: the hand-entered debt this paid (lowers its balance); null unlinks.
   debt_id?: string | null;
   contact_id?: string | null;
+  // Debits the user paid: one part per person; replaces shared_amount and
+  // contact_id (the backend sets shared_amount to the sum). [] = not shared.
+  shares?: { contact_id: string; amount: number }[];
 };
 
 /** A movement with no email (POST /transactions/manual). account "contact"

@@ -30,6 +30,7 @@ import CategoryIcon from "./CategoryIcon";
 import ContactPicker from "./ContactPicker";
 import ExpenseDayPicker from "./ExpenseDayPicker";
 import MoneyText from "./MoneyText";
+import ShareSplitEditor, { type ShareRow } from "./ShareSplitEditor";
 import { useWebSheet } from "./useWebSheet";
 
 // What else a category change applies to — "one" is just this movement.
@@ -66,6 +67,8 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   // Shared expense: the part someone else pays back (debits only).
   const [isShared, setIsShared] = useState(false);
   const [shared, setShared] = useState("");
+  // Debits the user paid: who they split it with and each one's part.
+  const [shareRows, setShareRows] = useState<ShareRow[]>([]);
   // Typed-in cash expenses: amount and day editable, and deletable. Bank rows mirror
   // their notification email, so their amount stays read-only.
   // Typed-in rows (cash, paybacks by "llave", what someone else paid) have no
@@ -86,7 +89,8 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   const canPickDebt =
     isDebit && transaction?.source !== "card" && selected === "debt_payment";
   // Who it's with: for a shared expense, money between people, or what they paid.
-  const pickContact = (isDebit && isShared) || selected === "reimbursement" || theyPaid;
+  // A split the user paid picks its people in ShareSplitEditor.
+  const pickContact = selected === "reimbursement" || theyPaid;
 
   useEffect(() => {
     if (transaction) {
@@ -100,6 +104,7 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       setShared(transaction.shared_amount ? toCOPInput(transaction.shared_amount) : "");
       setDebtId(transaction.debt_id);
       setContactId(transaction.contact_id);
+      setShareRows(initialShareRows(transaction));
     }
   }, [transaction]);
 
@@ -107,7 +112,6 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
   const total = isCash ? parseCOP(amount) : Math.round(Number(transaction?.amount ?? 0));
 
   function toggleShared() {
-    if (!isShared && !shared) setShared(toCOPInput(String(Math.round(total / 2))));
     setIsShared(!isShared);
   }
 
@@ -147,17 +151,33 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
       Alert.alert("Monto inválido", "Escribí un monto en pesos mayor a 0.");
       return;
     }
-    const sharedValue = isDebit && (isShared || theyPaid) ? parseCOP(shared) : 0;
+    const sharedValue = theyPaid ? parseCOP(shared) : 0;
     if (theyPaid && sharedValue > total) {
       Alert.alert("Parte inválida", "La parte de la otra persona no puede pasar del total.");
       return;
     }
-    if (!theyPaid && isDebit && isShared && (sharedValue <= 0 || sharedValue > total)) {
-      Alert.alert(
-        "Parte compartida inválida",
-        "Lo que pone la otra persona tiene que ser mayor a 0 y no pasar del monto.",
-      );
-      return;
+    // The split the user paid: sent only when it changed, so an old shared
+    // part with nobody assigned stays as it was until it's edited.
+    const nextShares =
+      isDebit && !theyPaid && isShared
+        ? shareRows.map((r) => ({ contact_id: r.contactId, amount: parseCOP(r.amount) }))
+        : [];
+    const sharesChanged =
+      isDebit &&
+      !theyPaid &&
+      (isShared !== !!transaction.shared_amount ||
+        sharesKey(nextShares) !== sharesKey(sharesOf(initialShareRows(transaction))));
+    if (sharesChanged && isShared) {
+      const sum = nextShares.reduce((acc, r) => acc + r.amount, 0);
+      if (nextShares.length === 0 || nextShares.some((r) => r.amount <= 0) || sum > total) {
+        Alert.alert(
+          "Parte compartida inválida",
+          nextShares.length === 0
+            ? "Elegí con quién lo compartís."
+            : "Cada parte tiene que ser mayor a 0 y entre todas no pasar del monto.",
+        );
+        return;
+      }
     }
     const previousShared = Math.round(Number(transaction.shared_amount ?? 0));
     // Leaving "Pago de deuda" unlinks it (the backend gives the amount back).
@@ -177,7 +197,8 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
         ...(isCash && daysAgo !== daysAgoOf(transaction.occurred_at)
           ? { occurred_at: expenseInstant(daysAgo) }
           : {}),
-        ...(isDebit && sharedValue !== previousShared ? { shared_amount: sharedValue } : {}),
+        ...(theyPaid && sharedValue !== previousShared ? { shared_amount: sharedValue } : {}),
+        ...(sharesChanged ? { shares: nextShares } : {}),
         ...(debtChanged ? { debt_id: nextDebtId } : {}),
         ...(pickContact && contactId !== transaction.contact_id ? { contact_id: contactId } : {}),
       },
@@ -421,27 +442,16 @@ export default function CategoryPickerSheet({ isVisible, transaction, onClose }:
                 color={isShared ? colors.primary : colors.textSecondary}
               />
               <Text style={styles.sharedToggleText}>
-                Lo comparto (otra persona me devuelve una parte)
+                Lo comparto (otras personas me devuelven una parte)
               </Text>
             </Pressable>
             {isShared ? (
-              <>
-                <Text style={styles.label}>Lo pone la otra persona (COP)</Text>
-                <BottomSheetTextInput
-                  style={styles.input}
-                  placeholder="0"
-                  placeholderTextColor={colors.textSecondary}
-                  value={shared}
-                  onChangeText={(v) => setShared(formatCOPInput(v))}
-                  keyboardType="number-pad"
-                  inputMode="numeric"
-                />
-                <Text style={styles.sharedHint}>
-                  Tu parte: <MoneyText value={String(Math.max(0, total - parseCOP(shared)))} size="sm" />
-                  {" "}— es lo que cuenta como gasto. Cuando te devuelva, marcá esa entrada
-                  como Reembolso.
-                </Text>
-              </>
+              <ShareSplitEditor
+                key={transaction?.id}
+                total={total}
+                rows={shareRows}
+                onChange={setShareRows}
+              />
             ) : null}
           </>
         ) : null}
@@ -621,3 +631,26 @@ const styles = StyleSheet.create({
     borderColor: colors.danger,
   },
 });
+
+/** The people a debit is split with, as editable rows: its saved split, or
+ * the one person of an older shared expense. */
+function initialShareRows(tx: TransactionOut): ShareRow[] {
+  if (tx.shares && tx.shares.length > 0) {
+    return tx.shares.map((sh) => ({ contactId: sh.contact_id, amount: toCOPInput(sh.amount) }));
+  }
+  if (tx.shared_amount && tx.contact_id && tx.source !== "contact") {
+    return [{ contactId: tx.contact_id, amount: toCOPInput(tx.shared_amount) }];
+  }
+  return [];
+}
+
+function sharesOf(rows: ShareRow[]) {
+  return rows.map((r) => ({ contact_id: r.contactId, amount: parseCOP(r.amount) }));
+}
+
+function sharesKey(shares: { contact_id: string; amount: number }[]): string {
+  return shares
+    .map((sh) => `${sh.contact_id}:${sh.amount}`)
+    .sort()
+    .join("|");
+}

@@ -24,6 +24,18 @@ def check_expense_date(value: datetime | None) -> datetime | None:
     return value
 
 
+class ShareOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    contact_id: uuid.UUID
+    amount: Decimal
+
+
+class ShareIn(BaseModel):
+    contact_id: uuid.UUID
+    amount: Decimal = Field(..., gt=0, le=MAX_NUMERIC_12_2)
+
+
 class TransactionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -44,6 +56,9 @@ class TransactionOut(BaseModel):
     shared_amount: Decimal | None = None
     # Who it's shared with / paid back by (services/contact_balance.py).
     contact_id: uuid.UUID | None = None
+    # A debit split with several people: each one's part (sums to
+    # shared_amount). Empty when shared with one person the old way.
+    shares: list[ShareOut] = []
     # Typed in by the user (no email): amount, date and deletion editable.
     manual: bool = False
 
@@ -66,6 +81,9 @@ class TransactionUpdate(BaseModel):
     debt_id: uuid.UUID | None = None
     # Who it's shared with or paid back by; None clears it.
     contact_id: uuid.UUID | None = None
+    # Debits the user paid: split among these people, one part each. Replaces
+    # shared_amount/contact_id (shared_amount becomes the sum); [] = not shared.
+    shares: list[ShareIn] | None = Field(default=None, max_length=20)
 
     _occurred_at = field_validator("occurred_at")(check_expense_date)
 

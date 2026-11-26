@@ -16,9 +16,10 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.transaction_share import TransactionShare
 
 
 class TransactionType(str, enum.Enum):
@@ -92,6 +93,13 @@ class Transaction(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # A debit split with several people: one part per person. When set,
+    # shared_amount is their sum and the balances read these instead of
+    # contact_id (services/contact_balance.py). Loaded eagerly so async
+    # code can read it without a lazy load.
+    shares: Mapped[list[TransactionShare]] = relationship(
+        lazy="selectin", cascade="all, delete-orphan"
     )
 
     @property
