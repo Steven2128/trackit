@@ -51,6 +51,10 @@ from app.services.net_worth import (
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
+# ?category= value for movements with no category ("Sin categoría"). A real
+# category slug never starts with "_" (slugify strips it).
+UNCATEGORIZED = "__none__"
+
 # "reimbursement": money between the user and a contact — paying back their
 # part of a shared expense, or lending — is neither income nor spending
 # (see Transaction.shared_amount and services/contact_balance.py).
@@ -82,7 +86,9 @@ async def list_transactions(
 ) -> TransactionListResponse:
     filters = [Transaction.user_id == current_user.id]
     filters.extend(month_filter(month))
-    if category is not None:
+    if category == UNCATEGORIZED:
+        filters.append(Transaction.category.is_(None))
+    elif category is not None:
         filters.append(Transaction.category == category)
     if type is not None:
         filters.append(Transaction.transaction_type == type)

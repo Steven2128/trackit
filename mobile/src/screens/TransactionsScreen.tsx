@@ -31,6 +31,7 @@ import {
   EXCLUDED_FROM_SPENT,
   INTERNAL_CATEGORIES,
   customCategoryKeys,
+  UNCATEGORIZED,
   getCategory,
   ownAmount,
 } from "../utils/categories";
@@ -66,7 +67,9 @@ export default function TransactionsScreen() {
   const route = useRoute<RouteProp<AppTabParamList, "Transactions">>();
   useEffect(() => {
     if (route.params && "category" in route.params) {
-      setCategory(route.params.category ?? null);
+      const param = route.params.category ?? null;
+      // Older links sent "null" for the uncategorized row.
+      setCategory(param === "null" ? UNCATEGORIZED : param);
     }
   }, [route.params]);
 
@@ -305,6 +308,11 @@ export default function TransactionsScreen() {
             <Text style={styles.filterGroupLabel}>Categoría</Text>
             <View style={styles.chipsWrap}>
               <Chip label="Todas" active={category === null} onPress={() => setCategory(null)} />
+              <Chip
+                label="Sin categoría"
+                active={category === UNCATEGORIZED}
+                onPress={() => setCategory(UNCATEGORIZED)}
+              />
               {FILTERABLE.map((c) => (
                 <Chip
                   key={c.key}

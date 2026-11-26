@@ -57,11 +57,15 @@ const LOAN: CategoryDef = {
 
 /** Display info for a category. Pass the movement's type so a debit
  * "reimbursement" reads as "Préstamo". */
+// Filter value for movements with no category (GET /transactions
+// ?category=__none__). Never a real slug: slugifyCategory strips "_" edges.
+export const UNCATEGORIZED = "__none__";
+
 export function getCategory(
   key: string | null | undefined,
   type?: "debit" | "credit",
 ): CategoryDef {
-  if (!key) return FALLBACK;
+  if (!key || key === UNCATEGORIZED) return FALLBACK;
   if (key === "reimbursement" && type === "debit") return LOAN;
   const found = CATEGORIES.find((c) => c.key === key);
   if (found) return found;

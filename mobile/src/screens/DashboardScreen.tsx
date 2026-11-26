@@ -34,7 +34,7 @@ import { useGoals } from "../services/queries/goals";
 import { useAuthStore } from "../store/auth";
 import { colors } from "../theme/colors";
 import { pageStyle, useIsWide } from "../theme/layout";
-import { getCategory } from "../utils/categories";
+import { UNCATEGORIZED, getCategory } from "../utils/categories";
 import { humanizeMonth } from "../utils/dates";
 
 const TOP_CATEGORIES = 5;
@@ -180,7 +180,9 @@ function DashboardContent({
             <Pressable
               key={`${c.category ?? "null"}-${i}`}
               style={({ pressed }) => [styles.catRow, pressed && styles.pressed]}
-              onPress={() => tabNavigation.navigate("Transactions", { category: c.category })}
+              onPress={() =>
+                tabNavigation.navigate("Transactions", { category: c.category ?? UNCATEGORIZED })
+              }
               accessibilityLabel={`Ver movimientos de ${cat.label}`}
             >
               <CategoryIcon categoryKey={c.category} />
